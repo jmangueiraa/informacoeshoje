@@ -86,8 +86,9 @@ function AuthPage() {
             </Button>
           </div>
         </CardContent>
-        <CardFooter className="flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
-          Ao continuar, você concorda com nossos termos de uso.
+        <CardFooter className="flex flex-col items-center justify-center gap-2 text-sm text-muted-foreground border-t pt-4">
+          <p>Ao continuar, você concorda com nossos termos de uso.</p>
+          <p className="text-xs opacity-70 mt-1">Criado pela empresa de entretenimento AJP-19981356505</p>
         </CardFooter>
       </Card>
     </div>
