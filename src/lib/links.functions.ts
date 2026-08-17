@@ -198,3 +198,30 @@ export const updateProfileDomain = createServerFn({ method: "POST" })
 
     return { success: true };
   });
+
+export const updateProfileSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: unknown) => z.object({
+    shopee_app_id: z.string().optional(),
+    shopee_app_secret: z.string().optional(),
+    shopee_api_key: z.string().optional(),
+    full_name: z.string().optional(),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { userId, supabase: authenticatedSupabase } = context;
+
+    // Remove undefined values to satisfy strict types if necessary
+    const updateData: any = {};
+    if (data.shopee_app_id !== undefined) updateData.shopee_app_id = data.shopee_app_id;
+    if (data.shopee_app_secret !== undefined) updateData.shopee_app_secret = data.shopee_app_secret;
+    if (data.shopee_api_key !== undefined) updateData.shopee_api_key = data.shopee_api_key;
+    if (data.full_name !== undefined) updateData.full_name = data.full_name;
+
+    const { error } = await authenticatedSupabase
+      .from("profiles")
+      .update(updateData)
+      .eq("id", userId);
+
+    if (error) return { error: error.message };
+    return { success: true };
+  });

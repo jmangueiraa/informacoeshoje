@@ -16,6 +16,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedLinksRouteImport } from './routes/_authenticated/links'
 import { Route as AuthenticatedPlayGeneratorRouteImport } from './routes/_authenticated/play-generator'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -52,6 +53,11 @@ const AuthenticatedPlayGeneratorRoute =
     path: '/play-generator',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/links': typeof AuthenticatedLinksRoute
   '/play-generator': typeof AuthenticatedPlayGeneratorRoute
+  '/settings': typeof AuthenticatedSettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -68,6 +75,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/links': typeof AuthenticatedLinksRoute
   '/play-generator': typeof AuthenticatedPlayGeneratorRoute
+  '/settings': typeof AuthenticatedSettingsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -78,13 +86,27 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/links': typeof AuthenticatedLinksRoute
   '/_authenticated/play-generator': typeof AuthenticatedPlayGeneratorRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/$slug' | '/auth' | '/dashboard' | '/links' | '/play-generator'
+    | '/'
+    | '/$slug'
+    | '/auth'
+    | '/dashboard'
+    | '/links'
+    | '/play-generator'
+    | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/$slug' | '/auth' | '/dashboard' | '/links' | '/play-generator'
+  to:
+    | '/'
+    | '/$slug'
+    | '/auth'
+    | '/dashboard'
+    | '/links'
+    | '/play-generator'
+    | '/settings'
   id:
     | '__root__'
     | '/'
@@ -94,6 +116,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/links'
     | '/_authenticated/play-generator'
+    | '/_authenticated/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -154,6 +177,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPlayGeneratorRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
@@ -161,12 +191,14 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedLinksRoute: typeof AuthenticatedLinksRoute
   AuthenticatedPlayGeneratorRoute: typeof AuthenticatedPlayGeneratorRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedLinksRoute: AuthenticatedLinksRoute,
   AuthenticatedPlayGeneratorRoute: AuthenticatedPlayGeneratorRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

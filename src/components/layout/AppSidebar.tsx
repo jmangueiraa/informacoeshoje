@@ -97,8 +97,8 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link to="/dashboard" className="flex items-center gap-3 py-2">
+            <SidebarMenuButton asChild tooltip="Configurações">
+              <Link to="/settings" className="flex items-center gap-3 py-2">
                 <Settings className="h-5 w-5" />
                 <span>Configurações</span>
               </Link>

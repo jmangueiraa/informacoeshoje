@@ -195,6 +195,9 @@ export type Database = {
           full_name: string | null
           id: string
           plan_id: string | null
+          shopee_api_key: string | null
+          shopee_app_id: string | null
+          shopee_app_secret: string | null
           status: string | null
           updated_at: string
           username: string | null
@@ -206,6 +209,9 @@ export type Database = {
           full_name?: string | null
           id: string
           plan_id?: string | null
+          shopee_api_key?: string | null
+          shopee_app_id?: string | null
+          shopee_app_secret?: string | null
           status?: string | null
           updated_at?: string
           username?: string | null
@@ -217,6 +223,9 @@ export type Database = {
           full_name?: string | null
           id?: string
           plan_id?: string | null
+          shopee_api_key?: string | null
+          shopee_app_id?: string | null
+          shopee_app_secret?: string | null
           status?: string | null
           updated_at?: string
           username?: string | null
