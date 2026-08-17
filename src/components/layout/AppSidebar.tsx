@@ -53,7 +53,7 @@ export function AppSidebar() {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Meus Links">
-                  <Link to="/dashboard" className="flex items-center gap-3 py-2">
+                  <Link to="/links" className="flex items-center gap-3 py-2">
                     <Link2 className="h-5 w-5" />
                     <span>Meus Links</span>
                   </Link>
@@ -61,7 +61,7 @@ export function AppSidebar() {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Criar Link">
-                  <Link to="/dashboard" className="flex items-center gap-3 py-2">
+                  <Link to="/links" className="flex items-center gap-3 py-2">
                     <PlusCircle className="h-5 w-5 text-primary" />
                     <span>Criar Link</span>
                   </Link>
@@ -69,7 +69,7 @@ export function AppSidebar() {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Estatísticas">
-                  <Link to="/dashboard" className="flex items-center gap-3 py-2">
+                  <Link to="/links" className="flex items-center gap-3 py-2">
                     <BarChart3 className="h-5 w-5" />
                     <span>Estatísticas</span>
                   </Link>
@@ -91,7 +91,7 @@ export function AppSidebar() {
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link to="/dashboard" className="flex items-center gap-3">
+              <Link to="/dashboard" className="flex items-center gap-3 py-2">
                 <Settings className="h-5 w-5" />
                 <span>Configurações</span>
               </Link>
