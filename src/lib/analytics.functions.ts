@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { UAParser } from "ua-parser-js";
 
 export const registerClick = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({
+  .validator((data: unknown) => z.object({
     slug: z.string(),
     host: z.string().optional(),
     userAgent: z.string().optional(),
