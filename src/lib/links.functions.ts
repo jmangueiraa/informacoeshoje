@@ -47,12 +47,17 @@ export const createCustomLink = createServerFn({ method: "POST" })
       console.error("Erro ao buscar perfil:", profileError);
     }
 
+    // Cast profile as any since TypeScript doesn't know about the new trial columns yet
+    const profileAny = profile as any;
+    const trialExpiresAt = profileAny?.trial_expires_at;
+    const isTrial = profileAny?.is_trial;
+
     // Lógica de Trial e Limite de Links
     const now = new Date();
-    const isTrialActive = profile?.is_trial && profile.trial_expires_at && new Date(profile.trial_expires_at) > now;
+    const isTrialActive = isTrial && trialExpiresAt && new Date(trialExpiresAt) > now;
     
     // Se o trial expirou e o usuário ainda está marcado como trial
-    if (profile?.is_trial && profile.trial_expires_at && new Date(profile.trial_expires_at) <= now) {
+    if (isTrial && trialExpiresAt && new Date(trialExpiresAt) <= now) {
       console.log("Trial expirado para o usuário:", userId);
     }
 
@@ -66,12 +71,12 @@ export const createCustomLink = createServerFn({ method: "POST" })
     }
 
     // Regra: Novos usuários têm 10 links durante o trial de 24h.
-    const maxLinks = isTrialActive ? 10 : ((profile?.plans as any)?.max_links || 0);
+    const maxLinks = isTrialActive ? 10 : (profileAny?.plans?.max_links || 0);
 
     if (count !== null && count >= maxLinks) {
       if (isTrialActive) {
         throw new Error(`Limite de links do período de teste atingido (Máximo: 10).`);
-      } else if (profile?.is_trial) {
+      } else if (isTrial) {
         throw new Error(`Seu período de teste de 24 horas expirou. Assine um plano para continuar criando links.`);
       } else {
         throw new Error(`Limite de links atingido para o plano atual (${maxLinks}).`);
