@@ -35,8 +35,7 @@ const TRENDS_MOCK = [
 
 export const getTrendingTopics = createServerFn({ method: "GET" })
   .handler(async () => {
-    // Em um cenário real, aqui chamaríamos uma API externa (Google Trends, etc.)
-    // E atualizaríamos o banco de dados. Para o MVP, usaremos mocks e salvaremos no DB.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     
     const { data: existing } = await supabaseAdmin
       .from('trending_topics')
@@ -46,7 +45,7 @@ export const getTrendingTopics = createServerFn({ method: "GET" })
     if (!existing || existing.length === 0) {
       await supabaseAdmin
         .from('trending_topics')
-        .insert(TRENDS_MOCK);
+        .upsert(TRENDS_MOCK, { onConflict: 'subject' });
     }
 
     const { data, error } = await supabaseAdmin
@@ -60,10 +59,9 @@ export const getTrendingTopics = createServerFn({ method: "GET" })
 
 export const refreshTrendingTopics = createServerFn({ method: "POST" })
   .handler(async () => {
-    // Limpa e recarrega para simular atualização
-    await supabaseAdmin.from('trending_topics').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     
-    // Simula variação nas menções
+    // Simula variação nas menções mantendo os mesmos assuntos (únicos)
     const updatedMock = TRENDS_MOCK.map(t => ({
       ...t,
       mentions: Math.floor(t.mentions * (0.8 + Math.random() * 0.4)),
@@ -72,7 +70,7 @@ export const refreshTrendingTopics = createServerFn({ method: "POST" })
 
     const { data, error } = await supabaseAdmin
       .from('trending_topics')
-      .insert(updatedMock)
+      .upsert(updatedMock, { onConflict: 'subject' })
       .select();
 
     if (error) throw error;

@@ -77,7 +77,12 @@ export const getViralContent = createServerFn({ method: "GET" })
     if (error) throw error;
     
     if (!results || results.length === 0) {
-      await supabaseAdmin.from('viral_contents').insert(TRENDING_MOCK);
+      // Usando upsert para garantir unicidade baseada no 'subject' (que agora tem restrição UNIQUE)
+      await supabaseAdmin.from('viral_contents').upsert(
+        TRENDING_MOCK, 
+        { onConflict: 'subject' }
+      );
+      
       const { data: seeded } = await supabaseAdmin.from('viral_contents').select('*').order('score', { ascending: false });
       return seeded || [];
     }

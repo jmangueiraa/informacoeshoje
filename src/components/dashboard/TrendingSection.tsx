@@ -65,7 +65,9 @@ export function TrendingSection() {
             <Card key={i} className="animate-pulse bg-muted/50 h-64" />
           ))
         ) : (
-          trends?.map((trend) => (
+          trends?.filter((item, index, self) => 
+            index === self.findIndex((t) => t.subject === item.subject)
+          ).map((trend) => (
             <Card key={trend.id} className="overflow-hidden group hover:border-primary/50 transition-colors">
               <div className="aspect-video relative overflow-hidden bg-muted">
                 {trend.image_url ? (

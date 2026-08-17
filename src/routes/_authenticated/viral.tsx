@@ -111,7 +111,9 @@ function ViralAgoraPage() {
                 </CardContent>
               </Card>
             ))
-          ) : contents?.map((item) => (
+          ) : contents?.filter((item, index, self) => 
+            index === self.findIndex((t) => t.subject === item.subject)
+          ).map((item) => (
             <Card key={item.id} className="group overflow-hidden border-border/50 hover:border-primary/50 transition-all hover:shadow-xl hover:-translate-y-1">
               <div className="relative aspect-video overflow-hidden bg-muted">
                 {item.image_url && (
