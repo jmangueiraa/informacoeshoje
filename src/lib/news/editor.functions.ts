@@ -4,7 +4,7 @@ import { z } from "zod";
 export const generateViralContentFromImage = createServerFn({ method: "POST" })
   .validator((data: { imageUrl: string }) => z.object({ imageUrl: z.string() }).parse(data))
   .handler(async ({ data }) => {
-    const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
+    const LOVABLE_API_KEY = process.env['LOVABLE_API_KEY'];
     
     if (!LOVABLE_API_KEY) {
       // Fallback in case API key is missing during transition
