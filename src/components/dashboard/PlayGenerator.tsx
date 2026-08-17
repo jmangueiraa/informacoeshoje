@@ -46,7 +46,7 @@ export function PlayGenerator() {
   const [playPos, setPlayPos] = useState({ x: 50, y: 50 });
   const [size, setSize] = useState(100);
   const [opacity, setOpacity] = useState(80);
-  const [style, setStyle] = useState<PlayStyle>(PLAY_STYLES[0]);
+  const [style, setStyle] = useState<PlayStyle>(PLAY_STYLES[0]!);
   const [quality, setQuality] = useState(90);
   const [format, setFormat] = useState<'image/jpeg' | 'image/png' | 'image/webp'>('image/jpeg');
   
