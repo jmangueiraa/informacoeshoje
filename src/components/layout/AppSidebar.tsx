@@ -1,5 +1,5 @@
 import * as React from "react"
-import { LayoutDashboard, PlusCircle, Link2, BarChart3, Settings, LogOut, CreditCard, Video, ShieldAlert } from "lucide-react"
+import { LayoutDashboard, PlusCircle, Link2, BarChart3, Settings, LogOut, CreditCard, Video, ShieldAlert, Globe } from "lucide-react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import { supabase } from "@/integrations/supabase/client"
 import {
