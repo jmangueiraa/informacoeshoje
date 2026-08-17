@@ -104,7 +104,8 @@ export const getAdminDomains = createServerFn({ method: "GET" })
         *,
         profiles (
           full_name,
-          username
+          username,
+          email
         )
       `)
       .order('created_at', { ascending: false });

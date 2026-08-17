@@ -164,10 +164,10 @@ function SettingsPage() {
           <CardHeader className="bg-primary/5">
             <CardTitle className="flex items-center gap-2">
               <Globe className="h-5 w-5 text-primary" />
-              🌐 Domínio do Usuário
+              🌐 Domínio para seus Links
             </CardTitle>
             <CardDescription>
-              Configure um domínio próprio para acessar suas páginas e links.
+              Cadastre um domínio próprio para personalizar os links que você gerar.
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6 space-y-6">
@@ -322,8 +322,8 @@ function SettingsPage() {
                       {/* DNS INSTRUCTIONS FOR CUSTOM DOMAIN */}
                       {d.domain_type === 'custom' && d.verification_status !== 'verified' && (
                         <div className="w-full mt-4 p-3 bg-muted/50 rounded-md border border-dashed text-xs space-y-2 col-span-full">
-                          <p className="font-semibold flex items-center gap-1">
-                            <Shield className="h-3 w-3" /> Instruções DNS:
+                          <p className="font-semibold flex items-center gap-1 text-amber-600">
+                            <Shield className="h-3 w-3" /> 🟡 Aguardando configuração DNS
                           </p>
                           <div className="grid grid-cols-3 gap-2 bg-background p-2 rounded border">
                             <div>
@@ -336,11 +336,27 @@ function SettingsPage() {
                             </div>
                             <div>
                               <span className="text-muted-foreground uppercase text-[10px]">Destino</span>
-                              <p className="font-mono">noticiasviraisctv.lovable.app</p>
+                              <p className="font-mono">{PLATFORM_DOMAIN}</p>
                             </div>
                           </div>
                           <p className="text-[10px] text-muted-foreground">
                             * Após configurar no seu provedor, aguarde alguns minutos e clique em "Verificar DNS".
+                          </p>
+                        </div>
+                      )}
+                      
+                      {d.domain_type === 'custom' && d.verification_status === 'verified' && (
+                        <div className="w-full mt-2 text-xs col-span-full">
+                           <p className="font-semibold flex items-center gap-1 text-green-600">
+                            <CheckCircle2 className="h-3 w-3" /> 🟢 Domínio verificado
+                          </p>
+                        </div>
+                      )}
+
+                      {d.domain_type === 'custom' && d.verification_status === 'failed' && (
+                        <div className="w-full mt-2 text-xs col-span-full">
+                           <p className="font-semibold flex items-center gap-1 text-red-600">
+                            <AlertCircle className="h-3 w-3" /> 🔴 DNS não configurado
                           </p>
                         </div>
                       )}

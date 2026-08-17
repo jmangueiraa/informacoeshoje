@@ -83,7 +83,7 @@ function AdminDomainsPage() {
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm">
                           <User className="h-3 w-3 text-muted-foreground" />
-                          {d.profiles?.full_name || d.profiles?.username || 'Usuário Desconhecido'}
+                          {d.profiles?.full_name || d.profiles?.email || 'Usuário Desconhecido'}
                         </div>
                       </TableCell>
                       <TableCell>

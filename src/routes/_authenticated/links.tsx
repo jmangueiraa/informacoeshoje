@@ -49,7 +49,7 @@ function LinksPage() {
   const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [newLink, setNewLink] = useState<{ title: string; slug: string; affiliate_url: string; custom_domain: string | null }>({ title: '', slug: '', affiliate_url: '', custom_domain: '' })
+  const [newLink, setNewLink] = useState<{ title: string; slug: string; affiliate_url: string; domain_id: string | null }>({ title: '', slug: '', affiliate_url: '', domain_id: null })
   
   const queryClient = useQueryClient()
 
@@ -58,33 +58,28 @@ function LinksPage() {
     queryFn: () => getUserProfile(),
   })
 
-  // Sincronizar o domínio do perfil com o novo link ao abrir o diálogo
+  // Buscar domínios do usuário para o formulário
+  const { data: domains } = useQuery({
+    queryKey: ['user-domains'],
+    queryFn: () => getUserDomains(),
+  })
+
+  // Sincronizar o domínio principal ao abrir o diálogo
   useEffect(() => {
-    if (profile && !('error' in profile) && profile.custom_domain && !newLink.custom_domain) {
-      setNewLink(prev => ({ ...prev, custom_domain: profile.custom_domain }));
+    if (domains && domains.length > 0 && !newLink.domain_id && isCreateOpen) {
+      const primary = domains.find((d: any) => d.is_primary && d.verification_status === 'verified')
+      if (primary) {
+        setNewLink(prev => ({ ...prev, domain_id: primary.id }));
+      }
     }
-  }, [profile, isCreateOpen]);
+  }, [domains, isCreateOpen]);
 
   const { data: links, isLoading } = useQuery({
     queryKey: ['user-links'],
     queryFn: () => getUserLinks(),
   })
 
-  const updateDomainMutation = useMutation({
-    mutationFn: (domain: string) => updateProfileDomain({ data: { domain } }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user-profile'] });
-    }
-  });
-
-  // Garantir que o domínio noticiasviraisctv.lovable.app esteja configurado se solicitado
-  useEffect(() => {
-    if (profile && !('error' in profile) && !profile.custom_domain) {
-      // Aqui poderíamos forçar a atualização, mas vamos apenas garantir que a UI o use se o usuário desejar
-      // Como o usuário respondeu que quer noticiasviraisctv.lovable.app como padrão:
-      updateDomainMutation.mutate('noticiasviraisctv.lovable.app');
-    }
-  }, [profile]);
+  // A atualização automática de domínio foi removida para respeitar a nova lógica de user_domains
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -95,7 +90,7 @@ function LinksPage() {
             affiliateUrl: data.affiliate_url,
             slug: data.slug,
             title: data.title || undefined,
-            customDomain: data.custom_domain || null
+            domainId: data.domain_id || null
           }
         });
         return result;
@@ -111,7 +106,7 @@ function LinksPage() {
         queryClient.invalidateQueries({ queryKey: ['user-links'] })
         toast.success("Link criado com sucesso!")
         setIsCreateOpen(false)
-        setNewLink({ title: '', slug: '', affiliate_url: '', custom_domain: '' })
+        setNewLink({ title: '', slug: '', affiliate_url: '', domain_id: null })
       }
     },
     onError: (error: any) => {
@@ -129,8 +124,19 @@ function LinksPage() {
   })
 
   const copyToClipboard = (link: any) => {
-    const domain = link.custom_domain || window.location.origin
-    const url = domain.startsWith('http') ? `${domain}/${link.slug}` : `https://${domain}/${link.slug}`
+    let baseUrl = window.location.origin
+    
+    // Se o link tem um domínio associado e ele está verificado (a info viria no join do link se necessário)
+    // Para simplificar, usamos o domínio principal do usuário se disponível
+    const userPrimaryDomain = domains?.find((d: any) => d.is_primary && d.verification_status === 'verified')
+    
+    if (userPrimaryDomain) {
+      baseUrl = userPrimaryDomain.domain.startsWith('http') 
+        ? userPrimaryDomain.domain 
+        : `https://${userPrimaryDomain.domain}`
+    }
+
+    const url = `${baseUrl}/${link.slug}`
     navigator.clipboard.writeText(url)
     toast.success("Link copiado!")
   }
@@ -185,7 +191,7 @@ function LinksPage() {
                 <Label htmlFor="slug">Slug Personalizado</Label>
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground text-sm shrink-0">
-                    {newLink.custom_domain || "linkafiliado.app"}/
+                    {domains?.find((d: any) => d.id === newLink.domain_id)?.domain || "linkafiliado.app"}/
                   </span>
                   <Input 
                     id="slug" 
@@ -196,15 +202,20 @@ function LinksPage() {
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="custom_domain">Domínio Personalizado (Opcional)</Label>
-                <Input 
-                  id="custom_domain" 
-                  placeholder="noticiasviraisctv.lovable.app" 
-                  value={newLink.custom_domain || ''}
-                  onChange={(e) => setNewLink({...newLink, custom_domain: e.target.value})}
-                />
+                <Label htmlFor="domain_id">Domínio para este Link</Label>
+                <select 
+                  id="domain_id"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={newLink.domain_id || ''}
+                  onChange={(e) => setNewLink({...newLink, domain_id: e.target.value || null})}
+                >
+                  <option value="">Padrão da Plataforma</option>
+                  {domains?.filter((d: any) => d.verification_status === 'verified').map((d: any) => (
+                    <option key={d.id} value={d.id}>{d.domain}</option>
+                  ))}
+                </select>
                 <p className="text-[10px] text-muted-foreground">
-                  Apenas para usuários Premium. Configure seu domínio `noticiasviraisctv.lovable.app` com um registro CNAME apontando para `noticiasviraisctv.lovable.app`.
+                  Selecione um domínio verificado ou use o padrão da plataforma.
                 </p>
               </div>
             </div>
@@ -292,8 +303,14 @@ function LinksPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Ações</DropdownMenuLabel>
                           <DropdownMenuItem onClick={() => {
-                            const domain = link.custom_domain || window.location.origin
-                            const url = domain.startsWith('http') ? `${domain}/${link.slug}` : `https://${domain}/${link.slug}`
+                            const userPrimaryDomain = domains?.find((d: any) => d.is_primary && d.verification_status === 'verified')
+                            let baseUrl = window.location.origin
+                            if (userPrimaryDomain) {
+                              baseUrl = userPrimaryDomain.domain.startsWith('http') 
+                                ? userPrimaryDomain.domain 
+                                : `https://${userPrimaryDomain.domain}`
+                            }
+                            const url = `${baseUrl}/${link.slug}`
                             window.open(url, '_blank', 'noopener,noreferrer')
                           }} className="gap-2">
                             <ExternalLink className="h-4 w-4" /> Abrir Link
