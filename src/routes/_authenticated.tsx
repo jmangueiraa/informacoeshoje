@@ -28,8 +28,9 @@ export const Route = createFileRoute('/_authenticated')({
 
       // No session found after checks, redirect to auth
       throw redirect({
-        to: '/auth',
+        to: '/',
         search: {
+          // @ts-ignore - redirect is a valid search param defined in src/routes/index.tsx
           redirect: location.href,
         },
       })

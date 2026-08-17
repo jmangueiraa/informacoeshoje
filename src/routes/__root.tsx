@@ -131,9 +131,9 @@ function RootComponent() {
       if (event === 'SIGNED_OUT') {
         queryClient.clear();
         // Only navigate if we are currently in an authenticated route and not in the process of a new login
-        const isAuthPage = window.location.pathname === '/auth';
+        const isAuthPage = window.location.pathname === '/';
         if (!isAuthPage) {
-          router.navigate({ to: '/auth' });
+          router.navigate({ to: '/' });
         }
       }
     });
