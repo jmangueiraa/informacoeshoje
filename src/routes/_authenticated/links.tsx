@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getUserLinks, createLink, deleteLink, updateLink } from '@/lib/links.functions'
+import { getUserLinks, createCustomLink, deleteLink, toggleLinkStatus } from '@/lib/links.functions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
