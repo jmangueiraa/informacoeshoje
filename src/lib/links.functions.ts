@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const createLinkSchema = z.object({
   affiliateUrl: z.string().url().refine(url => url.includes('shopee.com.br'), {
@@ -27,18 +28,16 @@ export const checkSlugAvailability = createServerFn({ method: "GET" })
     return !data;
   });
 
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-
 export const createCustomLink = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => createLinkSchema.parse(data))
   .handler(async ({ data, context }) => {
-    const { userId } = context;
+    const { userId, supabase: authenticatedSupabase } = context;
 
     console.log("Criando link para usuário:", userId);
 
     // Buscar perfil para verificar limite e plano
-    let { data: profile, error: profileError } = await supabase
+    let { data: profile, error: profileError } = await authenticatedSupabase
       .from("profiles")
       .select("plan_id, plans(max_links)")
       .eq("id", userId)
@@ -51,16 +50,16 @@ export const createCustomLink = createServerFn({ method: "POST" })
     // Se o perfil não tem plano, atribuir o plano gratuito por padrão
     if (!profile?.plan_id) {
       console.log("Usuário sem plano. Atribuindo plano gratuito.");
-      const { data: freePlan } = await supabase
+      const { data: freePlan } = await authenticatedSupabase
         .from("plans")
         .select("id")
         .eq("name", "Gratuito")
         .single();
       
       if (freePlan) {
-        await supabase.from("profiles").update({ plan_id: freePlan.id }).eq("id", userId);
+        await authenticatedSupabase.from("profiles").update({ plan_id: freePlan.id }).eq("id", userId);
         // Recarregar perfil
-        const { data: updatedProfile } = await supabase
+        const { data: updatedProfile } = await authenticatedSupabase
           .from("profiles")
           .select("plan_id, plans(max_links)")
           .eq("id", userId)
@@ -69,7 +68,7 @@ export const createCustomLink = createServerFn({ method: "POST" })
       }
     }
 
-    const { count, error: countError } = await supabase
+    const { count, error: countError } = await authenticatedSupabase
       .from("links")
       .select("*", { count: 'exact', head: true })
       .eq("user_id", userId);
@@ -95,7 +94,7 @@ export const createCustomLink = createServerFn({ method: "POST" })
 
     console.log("Dados de inserção:", insertData);
 
-    const { data: link, error } = await supabase
+    const { data: link, error } = await authenticatedSupabase
       .from("links")
       .insert(insertData)
       .select()
@@ -113,9 +112,9 @@ export const createCustomLink = createServerFn({ method: "POST" })
 export const getUserLinks = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { userId } = context;
+    const { userId, supabase: authenticatedSupabase } = context;
 
-    const { data, error } = await supabase
+    const { data, error } = await authenticatedSupabase
       .from("links")
       .select("*")
       .eq("user_id", userId)
@@ -129,9 +128,9 @@ export const deleteLink = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((id: unknown) => z.string().parse(id))
   .handler(async ({ data: id, context }) => {
-    const { userId } = context;
+    const { userId, supabase: authenticatedSupabase } = context;
 
-    const { error } = await supabase
+    const { error } = await authenticatedSupabase
       .from("links")
       .delete()
       .eq("id", id)
@@ -145,9 +144,9 @@ export const toggleLinkStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => z.object({ id: z.string(), status: z.enum(['active', 'inactive']) }).parse(data))
   .handler(async ({ data, context }) => {
-    const { userId } = context;
+    const { userId, supabase: authenticatedSupabase } = context;
 
-    const { error } = await supabase
+    const { error } = await authenticatedSupabase
       .from("links")
       .update({ status: data.status })
       .eq("id", data.id)
@@ -160,9 +159,9 @@ export const toggleLinkStatus = createServerFn({ method: "POST" })
 export const getUserProfile = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { userId } = context;
+    const { userId, supabase: authenticatedSupabase } = context;
 
-    const { data: profile, error } = await supabase
+    const { data: profile, error } = await authenticatedSupabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
@@ -176,10 +175,10 @@ export const updateProfileDomain = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => z.object({ domain: z.string() }).parse(data))
   .handler(async ({ data, context }) => {
-    const { userId } = context;
+    const { userId, supabase: authenticatedSupabase } = context;
 
     // 1. Atualizar o domínio no perfil
-    const { error: profileError } = await supabase
+    const { error: profileError } = await authenticatedSupabase
       .from("profiles")
       .update({ custom_domain: data.domain })
       .eq("id", userId);
@@ -187,7 +186,7 @@ export const updateProfileDomain = createServerFn({ method: "POST" })
     if (profileError) return { error: profileError.message };
 
     // 2. Registrar na tabela de domínios para o redirect engine
-    const { error: domainError } = await supabase
+    const { error: domainError } = await authenticatedSupabase
       .from("user_domains")
       .upsert({ 
         user_id: userId, 
