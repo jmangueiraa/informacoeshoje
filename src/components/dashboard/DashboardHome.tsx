@@ -33,7 +33,7 @@ export function DashboardHome() {
           <p className="text-muted-foreground">Gerencie seus links de afiliado e acompanhe resultados.</p>
         </div>
         <Button asChild size="lg" className="gap-2 bg-primary hover:bg-primary/90">
-          <Link to="/dashboard">
+          <Link to="/links">
             <PlusCircle className="h-5 w-5" />
             Criar Novo Link
           </Link>
@@ -87,7 +87,7 @@ export function DashboardHome() {
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-semibold tracking-tight">Links Recentes</h2>
           <Button variant="ghost" asChild>
-            <Link to="/dashboard">Ver todos</Link>
+            <Link to="/links">Ver todos</Link>
           </Button>
         </div>
         
@@ -145,7 +145,7 @@ export function DashboardHome() {
                             <Copy className="h-4 w-4" />
                           </Button>
                           <Button size="icon" variant="ghost" asChild>
-                            <Link to="/dashboard">
+                            <Link to="/links">
                               <BarChart3 className="h-4 w-4" />
                             </Link>
                           </Button>
