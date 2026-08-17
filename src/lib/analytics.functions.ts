@@ -62,13 +62,13 @@ export const registerClick = createServerFn({ method: "POST" })
       operating_system: os,
       referrer: data.referrer ?? null,
       ip_address: ip,
-    } as any);
+    });
 
     // 5. Incrementar contador de cliques no link (agora com filtro de IP na RPC)
-    await supabase.rpc('increment_link_clicks' as any, { 
+    await supabase.rpc('increment_link_clicks', { 
       link_id: link.id,
       visitor_ip: ip
-    } as any);
+    });
 
     return { url: link.affiliate_url };
   });
