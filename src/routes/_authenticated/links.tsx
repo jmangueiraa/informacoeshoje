@@ -149,7 +149,7 @@ function LinksPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
-              <Button onClick={() => createMutation.mutate(newLink)} disabled={createMutation.isPending}>
+              <Button onClick={() => createMutation.mutate(newLink)} disabled={createMutation.isPending || !newLink.affiliate_url || !newLink.slug}>
                 Criar Link
               </Button>
             </DialogFooter>
