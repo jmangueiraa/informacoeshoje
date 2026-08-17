@@ -20,7 +20,8 @@ export function DashboardHome() {
   })
 
   const copyToClipboard = (link: any) => {
-    const domain = link.custom_domain || profile?.custom_domain || window.location.origin
+    const profileDomain = profile && !('error' in profile) ? profile.custom_domain : null;
+    const domain = link.custom_domain || profileDomain || window.location.origin
     const url = domain.startsWith('http') ? `${domain}/${link.slug}` : `https://${domain}/${link.slug}`
     navigator.clipboard.writeText(url)
     toast.success("Link copiado para a área de transferência!")
