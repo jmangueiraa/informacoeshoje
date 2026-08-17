@@ -126,7 +126,7 @@ export const getUserLinks = createServerFn({ method: "GET" })
 
 export const deleteLink = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((id: unknown) => z.string().parse(id))
+  .inputValidator((id: unknown) => z.string().parse(id))
   .handler(async ({ data: id, context }) => {
     const { userId, supabase: authenticatedSupabase } = context;
 
