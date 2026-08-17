@@ -151,7 +151,7 @@ export function DashboardHome() {
                           <Button size="icon" variant="ghost" onClick={() => copyToClipboard(link)}>
                             <Copy className="h-4 w-4" />
                           </Button>
-                          <Button size="icon" variant="ghost" asChild>
+                          <Button size="icon" variant="ghost" asChild title="Ver Estatísticas">
                             <Link to="/links">
                               <BarChart3 className="h-4 w-4" />
                             </Link>
