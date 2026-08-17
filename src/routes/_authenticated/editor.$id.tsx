@@ -229,9 +229,26 @@ function EditorPage() {
                   value={title} 
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Ex: Novo recorde mundial..."
+                  disabled={isGenerating}
                 />
               </div>
               
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium">Fake News IA</label>
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    onClick={handleGenerateAI}
+                    disabled={isGenerating || !imageUrl}
+                    className="h-7 text-[10px] bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 border-none shadow-lg"
+                  >
+                    <Sparkles className={`h-3 w-3 mr-1 ${isGenerating ? 'animate-spin' : ''}`} /> 
+                    {isGenerating ? 'Analisando Imagem...' : 'Inventar Fake News'}
+                  </Button>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-sm font-medium">Curiosidade</label>
@@ -239,9 +256,10 @@ function EditorPage() {
                     variant="ghost" 
                     size="sm" 
                     onClick={generateCuriosity}
+                    disabled={isGenerating}
                     className="h-7 text-[10px] text-primary hover:text-primary hover:bg-primary/10"
                   >
-                    <Sparkles className="h-3 w-3 mr-1" /> Gerar IA
+                    <Sparkles className="h-3 w-3 mr-1" /> Aleatória
                   </Button>
                 </div>
                 <textarea 
