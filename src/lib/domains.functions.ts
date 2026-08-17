@@ -145,7 +145,7 @@ export const verifyDomainDNS = createServerFn({ method: "POST" })
     try {
       // Usar a API DoH do Google para verificar CNAME
       // O CNAME deve apontar para o domínio da aplicação
-      const appHost = "noticiasviraisctv.lovable.app";
+      const appHost = PLATFORM_DOMAIN;
       const response = await fetch(`https://dns.google/resolve?name=${domainData.domain}&type=CNAME`);
       const result = await response.json();
 

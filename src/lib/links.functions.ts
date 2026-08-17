@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const createLinkSchema = z.object({
-  affiliateUrl: z.string().url().refine(url => url.includes('shopee.com.br'), {
+  affiliateUrl: z.string().url().refine(url => url.includes('shopee.com.br') || url.includes('shope.ee'), {
     message: "Apenas links da Shopee são permitidos"
   }),
   slug: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_-]+$/, {
@@ -12,7 +12,7 @@ const createLinkSchema = z.object({
   }),
   title: z.string().optional(),
   expiresAt: z.string().optional().nullable(),
-  customDomain: z.string().optional().nullable(),
+  domainId: z.string().optional().nullable(),
 });
 
 export const checkSlugAvailability = createServerFn({ method: "GET" })
@@ -89,7 +89,7 @@ export const createCustomLink = createServerFn({ method: "POST" })
       affiliate_url: data.affiliateUrl,
       title: data.title || null,
       expires_at: data.expiresAt || null,
-      custom_domain: data.customDomain || null,
+      domain_id: data.domainId || null,
       status: 'active'
     };
 
@@ -97,7 +97,7 @@ export const createCustomLink = createServerFn({ method: "POST" })
 
     const { data: link, error } = await authenticatedSupabase
       .from("links")
-      .insert(insertData)
+      .insert(insertData as any)
       .select()
       .single();
 

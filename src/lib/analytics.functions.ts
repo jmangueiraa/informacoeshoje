@@ -19,18 +19,20 @@ export const registerClick = createServerFn({ method: "POST" })
     // 1. Identificar o usuário pelo host
     const resolved = data.host ? await resolveDomain(data.host) : null;
     
-    // 2. Buscar o link pelo slug e opcionalmente pelo user_id identificado pelo domínio
+    // 2. Buscar o link pelo slug
     let query = supabase
       .from("links")
-      .select("id, affiliate_url, status, expires_at, user_id")
+      .select("id, affiliate_url, status, expires_at, user_id, domain_id")
       .eq("slug", data.slug);
     
+    // Se o domínio for resolvido, garantimos que o link pertence ao usuário dono do domínio
+    // e opcionalmente filtramos pelo domain_id se for um acesso via domínio customizado
     if (resolved?.userId) {
       query = query.eq("user_id", resolved.userId);
     } else if (resolved?.type === 'platform') {
       // Se estiver no domínio da plataforma, permitimos buscar links sem filtro de usuário
-      // ou podemos restringir apenas a links que não têm domínio customizado.
-      query = query.is("custom_domain", null);
+      // Mas priorizamos links que não têm domínio customizado associado (usando o padrão)
+      query = query.is("domain_id", null);
     }
 
     const { data: link, error: linkError } = await query.maybeSingle();

@@ -1,8 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
-import { getAdminDomains } from '@/lib/admin.functions'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { getAdminDomains, deleteAdminDomain } from '@/lib/admin.functions'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Globe, ShieldCheck, User, Calendar, ExternalLink } from 'lucide-react'
+import { Globe, ShieldCheck, User, Calendar, ExternalLink, Trash2, Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
@@ -14,9 +16,21 @@ export const Route = createFileRoute('/_authenticated/admin/domains')({
 })
 
 function AdminDomainsPage() {
+  const queryClient = useQueryClient()
   const { data: domains, isLoading } = useQuery({
     queryKey: ['admin-domains'],
     queryFn: () => getAdminDomains(),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteAdminDomain({ data: id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-domains'] })
+      toast.success("Domínio removido pelo administrador.")
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Erro ao remover domínio.")
+    }
   })
 
   if (isLoading) {
@@ -83,7 +97,7 @@ function AdminDomainsPage() {
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm">
                           <User className="h-3 w-3 text-muted-foreground" />
-                          {d.profiles?.full_name || d.profiles?.username || 'Usuário Desconhecido'}
+                          {d.profiles?.full_name || d.profiles?.email || 'Usuário Desconhecido'}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -113,15 +127,30 @@ function AdminDomainsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <a 
-                          href={`https://${d.domain}`} 
-                          target="_blank" 
-                          rel="noreferrer"
-                          className="inline-flex items-center justify-center rounded-md text-xs font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 gap-1.5 ml-auto"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          Abrir
-                        </a>
+                        <div className="flex items-center justify-end gap-2">
+                          <a 
+                            href={`https://${d.domain}`} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="inline-flex items-center justify-center rounded-md text-xs font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 gap-1.5"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Abrir
+                          </a>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => {
+                              if (window.confirm(`Remover domínio ${d.domain}? Esta ação não pode ser desfeita.`)) {
+                                deleteMutation.mutate(d.id)
+                              }
+                            }}
+                            disabled={deleteMutation.isPending}
+                          >
+                            {deleteMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
