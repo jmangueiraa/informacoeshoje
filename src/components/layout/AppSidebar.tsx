@@ -1,5 +1,5 @@
 import * as React from "react"
-import { LayoutDashboard, PlusCircle, Link2, BarChart3, Settings, LogOut, CreditCard, Video } from "lucide-react"
+import { LayoutDashboard, PlusCircle, Link2, BarChart3, Settings, LogOut, CreditCard, Video, ShieldAlert } from "lucide-react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import { supabase } from "@/integrations/supabase/client"
 import {
@@ -15,9 +15,16 @@ import {
   SidebarGroupContent,
 } from "@/components/ui/sidebar"
 import { toast } from "sonner"
+import { checkIsAdmin } from "@/lib/admin.functions"
+import { useQuery } from "@tanstack/react-query"
 
 export function AppSidebar() {
   const navigate = useNavigate()
+  const { data: isAdmin } = useQuery({
+    queryKey: ['is-admin'],
+    queryFn: () => checkIsAdmin(),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  })
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut()
@@ -84,6 +91,16 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {isAdmin && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Painel ADM">
+                    <Link to="/admin" className="flex items-center gap-3 py-2 text-orange-500 hover:text-orange-600">
+                      <ShieldAlert className="h-5 w-5" />
+                      <span>Painel ADM</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
