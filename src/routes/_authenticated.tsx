@@ -6,6 +6,8 @@ import { Toaster } from '@/components/ui/sonner'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async ({ location }) => {
+    // getSession() is fast but might be stale during SSR. 
+    // However, for redirecting to login, it's usually enough.
     const { data: { session } } = await supabase.auth.getSession()
     console.log('Session check in _authenticated:', session ? 'Found' : 'Not found')
     
