@@ -41,16 +41,8 @@ function AuthPage() {
       console.log(`${type} result:`, data)
 
       if (type === 'signup') {
-        // No Supabase, se data.user existe mas data.session é null, 
-        // geralmente significa que a confirmação de e-mail é necessária.
-        if (data.user && !data.session) {
-          toast.success('Cadastro realizado! Por favor, verifique seu e-mail para confirmar a conta.', {
-            duration: 6000,
-          })
-        } else {
-          toast.success('Conta criada com sucesso!')
-          navigate({ to: redirect || '/dashboard' })
-        }
+        toast.success('Conta criada com sucesso!')
+        navigate({ to: redirect || '/dashboard' })
       } else {
         const dest = redirect || '/dashboard'
         console.log('Login successful, navigating to:', dest)
