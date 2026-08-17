@@ -16,7 +16,7 @@ const createLinkSchema = z.object({
 });
 
 export const checkSlugAvailability = createServerFn({ method: "GET" })
-  .validator((slug: unknown) => z.string().parse(slug))
+  .inputValidator((slug: unknown) => z.string().parse(slug))
   .handler(async ({ data: slug }) => {
     const { data, error } = await supabase
       .from("links")
