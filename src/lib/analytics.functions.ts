@@ -12,7 +12,7 @@ export const registerClick = createServerFn({ method: "POST" })
     referrer: z.string().optional(),
   }).parse(data))
   .handler(async ({ data }) => {
-    const request = getWebRequest();
+    const request = getRequest();
     
     // 1. Buscar o link pelo slug e opcionalmente pelo domínio
     let query = supabase
