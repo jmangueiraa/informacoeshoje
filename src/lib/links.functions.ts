@@ -36,52 +36,8 @@ export const createCustomLink = createServerFn({ method: "POST" })
 
     console.log("Criando link para usuário:", userId);
 
-    // Buscar perfil para verificar limite, plano e trial
-    let { data: profile, error: profileError } = await authenticatedSupabase
-      .from("profiles")
-      .select("plan_id, trial_expires_at, is_trial, plans(max_links)")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (profileError) {
-      console.error("Erro ao buscar perfil:", profileError);
-    }
-
-    // Cast profile as any since TypeScript doesn't know about the new trial columns yet
-    const profileAny = profile as any;
-    const trialExpiresAt = profileAny?.trial_expires_at;
-    const isTrial = profileAny?.is_trial;
-
-    // Lógica de Trial e Limite de Links
-    const now = new Date();
-    const isTrialActive = isTrial && trialExpiresAt && new Date(trialExpiresAt) > now;
-    
-    // Se o trial expirou e o usuário ainda está marcado como trial
-    if (isTrial && trialExpiresAt && new Date(trialExpiresAt) <= now) {
-      console.log("Trial expirado para o usuário:", userId);
-    }
-
-    const { count, error: countError } = await authenticatedSupabase
-      .from("links")
-      .select("*", { count: 'exact', head: true })
-      .eq("user_id", userId);
-
-    if (countError) {
-      console.error("Erro ao contar links:", countError);
-    }
-
-    // Regra: Novos usuários têm 10 links durante o trial de 24h.
-    const maxLinks = isTrialActive ? 10 : (profileAny?.plans?.max_links || 0);
-
-    if (count !== null && count >= maxLinks) {
-      if (isTrialActive) {
-        throw new Error(`Limite de links do período de teste atingido (Máximo: 10).`);
-      } else if (isTrial) {
-        throw new Error(`Seu período de teste de 24 horas expirou. Assine um plano para continuar criando links.`);
-      } else {
-        throw new Error(`Limite de links atingido para o plano atual (${maxLinks}).`);
-      }
-    }
+    // Lógica de limites removida para conta única unificada
+    // Todos os usuários têm acesso total
 
     const insertData = {
       user_id: userId,
