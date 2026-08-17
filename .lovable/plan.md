@@ -2,35 +2,32 @@
 
 LinkShopee é uma plataforma SaaS multitenant para criação e gerenciamento de links personalizados de afiliados da Shopee com estatísticas detalhadas.
 
-## 1. Banco de Dados e Segurança
-- Executar migração para criar as tabelas `plans`, `links`, `clicks` e `subscriptions`.
-- Configurar RLS para garantir isolamento total entre usuários.
-- Adicionar índices de performance para slugs e analytics.
-- Atualizar a tabela `profiles` para incluir referências a planos.
+## 1. Banco de Dados e Segurança (Concluído)
+- Tabelas `plans`, `links`, `clicks` e `subscriptions` criadas.
+- RLS configurado para isolamento de dados.
+- Planos iniciais (Gratuito, Pro, Premium) inseridos.
 
-## 2. Autenticação e Layout Base
-- Criar fluxo de Auth (Login, Cadastro, Recuperação) com Supabase.
-- Desenvolver `AppSidebar` e layout principal para o Dashboard.
-- Proteger rotas autenticadas.
+## 2. Autenticação e Layout (Próximo Passo)
+- **src/routes/auth.tsx**: Atualizar a interface de login/cadastro para o branding LinkShopee.
+- **src/components/layout/AppSidebar.tsx**: Reformular a barra lateral com rotas: Dashboard, Meus Links, Criar Link, Estatísticas, Planos e Configurações.
+- **src/routes/__root.tsx**: Garantir que o Toaster e metadados básicos estejam corretos.
 
 ## 3. Dashboard e Gerenciamento de Links
-- Desenvolver cards de resumo (Total de links, cliques, hoje).
-- Implementar lista de links com ações (copiar, editar, status).
-- Criar formulário de criação de link com validação de URL Shopee e verificação de slug.
+- **src/lib/links.functions.ts**: Criar funções de servidor para CRUD de links (validar URL Shopee, verificar slug único, criar link).
+- **src/routes/_authenticated/dashboard.tsx**: Implementar os cards de estatísticas globais (Total de links, cliques, cliques hoje) e gráfico de tendência.
+- **src/routes/_authenticated/links/index.tsx**: Tabela de gerenciamento de links com filtros e busca.
+- **src/routes/_authenticated/links/create.tsx**: Formulário de criação com feedback em tempo real da disponibilidade do slug.
 
-## 4. Redirecionamento e Analytics
-- Criar rota pública `/:slug` para processar redirecionamentos.
-- Implementar lógica de captura de metadados do visitante (Browser, OS, Dispositivo).
-- Registrar cliques no banco de dados antes do redirect 302.
-- Criar página de estatísticas detalhadas por link com gráficos.
+## 4. Sistema de Redirecionamento e Analytics
+- **src/routes/$slug.tsx**: Rota dinâmica de alto nível para processar o redirecionamento.
+- **src/lib/analytics.server.ts**: Lógica para extrair Device, OS, Browser do User-Agent.
+- **src/lib/analytics.functions.ts**: Função de servidor para registrar o clique e retornar a URL de destino.
+- Implementar verificação de expiração e status (ativo/inativo).
 
-## 5. Estrutura SaaS e Planos
-- Implementar verificação de limites do plano na criação de links.
-- Preparar componentes de visualização de planos e upgrade.
-- Criar área administrativa básica para gestão da plataforma.
+## 5. Estatísticas Detalhadas e Planos
+- **src/routes/_authenticated/links/$id/stats.tsx**: Página de analytics específica por link com gráficos detalhados.
+- **src/routes/_authenticated/billing.tsx**: Página de seleção de planos e status de assinatura.
+- **Lógica de Limites**: Middleware ou verificação nas funções de servidor para impedir criação de links além do limite do plano.
 
-## Detalhes Técnicos
-- **Frontend:** React 19 + TanStack Start (Router + Server Functions).
-- **Estilização:** Tailwind CSS v4 + Shadcn UI.
-- **Backend:** Supabase Auth/DB/RLS.
-- **Analytics:** Captura de User-Agent e Referrer.
+## 6. Área Administrativa
+- **src/routes/admin/index.tsx**: Dashboard global para o administrador gerenciar usuários, links e visualizar métricas da plataforma.
