@@ -57,9 +57,13 @@ function LinksPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => createLink({ data }),
-    onSuccess: (result) => {
-      if (result.error) {
+    mutationFn: (data: any) => createCustomLink({ data: {
+      affiliateUrl: data.affiliate_url,
+      slug: data.slug,
+      title: data.title
+    }}),
+    onSuccess: (result: any) => {
+      if (result?.error) {
         toast.error(result.error)
       } else {
         queryClient.invalidateQueries({ queryKey: ['user-links'] })
