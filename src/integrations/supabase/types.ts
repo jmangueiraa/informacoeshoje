@@ -63,6 +63,7 @@ export type Database = {
           affiliate_url: string
           clicks_count: number | null
           created_at: string
+          custom_domain: string | null
           expires_at: string | null
           id: string
           slug: string
@@ -75,6 +76,7 @@ export type Database = {
           affiliate_url: string
           clicks_count?: number | null
           created_at?: string
+          custom_domain?: string | null
           expires_at?: string | null
           id?: string
           slug: string
@@ -87,6 +89,7 @@ export type Database = {
           affiliate_url?: string
           clicks_count?: number | null
           created_at?: string
+          custom_domain?: string | null
           expires_at?: string | null
           id?: string
           slug?: string
@@ -188,6 +191,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          custom_domain: string | null
           full_name: string | null
           id: string
           plan_id: string | null
@@ -198,6 +202,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          custom_domain?: string | null
           full_name?: string | null
           id: string
           plan_id?: string | null
@@ -208,6 +213,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          custom_domain?: string | null
           full_name?: string | null
           id?: string
           plan_id?: string | null
@@ -299,6 +305,30 @@ export type Database = {
           subject?: string
           suggested_title?: string | null
           trending_at?: string | null
+        }
+        Relationships: []
+      }
+      user_domains: {
+        Row: {
+          created_at: string
+          domain: string
+          id: string
+          is_verified: boolean | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          domain: string
+          id?: string
+          is_verified?: boolean | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          domain?: string
+          id?: string
+          is_verified?: boolean | null
+          user_id?: string
         }
         Relationships: []
       }
