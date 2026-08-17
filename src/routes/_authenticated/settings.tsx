@@ -390,43 +390,34 @@ function SettingsPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="opacity-50 grayscale pointer-events-none">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shield className="h-5 w-5 text-blue-500" />
                 Shopee Affiliate API
               </CardTitle>
-              <CardDescription>Configure suas chaves para redirecionamento automático.</CardDescription>
+              <CardDescription>Esta funcionalidade está temporariamente desativada.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="shopee_app_id">App ID</Label>
-                <Input
-                  id="shopee_app_id"
-                  value={formData.shopee_app_id}
-                  onChange={(e) => setFormData({ ...formData, shopee_app_id: e.target.value })}
-                  placeholder="Seu App ID da Shopee"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="shopee_app_secret">App Secret</Label>
-                <Input
-                  id="shopee_app_secret"
-                  type="password"
-                  value={formData.shopee_app_secret}
-                  onChange={(e) => setFormData({ ...formData, shopee_app_secret: e.target.value })}
-                  placeholder="Seu App Secret da Shopee"
-                />
+              <div className="grid gap-2 text-sm text-muted-foreground italic">
+                A integração com a API da Shopee está em manutenção.
               </div>
             </CardContent>
             <CardFooter className="flex justify-between items-center border-t px-6 py-4">
-              <p className="text-sm text-muted-foreground">Certifique-se de salvar após as alterações.</p>
-              <Button type="submit" disabled={updateProfileMutation.isPending} className="gap-2">
+              <p className="text-sm text-muted-foreground">O formulário de perfil abaixo continua ativo.</p>
+              <Button type="button" disabled className="gap-2">
                 <Save className="h-4 w-4" />
-                {updateProfileMutation.isPending ? "Salvando..." : "Salvar Perfil"}
+                Salvar Perfil
               </Button>
             </CardFooter>
           </Card>
+          
+          <div className="flex justify-end">
+            <Button type="submit" disabled={updateProfileMutation.isPending} className="gap-2">
+              <Save className="h-4 w-4" />
+              {updateProfileMutation.isPending ? "Salvando..." : "Salvar Configurações"}
+            </Button>
+          </div>
         </form>
       </div>
     </div>
