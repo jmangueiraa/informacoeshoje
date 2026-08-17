@@ -27,20 +27,21 @@ export const checkSlugAvailability = createServerFn({ method: "GET" })
     return !data;
   });
 
-export const createCustomLink = createServerFn({ method: "POST" })
-  .validator((data: unknown) => createLinkSchema.parse(data))
-  .handler(async ({ data }) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const user = session?.user;
-    if (!user) throw new Error("Não autorizado");
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-    console.log("Criando link para usuário:", user.id);
+export const createCustomLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: unknown) => createLinkSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+
+    console.log("Criando link para usuário:", userId);
 
     // Buscar perfil para verificar limite e plano
     let { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("plan_id, plans(max_links)")
-      .eq("id", user.id)
+      .eq("id", userId)
       .maybeSingle();
 
     if (profileError) {
@@ -57,12 +58,12 @@ export const createCustomLink = createServerFn({ method: "POST" })
         .single();
       
       if (freePlan) {
-        await supabase.from("profiles").update({ plan_id: freePlan.id }).eq("id", user.id);
+        await supabase.from("profiles").update({ plan_id: freePlan.id }).eq("id", userId);
         // Recarregar perfil
         const { data: updatedProfile } = await supabase
           .from("profiles")
           .select("plan_id, plans(max_links)")
-          .eq("id", user.id)
+          .eq("id", userId)
           .single();
         profile = updatedProfile;
       }
@@ -71,7 +72,7 @@ export const createCustomLink = createServerFn({ method: "POST" })
     const { count, error: countError } = await supabase
       .from("links")
       .select("*", { count: 'exact', head: true })
-      .eq("user_id", user.id);
+      .eq("user_id", userId);
 
     if (countError) {
       console.error("Erro ao contar links:", countError);
@@ -83,7 +84,7 @@ export const createCustomLink = createServerFn({ method: "POST" })
     }
 
     const insertData = {
-      user_id: user.id,
+      user_id: userId,
       slug: data.slug,
       affiliate_url: data.affiliateUrl,
       title: data.title || null,
@@ -110,15 +111,14 @@ export const createCustomLink = createServerFn({ method: "POST" })
   });
 
 export const getUserLinks = createServerFn({ method: "GET" })
-  .handler(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const user = session?.user;
-    if (!user) throw new Error("Não autorizado");
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { userId } = context;
 
     const { data, error } = await supabase
       .from("links")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -126,49 +126,46 @@ export const getUserLinks = createServerFn({ method: "GET" })
   });
 
 export const deleteLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((id: unknown) => z.string().parse(id))
-  .handler(async ({ data: id }) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const user = session?.user;
-    if (!user) throw new Error("Não autorizado");
+  .handler(async ({ data: id, context }) => {
+    const { userId } = context;
 
     const { error } = await supabase
       .from("links")
       .delete()
       .eq("id", id)
-      .eq("user_id", user.id);
+      .eq("user_id", userId);
 
     if (error) throw error;
     return { success: true };
   });
 
 export const toggleLinkStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data: unknown) => z.object({ id: z.string(), status: z.enum(['active', 'inactive']) }).parse(data))
-  .handler(async ({ data }) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const user = session?.user;
-    if (!user) throw new Error("Não autorizado");
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
 
     const { error } = await supabase
       .from("links")
       .update({ status: data.status })
       .eq("id", data.id)
-      .eq("user_id", user.id);
+      .eq("user_id", userId);
 
     if (error) throw error;
     return { success: true };
   });
 
 export const getUserProfile = createServerFn({ method: "GET" })
-  .handler(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const user = session?.user;
-    if (!user) return { error: "Não autenticado" };
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { userId } = context;
 
     const { data: profile, error } = await supabase
       .from("profiles")
       .select("*")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (error) return { error: error.message };
@@ -176,17 +173,16 @@ export const getUserProfile = createServerFn({ method: "GET" })
   });
 
 export const updateProfileDomain = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data: unknown) => z.object({ domain: z.string() }).parse(data))
-  .handler(async ({ data }) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const user = session?.user;
-    if (!user) return { error: "Não autenticado" };
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
 
     // 1. Atualizar o domínio no perfil
     const { error: profileError } = await supabase
       .from("profiles")
       .update({ custom_domain: data.domain })
-      .eq("id", user.id);
+      .eq("id", userId);
 
     if (profileError) return { error: profileError.message };
 
@@ -194,7 +190,7 @@ export const updateProfileDomain = createServerFn({ method: "POST" })
     const { error: domainError } = await supabase
       .from("user_domains")
       .upsert({ 
-        user_id: user.id, 
+        user_id: userId, 
         domain: data.domain,
         is_verified: true
       }, { onConflict: 'domain' });
