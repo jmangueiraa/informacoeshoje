@@ -14,6 +14,89 @@ export type Database = {
   }
   public: {
     Tables: {
+      clicks: {
+        Row: {
+          approximate_location: Json | null
+          browser: string | null
+          clicked_at: string
+          device_type: string | null
+          id: string
+          link_id: string
+          operating_system: string | null
+          referrer: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          approximate_location?: Json | null
+          browser?: string | null
+          clicked_at?: string
+          device_type?: string | null
+          id?: string
+          link_id: string
+          operating_system?: string | null
+          referrer?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          approximate_location?: Json | null
+          browser?: string | null
+          clicked_at?: string
+          device_type?: string | null
+          id?: string
+          link_id?: string
+          operating_system?: string | null
+          referrer?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clicks_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      links: {
+        Row: {
+          affiliate_url: string
+          clicks_count: number | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          slug: string
+          status: string | null
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          affiliate_url: string
+          clicks_count?: number | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          slug: string
+          status?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          affiliate_url?: string
+          clicks_count?: number | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          slug?: string
+          status?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       news_projects: {
         Row: {
           author_name: string | null
@@ -68,12 +151,47 @@ export type Database = {
         }
         Relationships: []
       }
+      plans: {
+        Row: {
+          active: boolean | null
+          created_at: string
+          features: Json | null
+          id: string
+          max_clicks: number
+          max_links: number
+          name: string
+          price: number
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string
+          features?: Json | null
+          id?: string
+          max_clicks?: number
+          max_links?: number
+          name: string
+          price?: number
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string
+          features?: Json | null
+          id?: string
+          max_clicks?: number
+          max_links?: number
+          name?: string
+          price?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
           created_at: string
           full_name: string | null
           id: string
+          plan_id: string | null
+          status: string | null
           updated_at: string
           username: string | null
         }
@@ -82,6 +200,8 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id: string
+          plan_id?: string | null
+          status?: string | null
           updated_at?: string
           username?: string | null
         }
@@ -90,10 +210,61 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id?: string
+          plan_id?: string | null
+          status?: string | null
           updated_at?: string
           username?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          plan_id: string
+          started_at: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          plan_id: string
+          started_at?: string
+          status: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          plan_id?: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       trending_topics: {
         Row: {
