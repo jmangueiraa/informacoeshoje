@@ -6,20 +6,25 @@ import { Toaster } from '@/components/ui/sonner'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async ({ location }) => {
-    // getSession() is fast but might be stale during SSR. 
-    // However, for redirecting to login, it's usually enough.
+    // getSession() is appropriate for client-side auth state checks
     const { data: { session } } = await supabase.auth.getSession()
     console.log('Session check in _authenticated:', session ? 'Found' : 'Not found')
     
     if (!session) {
-      throw redirect({
-        to: '/auth',
-        search: {
-          redirect: location.href,
-        },
-      })
+      // Check if this is an OAuth callback to avoid premature redirection
+      const isAuthCallback = typeof window !== 'undefined' && 
+        (window.location.hash.includes('access_token=') || window.location.search.includes('code='));
+
+      if (!isAuthCallback) {
+        throw redirect({
+          to: '/auth',
+          search: {
+            redirect: location.href,
+          },
+        })
+      }
     }
-    return { session, userId: session.user.id }
+    return { session, userId: session?.user?.id }
   },
   component: AuthenticatedLayout,
 })
