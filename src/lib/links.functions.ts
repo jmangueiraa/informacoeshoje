@@ -11,6 +11,7 @@ const createLinkSchema = z.object({
   }),
   title: z.string().optional(),
   expiresAt: z.string().optional().nullable(),
+  customDomain: z.string().optional().nullable(),
 });
 
 export const checkSlugAvailability = createServerFn({ method: "GET" })
@@ -57,6 +58,7 @@ export const createCustomLink = createServerFn({ method: "POST" })
         affiliate_url: data.affiliateUrl,
         title: data.title ?? null,
         expires_at: data.expiresAt ?? null,
+        custom_domain: data.customDomain ?? null,
         status: 'active'
       })
       .select()

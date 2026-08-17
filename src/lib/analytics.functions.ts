@@ -6,16 +6,23 @@ import { UAParser } from "ua-parser-js";
 export const registerClick = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({
     slug: z.string(),
+    host: z.string().optional(),
     userAgent: z.string().optional(),
     referrer: z.string().optional(),
   }).parse(data))
   .handler(async ({ data }) => {
-    // 1. Buscar o link pelo slug
-    const { data: link, error: linkError } = await supabase
+    // 1. Buscar o link pelo slug e opcionalmente pelo domínio
+    let query = supabase
       .from("links")
-      .select("id, affiliate_url, status, expires_at")
-      .eq("slug", data.slug)
-      .maybeSingle();
+      .select("id, affiliate_url, status, expires_at, custom_domain")
+      .eq("slug", data.slug);
+    
+    // Se o host foi enviado e não é o padrão do app, tentamos filtrar por custom_domain
+    if (data.host && !data.host.includes('lovable.app') && !data.host.includes('localhost')) {
+       query = query.eq("custom_domain", data.host);
+    }
+
+    const { data: link, error: linkError } = await query.maybeSingle();
 
     if (linkError || !link) {
       return { error: "Link não encontrado", status: 404 };
