@@ -15,7 +15,7 @@ const createLinkSchema = z.object({
 });
 
 export const checkSlugAvailability = createServerFn({ method: "GET" })
-  .inputValidator((slug) => z.string().parse(slug))
+  .validator((slug: unknown) => z.string().parse(slug))
   .handler(async ({ data: slug }) => {
     const { data, error } = await supabase
       .from("links")
@@ -28,7 +28,7 @@ export const checkSlugAvailability = createServerFn({ method: "GET" })
   });
 
 export const createCustomLink = createServerFn({ method: "POST" })
-  .inputValidator((data) => createLinkSchema.parse(data))
+  .validator((data: unknown) => createLinkSchema.parse(data))
   .handler(async ({ data }) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autorizado");
@@ -88,7 +88,7 @@ export const getUserLinks = createServerFn({ method: "GET" })
   });
 
 export const deleteLink = createServerFn({ method: "POST" })
-  .inputValidator((id) => z.string().parse(id))
+  .validator((id: unknown) => z.string().parse(id))
   .handler(async ({ data: id }) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autorizado");
@@ -104,7 +104,7 @@ export const deleteLink = createServerFn({ method: "POST" })
   });
 
 export const toggleLinkStatus = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({ id: z.string(), status: z.enum(['active', 'inactive']) }).parse(data))
+  .validator((data: unknown) => z.object({ id: z.string(), status: z.enum(['active', 'inactive']) }).parse(data))
   .handler(async ({ data }) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autorizado");
@@ -135,7 +135,7 @@ export const getUserProfile = createServerFn({ method: "GET" })
   });
 
 export const updateProfileDomain = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({ domain: z.string() }).parse(data))
+  .validator((data: unknown) => z.object({ domain: z.string() }).parse(data))
   .handler(async ({ data }) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "Não autenticado" };
