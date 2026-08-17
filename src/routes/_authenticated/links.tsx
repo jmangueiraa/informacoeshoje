@@ -86,14 +86,17 @@ function LinksPage() {
   }, [profile]);
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => createCustomLink({ 
-      data: {
-        affiliateUrl: data.affiliate_url,
-        slug: data.slug,
-        title: data.title,
-        customDomain: data.custom_domain
-      }
-    }),
+    mutationFn: async (data: any) => {
+      console.log("Enviando dados para criação:", data);
+      return createCustomLink({ 
+        data: {
+          affiliateUrl: data.affiliate_url,
+          slug: data.slug,
+          title: data.title || undefined,
+          customDomain: data.custom_domain || null
+        }
+      });
+    },
     onSuccess: (result: any) => {
       if (result?.error) {
         toast.error(result.error)
