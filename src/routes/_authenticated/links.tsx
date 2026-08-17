@@ -59,7 +59,7 @@ function LinksPage() {
 
   // Sincronizar o domínio do perfil com o novo link ao abrir o diálogo
   useEffect(() => {
-    if (profile?.custom_domain && !newLink.custom_domain) {
+    if (profile && !('error' in profile) && profile.custom_domain && !newLink.custom_domain) {
       setNewLink(prev => ({ ...prev, custom_domain: profile.custom_domain }));
     }
   }, [profile, isCreateOpen]);
@@ -78,7 +78,7 @@ function LinksPage() {
 
   // Garantir que o domínio ajpvip.com.br esteja configurado se solicitado
   useEffect(() => {
-    if (profile && !profile.custom_domain) {
+    if (profile && !('error' in profile) && !profile.custom_domain) {
       // Aqui poderíamos forçar a atualização, mas vamos apenas garantir que a UI o use se o usuário desejar
       // Como o usuário respondeu que quer ajpvip.com.br como padrão:
       updateDomainMutation.mutate('ajpvip.com.br');
