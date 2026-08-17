@@ -71,10 +71,8 @@ export function AppSidebar() {
                 <SidebarMenuButton asChild tooltip="Estatísticas">
                   <Link to="/links" className="flex items-center gap-3 py-2">
                     <BarChart3 className="h-5 w-5" />
-                    <span>Estatísticas</span>
                   </Link>
                 </SidebarMenuButton>
-              </SidebarMenuItem>
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Gerador de Play">
