@@ -27,23 +27,38 @@ function AuthPage() {
 
   const handleEmailAuth = async (type: 'login' | 'signup') => {
     setLoading(true)
+    console.log(`Starting ${type} for:`, email)
     try {
-      const { error } = type === 'login' 
+      const { data, error } = type === 'login' 
         ? await supabase.auth.signInWithPassword({ email, password })
         : await supabase.auth.signUp({ email, password })
 
-      if (error) throw error
+      if (error) {
+        console.error(`${type} error detail:`, error)
+        throw error
+      }
       
+      console.log(`${type} result:`, data)
+
       if (type === 'signup') {
-        toast.success('Verifique seu e-mail para confirmar o cadastro!')
+        // No Supabase, se data.user existe mas data.session é null, 
+        // geralmente significa que a confirmação de e-mail é necessária.
+        if (data.user && !data.session) {
+          toast.success('Cadastro realizado! Por favor, verifique seu e-mail para confirmar a conta.', {
+            duration: 6000,
+          })
+        } else {
+          toast.success('Conta criada com sucesso!')
+          navigate({ to: redirect || '/dashboard' })
+        }
       } else {
         const dest = redirect || '/dashboard'
         console.log('Login successful, navigating to:', dest)
         navigate({ to: dest })
       }
     } catch (error: any) {
-      console.error('Auth error:', error)
-      toast.error(error.message || 'Erro na autenticação')
+      console.error('Auth handler error:', error)
+      toast.error(error.message || 'Erro na autenticação. Verifique os dados e tente novamente.')
     } finally {
       setLoading(false)
     }
