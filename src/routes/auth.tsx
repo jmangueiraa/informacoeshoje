@@ -42,6 +42,7 @@ function AuthPage() {
         navigate({ to: dest })
       }
     } catch (error: any) {
+      console.error('Auth error:', error)
       toast.error(error.message || 'Erro na autenticação')
     } finally {
       setLoading(false)
