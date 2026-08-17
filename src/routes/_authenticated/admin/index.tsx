@@ -109,7 +109,7 @@ function AdminDashboard() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Usuário</TableHead>
-                    <TableHead>Plano</TableHead>
+                    
                     <TableHead>Status</TableHead>
                     <TableHead>Cadastro</TableHead>
                   </TableRow>
@@ -141,11 +141,6 @@ function AdminDashboard() {
                               </span>
                             </div>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="font-normal capitalize">
-                            {(user as any).plans?.name || 'Gratuito'}
-                          </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge 
