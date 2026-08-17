@@ -85,7 +85,17 @@ export function TrendingSection() {
               </div>
               <CardHeader className="p-4">
                 <CardTitle className="text-base line-clamp-1">{trend.subject}</CardTitle>
-                <CardDescription className="text-xs">Fonte: {trend.source}</CardDescription>
+                <CardDescription className="text-xs">
+                  Fonte: 
+                  <a 
+                    href={trend.source_url || '#'} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="ml-1 hover:text-primary transition-colors underline-offset-4 hover:underline"
+                  >
+                    {trend.source}
+                  </a>
+                </CardDescription>
               </CardHeader>
               <CardContent className="px-4 py-0">
                 <p className="text-sm text-muted-foreground italic line-clamp-2">

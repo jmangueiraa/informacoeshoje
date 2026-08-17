@@ -162,9 +162,14 @@ function ViralAgoraPage() {
               </CardHeader>
               <CardContent className="p-4 pt-0">
                 <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
-                  <span className="flex items-center gap-1">
+                  <a 
+                    href={item.source_url || '#'} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 hover:text-primary transition-colors"
+                  >
                     <ExternalLink className="h-3 w-3" /> {item.source || 'Desconhecido'}
-                  </span>
+                  </a>
                   <span className="flex items-center gap-1 font-medium text-orange-500">
                     <TrendingUp className="h-3 w-3" /> {(item.mentions ?? 0).toLocaleString()} menções
                   </span>
@@ -174,7 +179,7 @@ function ViralAgoraPage() {
                 {item.type === 'video' ? (
                   <>
                     <Button variant="outline" size="sm" className="w-full text-xs" asChild>
-                      <a href={item.video_url || '#'} target="_blank" rel="noopener noreferrer">
+                      <a href={item.source_url || item.video_url || '#'} target="_blank" rel="noopener noreferrer">
                         Abrir Original
                       </a>
                     </Button>
@@ -184,8 +189,10 @@ function ViralAgoraPage() {
                   </>
                 ) : (
                   <>
-                    <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => handleUseContent(item)}>
-                      Usar Assunto
+                    <Button variant="outline" size="sm" className="w-full text-xs" asChild>
+                      <a href={item.source_url || '#'} target="_blank" rel="noopener noreferrer">
+                        Abrir Original
+                      </a>
                     </Button>
                     <Button size="sm" className="w-full text-xs" onClick={() => handleUseContent(item)}>
                       Usar Imagem
