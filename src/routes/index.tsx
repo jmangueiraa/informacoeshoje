@@ -63,16 +63,6 @@ function AuthPage() {
     }
   }
 
-  const handleGoogleAuth = async () => {
-    try {
-      const result = await lovable.auth.signInWithOAuth('google', {
-        redirect_uri: window.location.origin + '/dashboard',
-      })
-      if (result.error) throw result.error
-    } catch (error: any) {
-      toast.error(error.message || 'Erro com Google Auth')
-    }
-  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
