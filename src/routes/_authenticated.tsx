@@ -45,8 +45,13 @@ function AuthenticatedLayout() {
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">
         <AppSidebar />
-        <main className="flex-1 overflow-y-auto">
-          <Outlet />
+        <main className="flex-1 overflow-y-auto flex flex-col">
+          <div className="flex-1">
+            <Outlet />
+          </div>
+          <footer className="p-4 border-t text-center text-xs text-muted-foreground bg-card/50">
+            Criado pela empresa de entretenimento AJP-19981356505
+          </footer>
         </main>
       </div>
       <Toaster />
