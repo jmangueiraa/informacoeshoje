@@ -1,112 +1,140 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { Button } from "@/components/ui/button"
-import { Link } from "@tanstack/react-router"
-import { ShoppingBag, Zap, BarChart3, ShieldCheck, ArrowRight, CheckCircle2, Video } from "lucide-react"
+import { createFileRoute, useNavigate, redirect } from '@tanstack/react-router'
+import { useState } from 'react'
+import { z } from 'zod'
+import { supabase } from '@/integrations/supabase/client'
+import { lovable } from '@/integrations/lovable/index'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { toast } from 'sonner'
 
 export const Route = createFileRoute('/')({
-  component: LandingPage,
+  validateSearch: z.object({
+    redirect: z.string().optional(),
+  }),
+  beforeLoad: async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      throw redirect({ to: '/dashboard' })
+    }
+  },
+  component: AuthPage,
 })
 
-function LandingPage() {
+function AuthPage() {
+  const search = Route.useSearch()
+  const redirectPath = search.redirect
+  const navigate = useNavigate()
+  const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+
+  const handleEmailAuth = async (type: 'login' | 'signup') => {
+    setLoading(true)
+    console.log(`Starting ${type} for:`, email)
+    try {
+      const { data, error } = type === 'login' 
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ email, password })
+
+      if (error) {
+        console.error(`${type} error detail:`, error)
+        throw error
+      }
+      
+      console.log(`${type} result:`, data)
+
+      if (type === 'signup') {
+        toast.success('Conta criada com sucesso!')
+        navigate({ to: redirectPath || '/dashboard' })
+      } else {
+        const dest = redirectPath || '/dashboard'
+        toast.success('Entrando...')
+        
+        setTimeout(() => {
+          navigate({ to: dest })
+        }, 500)
+      }
+    } catch (error: any) {
+      console.error('Auth handler error:', error)
+      toast.error(error.message || 'Erro na autenticação. Verifique os dados e tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGoogleAuth = async () => {
+    try {
+      const result = await lovable.auth.signInWithOAuth('google', {
+        redirect_uri: window.location.origin + '/dashboard',
+      })
+      if (result.error) throw result.error
+    } catch (error: any) {
+      toast.error(error.message || 'Erro com Google Auth')
+    }
+  }
+
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      {/* Navigation */}
-      <header className="px-4 lg:px-6 h-16 flex items-center border-b sticky top-0 bg-background/80 backdrop-blur-md z-50">
-        <Link to="/" className="flex items-center justify-center gap-2 font-bold text-xl tracking-tight text-primary">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground text-sm">
-            LA
+    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="text-3xl font-bold tracking-tight text-primary">LinkAfiliado</CardTitle>
+          <CardDescription>Gerencie seus links de afiliado com inteligência</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <div className="grid grid-cols-1 gap-2">
+            <Button variant="outline" onClick={handleGoogleAuth} className="w-full">
+              <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path></svg>
+              Continuar com Google
+            </Button>
           </div>
-          <span>Link<span className="text-foreground">Afiliado</span></span>
-        </Link>
-        <nav className="ml-auto flex gap-4 sm:gap-6">
-          <a className="text-sm font-medium hover:text-primary transition-colors cursor-pointer" href="#features">
-            Recursos
-          </a>
-          <Link to="/auth" className="text-sm font-medium hover:text-primary transition-colors">
-            Entrar
-          </Link>
-        </nav>
-      </header>
-
-      <main className="flex-1">
-        {/* Hero Section */}
-        <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48 px-4">
-          <div className="container mx-auto max-w-7xl">
-            <div className="flex flex-col items-center space-y-4 text-center">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">Ou com e-mail</span>
+            </div>
+          </div>
+          <Tabs defaultValue="login" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="login">Entrar</TabsTrigger>
+              <TabsTrigger value="signup">Criar Conta</TabsTrigger>
+            </TabsList>
+            <TabsContent value="login" className="space-y-4 pt-4">
               <div className="space-y-2">
-                <h1 className="text-4xl font-extrabold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">
-                  Transforme seus links de <span className="text-primary">Afiliado</span>
-                </h1>
-                <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl lg:text-2xl">
-                  Crie links personalizados, acompanhe cliques em tempo real e aumente suas conversões com o LinkAfiliado.
-                </p>
+                <Label htmlFor="email">E-mail</Label>
+                <Input id="email" type="email" placeholder="nome@exemplo.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
-              <div className="space-x-4">
-                <Button asChild size="lg" className="h-12 px-8 text-lg">
-                  <Link to="/auth">Começar Agora <ArrowRight className="ml-2 h-5 w-5" /></Link>
-                </Button>
-                <Button variant="outline" size="lg" className="h-12 px-8 text-lg" asChild>
-                  <a href="#features">Saiba Mais</a>
-                </Button>
+              <div className="space-y-2">
+                <Label htmlFor="password">Senha</Label>
+                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Features Section */}
-        <section id="features" className="w-full py-12 md:py-24 lg:py-32 bg-muted/50">
-          <div className="container mx-auto max-w-7xl px-4">
-            <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl text-center mb-12">Por que o LinkAfiliado?</h2>
-            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="flex flex-col items-center space-y-4 text-center p-6 bg-background rounded-xl border shadow-sm">
-                <div className="p-3 bg-primary/10 rounded-full">
-                  <Zap className="h-8 w-8 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold">Redirecionamento Rápido</h3>
-                <p className="text-muted-foreground">Tecnologia de ponta para garantir que seu cliente chegue à oferta sem atrasos.</p>
+              <Button className="w-full" onClick={() => handleEmailAuth('login')} disabled={loading}>
+                {loading ? 'Entrando...' : 'Entrar'}
+              </Button>
+            </TabsContent>
+            <TabsContent value="signup" className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="signup-email">E-mail</Label>
+                <Input id="signup-email" type="email" placeholder="nome@exemplo.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
-              <div className="flex flex-col items-center space-y-4 text-center p-6 bg-background rounded-xl border shadow-sm">
-                <div className="p-3 bg-primary/10 rounded-full">
-                  <BarChart3 className="h-8 w-8 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold">Analytics Completo</h3>
-                <p className="text-muted-foreground">Saiba de onde vêm seus cliques, qual dispositivo usam e muito mais.</p>
+              <div className="space-y-2">
+                <Label htmlFor="signup-password">Senha</Label>
+                <Input id="signup-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
-              <div className="flex flex-col items-center space-y-4 text-center p-6 bg-background rounded-xl border shadow-sm">
-                <div className="p-3 bg-primary/10 rounded-full">
-                  <Video className="h-8 w-8 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold">Gerador de Play</h3>
-                <p className="text-muted-foreground">Adicione botões de play profissionais às suas imagens para aumentar cliques e conversões.</p>
-              </div>
-              <div className="flex flex-col items-center space-y-4 text-center p-6 bg-background rounded-xl border shadow-sm">
-                <div className="p-3 bg-primary/10 rounded-full">
-                  <ShieldCheck className="h-8 w-8 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold">Totalmente Seguro</h3>
-                <p className="text-muted-foreground">Não alteramos seus cookies de afiliado. O redirecionamento é 100% transparente.</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-      </main>
-
-      <footer className="border-t py-6 md:py-12 bg-muted/20">
-        <div className="container mx-auto max-w-7xl px-4 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 font-bold text-lg">
-            <ShoppingBag className="h-5 w-5 text-primary" />
-            <span>LinkAfiliado</span>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            © 2026 LinkAfiliado. Todos os direitos reservados.
-          </p>
-          <div className="flex gap-4">
-            <a href="#" className="text-sm text-muted-foreground hover:underline">Termos</a>
-            <a href="#" className="text-sm text-muted-foreground hover:underline">Privacidade</a>
-          </div>
-        </div>
-      </footer>
+              <Button className="w-full" variant="secondary" onClick={() => handleEmailAuth('signup')} disabled={loading}>
+                {loading ? 'Criando conta...' : 'Criar Conta'}
+              </Button>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+        <CardFooter className="flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
+          Ao continuar, você concorda com nossos termos de uso.
+        </CardFooter>
+      </Card>
     </div>
   )
 }
