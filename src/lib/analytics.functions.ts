@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { UAParser } from "ua-parser-js";
 import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { resolveDomain } from "@/utils/domain-resolver";
 
 export const registerClick = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({
@@ -15,15 +16,21 @@ export const registerClick = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const request = getRequest();
     
-    // 1. Buscar o link pelo slug e opcionalmente pelo domínio
+    // 1. Identificar o usuário pelo host
+    const resolved = data.host ? await resolveDomain(data.host) : null;
+    
+    // 2. Buscar o link pelo slug e opcionalmente pelo user_id identificado pelo domínio
     let query = supabase
       .from("links")
-      .select("id, affiliate_url, status, expires_at, custom_domain")
+      .select("id, affiliate_url, status, expires_at, user_id")
       .eq("slug", data.slug);
     
-    // Se o host foi enviado e não é o padrão do app, tentamos filtrar por custom_domain
-    if (data.host && !data.host.includes('lovable.app') && !data.host.includes('localhost')) {
-       query = query.or(`custom_domain.eq.${data.host},custom_domain.is.null`);
+    if (resolved?.userId) {
+      query = query.eq("user_id", resolved.userId);
+    } else if (resolved?.type === 'platform') {
+      // Se estiver no domínio da plataforma, permitimos buscar links sem filtro de usuário
+      // ou podemos restringir apenas a links que não têm domínio customizado.
+      query = query.is("custom_domain", null);
     }
 
     const { data: link, error: linkError } = await query.maybeSingle();

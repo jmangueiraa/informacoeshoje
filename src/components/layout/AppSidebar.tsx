@@ -1,5 +1,5 @@
 import * as React from "react"
-import { LayoutDashboard, PlusCircle, Link2, BarChart3, Settings, LogOut, CreditCard, Video, ShieldAlert } from "lucide-react"
+import { LayoutDashboard, PlusCircle, Link2, BarChart3, Settings, LogOut, CreditCard, Video, ShieldAlert, Globe } from "lucide-react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import { supabase } from "@/integrations/supabase/client"
 import {
@@ -92,14 +92,29 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
               {isAdmin && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Painel ADM">
-                    <Link to="/admin" className="flex items-center gap-3 py-2 text-orange-500 hover:text-orange-600">
-                      <ShieldAlert className="h-5 w-5" />
-                      <span>Painel ADM</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <SidebarGroup>
+                  <SidebarGroupLabel className="text-orange-500/70">Administração</SidebarGroupLabel>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild tooltip="Métricas ADM">
+                          <Link to="/admin" className="flex items-center gap-3 py-2 text-orange-500 hover:text-orange-600">
+                            <ShieldAlert className="h-5 w-5" />
+                            <span>Métricas ADM</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild tooltip="Gerenciar Domínios">
+                          <Link to="/admin/domains" className="flex items-center gap-3 py-2 text-orange-500 hover:text-orange-600">
+                            <Globe className="h-5 w-5" />
+                            <span>Gerenciar Domínios</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
               )}
             </SidebarMenu>
           </SidebarGroupContent>
