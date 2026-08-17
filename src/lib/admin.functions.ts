@@ -113,3 +113,28 @@ export const getAdminDomains = createServerFn({ method: "GET" })
     if (error) throw error;
     return domains || [];
   });
+
+export const deleteAdminDomain = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((id: unknown) => z.string().parse(id))
+  .handler(async ({ data: id, context }) => {
+    const { userId, supabase: authenticatedSupabase } = context;
+
+    // Verificar se o usuário é admin
+    const { data: isAdmin, error: roleError } = await authenticatedSupabase.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin'
+    });
+
+    if (roleError || !isAdmin) {
+      throw new Error("Não autorizado.");
+    }
+
+    const { error } = await authenticatedSupabase
+      .from("user_domains")
+      .delete()
+      .eq("id", id);
+
+    if (error) throw error;
+    return { success: true };
+  });
