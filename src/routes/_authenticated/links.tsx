@@ -183,7 +183,7 @@ function LinksPage() {
               <div className="grid gap-2">
                 <Label htmlFor="slug">Slug Personalizado</Label>
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground text-sm truncate">
+                  <span className="text-muted-foreground text-sm shrink-0">
                     {newLink.custom_domain || "linkshopee.app"}/
                   </span>
                   <Input 
