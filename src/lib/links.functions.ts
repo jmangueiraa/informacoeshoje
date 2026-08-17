@@ -30,7 +30,8 @@ export const checkSlugAvailability = createServerFn({ method: "GET" })
 export const createCustomLink = createServerFn({ method: "POST" })
   .validator((data: unknown) => createLinkSchema.parse(data))
   .handler(async ({ data }) => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
     if (!user) throw new Error("Não autorizado");
 
     // Verificar limite do plano (simplificado por enquanto)
@@ -74,7 +75,8 @@ export const createCustomLink = createServerFn({ method: "POST" })
 
 export const getUserLinks = createServerFn({ method: "GET" })
   .handler(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
     if (!user) throw new Error("Não autorizado");
 
     const { data, error } = await supabase
@@ -90,7 +92,8 @@ export const getUserLinks = createServerFn({ method: "GET" })
 export const deleteLink = createServerFn({ method: "POST" })
   .validator((id: unknown) => z.string().parse(id))
   .handler(async ({ data: id }) => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
     if (!user) throw new Error("Não autorizado");
 
     const { error } = await supabase
@@ -106,7 +109,8 @@ export const deleteLink = createServerFn({ method: "POST" })
 export const toggleLinkStatus = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ id: z.string(), status: z.enum(['active', 'inactive']) }).parse(data))
   .handler(async ({ data }) => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
     if (!user) throw new Error("Não autorizado");
 
     const { error } = await supabase
@@ -121,7 +125,8 @@ export const toggleLinkStatus = createServerFn({ method: "POST" })
 
 export const getUserProfile = createServerFn({ method: "GET" })
   .handler(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
     if (!user) return { error: "Não autenticado" };
 
     const { data: profile, error } = await supabase
@@ -137,7 +142,8 @@ export const getUserProfile = createServerFn({ method: "GET" })
 export const updateProfileDomain = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ domain: z.string() }).parse(data))
   .handler(async ({ data }) => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
     if (!user) return { error: "Não autenticado" };
 
     // 1. Atualizar o domínio no perfil

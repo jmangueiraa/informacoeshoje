@@ -48,7 +48,7 @@ export const Route = createFileRoute('/_authenticated/links')({
 function LinksPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [newLink, setNewLink] = useState({ title: '', slug: '', affiliate_url: '', custom_domain: '' })
+  const [newLink, setNewLink] = useState<{ title: string; slug: string; affiliate_url: string; custom_domain: string | null }>({ title: '', slug: '', affiliate_url: '', custom_domain: '' })
   
   const queryClient = useQueryClient()
 
@@ -86,14 +86,17 @@ function LinksPage() {
   }, [profile]);
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => createCustomLink({ 
-      data: {
-        affiliateUrl: data.affiliate_url,
-        slug: data.slug,
-        title: data.title,
-        customDomain: data.custom_domain
-      }
-    }),
+    mutationFn: async (data: any) => {
+      console.log("Enviando dados para criação:", data);
+      return createCustomLink({ 
+        data: {
+          affiliateUrl: data.affiliate_url,
+          slug: data.slug,
+          title: data.title || undefined,
+          customDomain: data.custom_domain || null
+        }
+      });
+    },
     onSuccess: (result: any) => {
       if (result?.error) {
         toast.error(result.error)
@@ -186,7 +189,7 @@ function LinksPage() {
                 <Input 
                   id="custom_domain" 
                   placeholder="ajp.com.br" 
-                  value={newLink.custom_domain}
+                  value={newLink.custom_domain || ''}
                   onChange={(e) => setNewLink({...newLink, custom_domain: e.target.value})}
                 />
                 <p className="text-[10px] text-muted-foreground">
