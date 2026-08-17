@@ -45,7 +45,12 @@ export const registerClick = createServerFn({ method: "POST" })
     const browser = `${result.browser.name} ${result.browser.version}`;
     const os = `${result.os.name} ${result.os.version}`;
 
-    // 3. Registrar o clique
+    // 3. Obter IP do visitante (pode vir de headers no handler)
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || 
+               request.headers.get("cf-connecting-ip") || 
+               "unknown";
+
+    // 4. Registrar o clique
     await supabase.from("clicks").insert({
       link_id: link.id,
       user_agent: data.userAgent ?? null,
@@ -53,10 +58,14 @@ export const registerClick = createServerFn({ method: "POST" })
       browser: browser,
       operating_system: os,
       referrer: data.referrer ?? null,
+      ip_address: ip,
     });
 
-    // 4. Incrementar contador de cliques no link
-    await supabase.rpc('increment_link_clicks', { link_id: link.id });
+    // 5. Incrementar contador de cliques no link (agora com filtro de IP na RPC)
+    await supabase.rpc('increment_link_clicks', { 
+      link_id: link.id,
+      visitor_ip: ip
+    });
 
     return { url: link.affiliate_url };
   });
