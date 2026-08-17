@@ -3,9 +3,10 @@ import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { UAParser } from "ua-parser-js";
 import { getRequest } from "@tanstack/react-start/server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const registerClick = createServerFn({ method: "POST" })
-  .validator((data: unknown) => z.object({
+  .inputValidator((data: unknown) => z.object({
     slug: z.string(),
     host: z.string().optional(),
     userAgent: z.string().optional(),
@@ -22,7 +23,6 @@ export const registerClick = createServerFn({ method: "POST" })
     
     // Se o host foi enviado e não é o padrão do app, tentamos filtrar por custom_domain
     if (data.host && !data.host.includes('lovable.app') && !data.host.includes('localhost')) {
-       // Se o host for noticiasviraisctv.lovable.app, buscamos links associados a esse domínio ou onde o custom_domain seja nulo (se for o domínio padrão do usuário)
        query = query.or(`custom_domain.eq.${data.host},custom_domain.is.null`);
     }
 
@@ -48,12 +48,12 @@ export const registerClick = createServerFn({ method: "POST" })
     const browser = `${result.browser.name} ${result.browser.version}`;
     const os = `${result.os.name} ${result.os.version}`;
 
-    // 3. Obter IP do visitante
-    const ip = request?.headers.get("x-forwarded-for")?.split(",")[0] || 
+    // 3. Obter IP do visitante de forma robusta
+    const ip = request?.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || 
                request?.headers.get("cf-connecting-ip") || 
                "unknown";
 
-    // 4. Registrar o clique
+    // 4. Registrar o clique na tabela clicks
     await supabase.from("clicks").insert({
       link_id: link.id,
       user_agent: data.userAgent ?? null,
@@ -64,7 +64,7 @@ export const registerClick = createServerFn({ method: "POST" })
       ip_address: ip,
     });
 
-    // 5. Incrementar contador de cliques no link (agora com filtro de IP na RPC)
+    // 5. Incrementar contador de cliques no link via RPC (com filtro de IP de 24h)
     await supabase.rpc('increment_link_clicks', { 
       link_id: link.id,
       visitor_ip: ip
@@ -74,41 +74,40 @@ export const registerClick = createServerFn({ method: "POST" })
   });
 
 export const getDashboardStats = createServerFn({ method: "GET" })
-  .handler(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Não autorizado");
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase: authenticatedSupabase, userId } = context;
 
-    // Total de links
-    const { count: totalLinks } = await supabase
+    // Total de links do usuário
+    const { count: totalLinks } = await authenticatedSupabase
       .from("links")
       .select("*", { count: 'exact', head: true })
-      .eq("user_id", user.id);
+      .eq("user_id", userId);
 
-    // Total de cliques e cliques hoje
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const { data: links } = await supabase
+    // Total de cliques acumulados nos links do usuário
+    const { data: links } = await authenticatedSupabase
       .from("links")
-      .select("id, clicks_count")
-      .eq("user_id", user.id);
+      .select("id, clicks_count, status")
+      .eq("user_id", userId);
 
     const totalClicks = links?.reduce((acc, curr) => acc + (curr.clicks_count || 0), 0) || 0;
+    const activeLinks = links?.filter(l => l.status === 'active').length || 0;
 
-    // Buscar cliques nas últimas 24h para os links do usuário
+    // Cliques nas últimas 24h
+    const today = new Date();
+    today.setHours(today.getHours() - 24); // Mudança para "últimas 24h" reais em vez de "hoje 00:00"
+
     const linkIds = links?.map(l => l.id) || [];
     
     let clicksToday = 0;
     if (linkIds.length > 0) {
-      const { count } = await supabase
+      const { count } = await authenticatedSupabase
         .from("clicks")
         .select("*", { count: 'exact', head: true })
         .in("link_id", linkIds)
         .gte("clicked_at", today.toISOString());
       clicksToday = count || 0;
     }
-
-    const activeLinks = links?.filter(l => true).length || 0; // Simplificado
 
     return {
       totalLinks: totalLinks || 0,

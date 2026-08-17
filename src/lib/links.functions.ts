@@ -16,7 +16,7 @@ const createLinkSchema = z.object({
 });
 
 export const checkSlugAvailability = createServerFn({ method: "GET" })
-  .validator((slug: unknown) => z.string().parse(slug))
+  .inputValidator((slug: unknown) => z.string().parse(slug))
   .handler(async ({ data: slug }) => {
     const { data, error } = await supabase
       .from("links")
@@ -30,7 +30,7 @@ export const checkSlugAvailability = createServerFn({ method: "GET" })
 
 export const createCustomLink = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) => createLinkSchema.parse(data))
+  .inputValidator((data: unknown) => createLinkSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { userId, supabase: authenticatedSupabase } = context;
 
@@ -126,7 +126,7 @@ export const getUserLinks = createServerFn({ method: "GET" })
 
 export const deleteLink = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((id: unknown) => z.string().parse(id))
+  .inputValidator((id: unknown) => z.string().parse(id))
   .handler(async ({ data: id, context }) => {
     const { userId, supabase: authenticatedSupabase } = context;
 
@@ -142,7 +142,7 @@ export const deleteLink = createServerFn({ method: "POST" })
 
 export const toggleLinkStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) => z.object({ id: z.string(), status: z.enum(['active', 'inactive']) }).parse(data))
+  .inputValidator((data: unknown) => z.object({ id: z.string(), status: z.enum(['active', 'inactive']) }).parse(data))
   .handler(async ({ data, context }) => {
     const { userId, supabase: authenticatedSupabase } = context;
 
@@ -173,7 +173,7 @@ export const getUserProfile = createServerFn({ method: "GET" })
 
 export const updateProfileDomain = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) => z.object({ domain: z.string() }).parse(data))
+  .inputValidator((data: unknown) => z.object({ domain: z.string() }).parse(data))
   .handler(async ({ data, context }) => {
     const { userId, supabase: authenticatedSupabase } = context;
 
@@ -201,7 +201,7 @@ export const updateProfileDomain = createServerFn({ method: "POST" })
 
 export const updateProfileSettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) => z.object({
+  .inputValidator((data: unknown) => z.object({
     shopee_app_id: z.string().optional(),
     shopee_app_secret: z.string().optional(),
     shopee_api_key: z.string().optional(),
