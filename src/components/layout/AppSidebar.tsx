@@ -1,5 +1,5 @@
 import * as React from "react"
-import { LayoutDashboard, PlusCircle, History, Settings, LogOut } from "lucide-react"
+import { LayoutDashboard, PlusCircle, History, Settings, LogOut, Flame } from "lucide-react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import { supabase } from "@/integrations/supabase/client"
 import {
@@ -56,6 +56,14 @@ export function AppSidebar() {
                   <Link to="/editor/$id" params={{ id: 'new' }} className="flex items-center gap-3 py-2">
                     <PlusCircle className="h-5 w-5" />
                     <span>Criar Notícia</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Viral Agora">
+                  <Link to="/viral" className="flex items-center gap-3 py-2">
+                    <Flame className="h-5 w-5 text-orange-500" />
+                    <span>Viral Agora</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
