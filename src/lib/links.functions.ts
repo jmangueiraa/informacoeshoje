@@ -55,8 +55,8 @@ export const createCustomLink = createServerFn({ method: "POST" })
         user_id: user.id,
         slug: data.slug,
         affiliate_url: data.affiliateUrl,
-        title: data.title,
-        expires_at: data.expiresAt,
+        title: data.title ?? null,
+        expires_at: data.expiresAt ?? null,
         status: 'active'
       })
       .select()
