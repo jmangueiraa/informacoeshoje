@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { Upload, Type, Download, Trash2, Sparkles, Image as ImageIcon } from 'lucide-react'
 import { toast } from 'sonner'
+import { generateViralContentFromImage } from '@/lib/news/editor.functions'
+import { useServerFn } from '@tanstack/react-start'
 
 export const Route = createFileRoute('/_authenticated/editor/$id')({
   validateSearch: z.object({
@@ -23,6 +25,9 @@ function EditorPage() {
   const [title, setTitle] = useState(initialTitle || '')
   const [source, setSource] = useState(initialSource || '')
   const [curiosity, setCuriosity] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  
+  const generateViralContent = useServerFn(generateViralContentFromImage)
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -45,6 +50,26 @@ function EditorPage() {
     }
   }
 
+  const handleGenerateAI = async () => {
+    if (!imageUrl) {
+      toast.error("Suba uma imagem primeiro para gerar conteúdo contextual.")
+      return
+    }
+
+    setIsGenerating(true)
+    try {
+      const result = await generateViralContent({ data: { imageUrl } })
+      setTitle(result.suggestedTitle)
+      setCuriosity(result.suggestedCuriosity)
+      toast.success("Notícia gerada com sucesso!")
+    } catch (error) {
+      console.error(error)
+      toast.error("Erro ao gerar conteúdo via IA.")
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   const generateCuriosity = () => {
     const curiosities = [
       "Você sabia que o primeiro site da web ainda está no ar?",
@@ -55,7 +80,7 @@ function EditorPage() {
     ]
     const random = curiosities[Math.floor(Math.random() * curiosities.length)]
     setCuriosity(random || "")
-    toast.success("Curiosidade gerada!")
+    toast.success("Curiosidade genérica gerada!")
   }
 
   const drawCanvas = () => {
