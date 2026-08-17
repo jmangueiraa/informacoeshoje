@@ -54,7 +54,7 @@ function EditorPage() {
       "O Brasil é um dos países que mais consome notícias via redes sociais."
     ]
     const random = curiosities[Math.floor(Math.random() * curiosities.length)]
-    setCuriosity(random)
+    setCuriosity(random || "")
     toast.success("Curiosidade gerada!")
   }
 
