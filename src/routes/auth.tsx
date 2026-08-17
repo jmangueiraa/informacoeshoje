@@ -37,7 +37,9 @@ function AuthPage() {
       if (type === 'signup') {
         toast.success('Verifique seu e-mail para confirmar o cadastro!')
       } else {
-        navigate({ to: '/dashboard' })
+        const dest = redirect || '/dashboard'
+        console.log('Login successful, navigating to:', dest)
+        navigate({ to: dest })
       }
     } catch (error: any) {
       toast.error(error.message || 'Erro na autenticação')
