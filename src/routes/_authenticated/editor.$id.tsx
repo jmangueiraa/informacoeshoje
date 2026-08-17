@@ -61,6 +61,7 @@ function EditorPage() {
       const result = await generateViralContent({ data: { imageUrl } })
       setTitle(result.suggestedTitle)
       setCuriosity(result.suggestedCuriosity)
+      setSource("IA Analista")
       toast.success("Notícia gerada com sucesso!")
     } catch (error) {
       console.error(error)
