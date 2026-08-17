@@ -123,14 +123,6 @@ export function AppSidebar() {
       <SidebarFooter className="p-4 border-t">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Planos">
-              <Link to="/dashboard" className="flex items-center gap-3 py-2">
-                <CreditCard className="h-5 w-5" />
-                <span>Assinatura</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Configurações">
               <Link to="/settings" className="flex items-center gap-3 py-2">
                 <Settings className="h-5 w-5" />

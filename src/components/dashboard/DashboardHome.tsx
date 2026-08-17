@@ -90,31 +90,6 @@ export function DashboardHome() {
         </Card>
       </div>
 
-      {profile && !('error' in profile) && (profile as any).is_trial && (
-        <Card className="bg-primary/5 border-primary/20">
-          <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground">Período de Teste Ativo</h3>
-                <p className="text-sm text-muted-foreground">
-                  Você tem 24 horas para testar o sistema com direito a 10 links.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="bg-background">
-                Expira em: {new Date((profile as any).trial_expires_at).toLocaleString()}
-              </Badge>
-              <Button size="sm" asChild>
-                <Link to="/settings">Assinar Pro</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       <div className="space-y-4">
         <div className="flex justify-between items-center">
