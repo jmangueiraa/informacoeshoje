@@ -4,30 +4,64 @@ import { z } from "zod";
 export const generateViralContentFromImage = createServerFn({ method: "POST" })
   .validator((data: { imageUrl: string }) => z.object({ imageUrl: z.string() }).parse(data))
   .handler(async ({ data }) => {
-    // Em um cenário real, usaríamos o AI Gateway para analisar a imagem.
-    // Como estamos implementando a lógica inicial, vamos simular a resposta da IA
-    // baseada em alguns padrões de URLs ou apenas retornar algo criativo genérico
-    // que será aprimorado conforme a integração com Visão for disponibilizada.
+    const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
     
-    const isNature = data.imageUrl.includes('photo') || data.imageUrl.includes('nature');
-    const isTech = data.imageUrl.includes('tech') || data.imageUrl.includes('computer');
-
-    let title = "Descoberta Incrível Impacta o Mundo";
-    let curiosity = "Cientistas afirmam que este fenômeno pode mudar tudo o que sabemos sobre a realidade atual.";
-
-    if (isNature) {
-      title = "Planta mutante encontrada na Amazônia";
-      curiosity = "Botânicos descobriram que esta espécie consegue se comunicar através de frequências de rádio orgânicas.";
-    } else if (isTech) {
-      title = "IA desenvolve consciência e cria própria linguagem";
-      curiosity = "O código gerado é tão complexo que nenhum computador humano consegue decifrar o que foi escrito até agora.";
+    if (!LOVABLE_API_KEY) {
+      // Fallback in case API key is missing during transition
+      return {
+        suggestedTitle: "Erro: IA não configurada",
+        suggestedCuriosity: "Por favor, configure a chave de API do Lovable para usar a análise de imagem."
+      };
     }
 
-    // Simulando um delay de IA
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const response = await fetch("https://api.lovable.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: "Analise esta imagem e crie uma notícia viral (fake news humorística ou sensacionalista). Retorne APENAS um JSON com os campos 'suggestedTitle' (um título impactante e curto) e 'suggestedCuriosity' (um texto curto de curiosidade viral sobre a imagem). O texto deve ser em Português do Brasil.",
+                },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: data.imageUrl,
+                  },
+                },
+              ],
+            },
+          ],
+          response_format: { type: "json_object" },
+        }),
+      });
 
-    return {
-      suggestedTitle: title,
-      suggestedCuriosity: curiosity
-    };
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("AI Gateway error:", errorText);
+        throw new Error("Falha na análise da imagem pela IA");
+      }
+
+      const result = await response.json();
+      const content = JSON.parse(result.choices[0].message.content);
+      
+      return {
+        suggestedTitle: content.suggestedTitle || "Título não gerado",
+        suggestedCuriosity: content.suggestedCuriosity || "Curiosidade não gerada"
+      };
+    } catch (error) {
+      console.error("Error generating content from image:", error);
+      return {
+        suggestedTitle: "Mistério revelado pela imagem",
+        suggestedCuriosity: "Especialistas estão perplexos com os detalhes encontrados nesta foto recente."
+      };
+    }
   });
