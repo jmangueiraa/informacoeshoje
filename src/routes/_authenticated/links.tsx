@@ -46,6 +46,7 @@ export const Route = createFileRoute('/_authenticated/links')({
 })
 
 function LinksPage() {
+  const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newLink, setNewLink] = useState<{ title: string; slug: string; affiliate_url: string; custom_domain: string | null }>({ title: '', slug: '', affiliate_url: '', custom_domain: '' })
