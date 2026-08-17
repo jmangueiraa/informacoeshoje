@@ -193,7 +193,7 @@ function LinksPage() {
                   onChange={(e) => setNewLink({...newLink, custom_domain: e.target.value})}
                 />
                 <p className="text-[10px] text-muted-foreground">
-                  Apenas para usuários Premium. Certifique-se de que o DNS está configurado.
+                  Apenas para usuários Premium. Configure seu domínio `ajpvip.com.br` com um registro CNAME apontando para `noticiasviraisctv.lovable.app`.
                 </p>
               </div>
             </div>

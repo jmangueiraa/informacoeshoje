@@ -19,7 +19,8 @@ export const registerClick = createServerFn({ method: "POST" })
     
     // Se o host foi enviado e não é o padrão do app, tentamos filtrar por custom_domain
     if (data.host && !data.host.includes('lovable.app') && !data.host.includes('localhost')) {
-       query = query.eq("custom_domain", data.host);
+       // Se o host for ajpvip.com.br, buscamos links associados a esse domínio ou onde o custom_domain seja nulo (se for o domínio padrão do usuário)
+       query = query.or(`custom_domain.eq.${data.host},custom_domain.is.null`);
     }
 
     const { data: link, error: linkError } = await query.maybeSingle();

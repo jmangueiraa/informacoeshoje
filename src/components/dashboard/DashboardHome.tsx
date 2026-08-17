@@ -4,7 +4,7 @@ import { PlusCircle, Link2, BarChart3, MousePointer2, ArrowUpRight, Copy, Extern
 import { Link } from "@tanstack/react-router"
 import { useQuery } from "@tanstack/react-query"
 import { getDashboardStats } from "@/lib/analytics.functions"
-import { getUserLinks } from "@/lib/links.functions"
+import { getUserLinks, getUserProfile } from "@/lib/links.functions"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 
@@ -19,11 +19,18 @@ export function DashboardHome() {
     queryFn: () => getUserLinks(),
   })
 
-  const copyToClipboard = (slug: string) => {
-    const url = `${window.location.origin}/${slug}`
+  const copyToClipboard = (link: any) => {
+    const profileDomain = profile && !('error' in profile) ? profile.custom_domain : null;
+    const domain = link.custom_domain || profileDomain || window.location.origin
+    const url = domain.startsWith('http') ? `${domain}/${link.slug}` : `https://${domain}/${link.slug}`
     navigator.clipboard.writeText(url)
     toast.success("Link copiado para a área de transferência!")
   }
+
+  const { data: profile } = useQuery({
+    queryKey: ['user-profile'],
+    queryFn: () => getUserProfile(),
+  })
 
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
@@ -141,7 +148,7 @@ export function DashboardHome() {
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-2">
-                          <Button size="icon" variant="ghost" onClick={() => copyToClipboard(link.slug)}>
+                          <Button size="icon" variant="ghost" onClick={() => copyToClipboard(link)}>
                             <Copy className="h-4 w-4" />
                           </Button>
                           <Button size="icon" variant="ghost" asChild>
