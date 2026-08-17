@@ -14,9 +14,9 @@ function LandingPage() {
       <header className="px-4 lg:px-6 h-16 flex items-center border-b sticky top-0 bg-background/80 backdrop-blur-md z-50">
         <Link to="/" className="flex items-center justify-center gap-2 font-bold text-xl tracking-tight text-primary">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground text-sm">
-            LS
+            LA
           </div>
-          <span>Link<span className="text-foreground">Shopee</span></span>
+          <span>Link<span className="text-foreground">Afiliado</span></span>
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
           <a className="text-sm font-medium hover:text-primary transition-colors cursor-pointer" href="#features">
@@ -38,10 +38,10 @@ function LandingPage() {
             <div className="flex flex-col items-center space-y-4 text-center">
               <div className="space-y-2">
                 <h1 className="text-4xl font-extrabold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">
-                  Transforme seus links de <span className="text-primary">Afiliado Shopee</span>
+                  Transforme seus links de <span className="text-primary">Afiliado</span>
                 </h1>
                 <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl lg:text-2xl">
-                  Crie links personalizados, acompanhe cliques em tempo real e aumente suas conversões com o LinkShopee.
+                  Crie links personalizados, acompanhe cliques em tempo real e aumente suas conversões com o LinkAfiliado.
                 </p>
               </div>
               <div className="space-x-4">
@@ -59,7 +59,7 @@ function LandingPage() {
         {/* Features Section */}
         <section id="features" className="w-full py-12 md:py-24 lg:py-32 bg-muted/50">
           <div className="container mx-auto max-w-7xl px-4">
-            <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl text-center mb-12">Por que o LinkShopee?</h2>
+            <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl text-center mb-12">Por que o LinkAfiliado?</h2>
             <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
               <div className="flex flex-col items-center space-y-4 text-center p-6 bg-background rounded-xl border shadow-sm">
                 <div className="p-3 bg-primary/10 rounded-full">
@@ -162,10 +162,10 @@ function LandingPage() {
         <div className="container mx-auto max-w-7xl px-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 font-bold text-lg">
             <ShoppingBag className="h-5 w-5 text-primary" />
-            <span>LinkShopee</span>
+            <span>LinkAfiliado</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            © 2026 LinkShopee. Todos os direitos reservados.
+            © 2026 LinkAfiliado. Todos os direitos reservados.
           </p>
           <div className="flex gap-4">
             <a href="#" className="text-sm text-muted-foreground hover:underline">Termos</a>

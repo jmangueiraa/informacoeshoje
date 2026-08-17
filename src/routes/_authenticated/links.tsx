@@ -145,7 +145,7 @@ function LinksPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Meus Links</h1>
-          <p className="text-muted-foreground">Gerencie e monitore o desempenho dos seus links Shopee.</p>
+          <p className="text-muted-foreground">Gerencie e monitore o desempenho dos seus links de afiliado.</p>
         </div>
         
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -185,7 +185,7 @@ function LinksPage() {
                 <Label htmlFor="slug">Slug Personalizado</Label>
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground text-sm shrink-0">
-                    {newLink.custom_domain || "linkshopee.app"}/
+                    {newLink.custom_domain || "linkafiliado.app"}/
                   </span>
                   <Input 
                     id="slug" 

@@ -34,9 +34,9 @@ export function AppSidebar() {
       <SidebarHeader className="p-4 border-b">
         <div className="flex items-center gap-2 font-bold text-xl tracking-tight text-primary">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground">
-            LS
+            LA
           </div>
-          <span>Link<span className="text-foreground">Shopee</span></span>
+          <span>Link<span className="text-foreground">Afiliado</span></span>
         </div>
       </SidebarHeader>
       <SidebarContent>
