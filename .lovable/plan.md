@@ -1,25 +1,27 @@
 # Plano: Corrigir Botões de Ação no Dashboard e Links
 
-O usuário relatou que os botões de ação não estão funcionando. Após investigar o código, identifiquei alguns problemas de navegação e lógica nos componentes `DashboardHome.tsx` e `AppSidebar.tsx` que podem causar confusão ou mau funcionamento.
+O usuário relatou que os botões de ação não estão funcionando. Identifiquei erros de lógica em mutações e ações incompletas em menus de contexto.
 
 ## Alterações
 
-### 1. Dashboard (`src/components/dashboard/DashboardHome.tsx`)
-- **Navegação**: O botão "Estatísticas" (BarChart3) nos links recentes apenas redireciona para `/links`. Vou garantir que o redirecionamento faça sentido ou que a ação seja clara.
-- **Consistência**: Verificar se o botão de cópia (`copyToClipboard`) está funcionando corretamente com o domínio padrão do perfil.
+### 1. Correção de Erros Críticos (`src/routes/_authenticated/links.tsx`)
+- **Mutação de Exclusão**: Corrigir `deleteMutation` para passar o ID corretamente para a Server Function `deleteLink`. Atualmente ela envia um objeto `{ id }` onde a função espera apenas a string do ID, causando falha na validação Zod.
+- **Ações do Dropdown**: 
+    - Implementar funcionalidade no botão "Abrir Link" para usar a mesma lógica de URL do "Copiar Link".
+    - Adicionar redirecionamento para `/dashboard` no botão "Estatísticas".
+    - Adicionar redirecionamento para `/settings` no botão "Configurações".
+    - Corrigir o fechamento do dropdown ao clicar em "Copiar Link" movendo a ação para um `DropdownMenuItem`.
 
 ### 2. Sidebar (`src/components/layout/AppSidebar.tsx`)
-- **Links de Navegação**:
-    - "Meus Links" e "Criar Link" estão ambos apontando para `/links`. Embora `/links` tenha o modal de criação, o item "Estatísticas" na sidebar também aponta para `/links` e está sem label de texto (apenas ícone).
-    - Vou adicionar o texto "Estatísticas" ao item de menu correspondente para melhorar a acessibilidade e usabilidade.
+- **Acessibilidade**: Adicionar o texto "Estatísticas" ao item de menu na sidebar, que atualmente exibe apenas o ícone.
 
-### 3. Página de Links (`src/routes/_authenticated/links.tsx`)
-- **Dropdown de Ações**:
-    - O botão "Estatísticas" no dropdown de cada link não tem uma ação definida (apenas fecha o menu).
-    - O botão "Configurações" no dropdown também não tem uma ação definida.
-    - Vou adicionar mensagens de "Em breve" ou redirecionamentos apropriados para essas ações para que o usuário não sinta que o botão "não funciona".
+### 3. Dashboard (`src/components/dashboard/DashboardHome.tsx`)
+- **Navegação**: Garantir que o botão de "Estatísticas" nos links recentes redirecione corretamente.
 
 ## Detalhes Técnicos
-- Corrigir a falta de label no item "Estatísticas" da sidebar.
-- Adicionar feedbacks visuais (toasts) ou redirecionamentos para ações que atualmente são placeholders.
-- Validar se os botões de exclusão e cópia estão disparando as mutações corretamente.
+- Arquivo `src/routes/_authenticated/links.tsx`:
+    - Ajustar `deleteMutation` (linha 123).
+    - Adicionar `DropdownMenuItem` para "Copiar Link".
+    - Preencher `onClick` para "Estatísticas" e "Configurações".
+- Arquivo `src/components/layout/AppSidebar.tsx`:
+    - Adicionar `<span>Estatísticas</span>` (linha 75).
