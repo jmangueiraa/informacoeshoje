@@ -173,7 +173,7 @@ function LinksPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="url">URL Shopee</Label>
+                <Label htmlFor="url">URL Afiliado</Label>
                 <Input 
                   id="url" 
                   placeholder="https://shopee.com.br/..." 
