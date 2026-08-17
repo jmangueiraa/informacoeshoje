@@ -7,6 +7,8 @@ import { Toaster } from '@/components/ui/sonner'
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async ({ location }) => {
     const { data: { session } } = await supabase.auth.getSession()
+    console.log('Session check in _authenticated:', session ? 'Found' : 'Not found')
+    
     if (!session) {
       throw redirect({
         to: '/auth',
