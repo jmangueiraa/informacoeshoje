@@ -291,15 +291,20 @@ function LinksPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                          <DropdownMenuItem asChild>
-                            <a href={`${window.location.origin}/${link.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
-                              <ExternalLink className="h-4 w-4" /> Abrir Link
-                            </a>
+                          <DropdownMenuItem onClick={() => {
+                            const domain = link.custom_domain || window.location.origin
+                            const url = domain.startsWith('http') ? `${domain}/${link.slug}` : `https://${domain}/${link.slug}`
+                            window.open(url, '_blank', 'noopener,noreferrer')
+                          }} className="gap-2">
+                            <ExternalLink className="h-4 w-4" /> Abrir Link
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2">
+                          <DropdownMenuItem onClick={() => copyToClipboard(link)} className="gap-2">
+                            <Copy className="h-4 w-4" /> Copiar Link
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate({ to: '/dashboard' })} className="gap-2">
                             <BarChart3 className="h-4 w-4" /> Estatísticas
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2">
+                          <DropdownMenuItem onClick={() => navigate({ to: '/settings' })} className="gap-2">
                             <Settings2 className="h-4 w-4" /> Configurações
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
