@@ -84,7 +84,7 @@ function SettingsPage() {
   })
 
   const addDomainMutation = useMutation({
-    mutationFn: (data: { domain: string, type: 'subdomain' | 'custom' }) => addUserDomain(data),
+    mutationFn: (data: { domain: string, type: 'subdomain' | 'custom' }) => addUserDomain({ data }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-domains'] })
       toast.success("Domínio adicionado com sucesso!")
@@ -97,7 +97,7 @@ function SettingsPage() {
   })
 
   const deleteDomainMutation = useMutation({
-    mutationFn: (id: string) => deleteUserDomain(id),
+    mutationFn: (id: string) => deleteUserDomain({ data: id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-domains'] })
       toast.success("Domínio removido")
@@ -105,7 +105,7 @@ function SettingsPage() {
   })
 
   const setPrimaryMutation = useMutation({
-    mutationFn: (id: string) => setPrimaryDomain(id),
+    mutationFn: (id: string) => setPrimaryDomain({ data: id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-domains'] })
       queryClient.invalidateQueries({ queryKey: ['user-profile'] })
@@ -114,7 +114,7 @@ function SettingsPage() {
   })
 
   const verifyDNSMutation = useMutation({
-    mutationFn: (id: string) => verifyDomainDNS(id),
+    mutationFn: (id: string) => verifyDomainDNS({ data: id }),
     onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ['user-domains'] })
       if (result.status === 'verified') {
