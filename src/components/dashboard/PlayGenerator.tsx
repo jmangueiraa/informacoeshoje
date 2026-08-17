@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,21 +11,28 @@ import {
   Upload, 
   Download, 
   Trash2, 
-  Maximize, 
-  Settings, 
   Layout, 
   Palette,
   ChevronUp,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  CircleDot
+  CircleDot,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { savePlayAsset, getPlayAssets, deletePlayAsset } from '@/lib/play-generator.functions';
-import { supabase } from '@/integrations/supabase/client';
 
-const PLAY_STYLES = [
+interface PlayStyle {
+  id: string;
+  name: string;
+  bgColor: string;
+  iconColor: string;
+  border: boolean;
+  shadow: boolean;
+}
+
+const PLAY_STYLES: PlayStyle[] = [
   { id: 'default', name: 'Padrão', bgColor: 'rgba(0,0,0,0.5)', iconColor: '#ffffff', border: true, shadow: true },
   { id: 'white', name: 'Branco + Preto', bgColor: '#ffffff', iconColor: '#000000', border: true, shadow: true },
   { id: 'red', name: 'Vermelho + Branco', bgColor: '#ff0000', iconColor: '#ffffff', border: false, shadow: true },
@@ -36,11 +43,10 @@ const PLAY_STYLES = [
 
 export function PlayGenerator() {
   const [image, setImage] = useState<string | null>(null);
-  const [originalFile, setOriginalFile] = useState<File | null>(null);
-  const [playPos, setPlayPos] = useState({ x: 50, y: 50 }); // Porcentagem
+  const [playPos, setPlayPos] = useState({ x: 50, y: 50 });
   const [size, setSize] = useState(100);
   const [opacity, setOpacity] = useState(80);
-  const [style, setStyle] = useState(PLAY_STYLES[0]);
+  const [style, setStyle] = useState<PlayStyle>(PLAY_STYLES[0]);
   const [quality, setQuality] = useState(90);
   const [format, setFormat] = useState<'image/jpeg' | 'image/png' | 'image/webp'>('image/jpeg');
   
@@ -75,7 +81,6 @@ export function PlayGenerator() {
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setOriginalFile(file);
       const reader = new FileReader();
       reader.onload = (event) => setImage(event.target?.result as string);
       reader.readAsDataURL(file);
@@ -85,8 +90,8 @@ export function PlayGenerator() {
   const handleDrag = (e: React.MouseEvent | React.TouchEvent) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
     
     let x = ((clientX - rect.left) / rect.width) * 100;
     let y = ((clientY - rect.top) / rect.height) * 100;
@@ -114,11 +119,9 @@ export function PlayGenerator() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Desenhar imagem original
     ctx.drawImage(img, 0, 0);
 
-    // Calcular dimensões do PLAY proporcionalmente
-    const scale = img.width / 500; // Baseado num preview de 500px
+    const scale = img.width / (containerRef.current?.offsetWidth || 500);
     const playSize = (size / 2) * scale;
     const centerX = (playPos.x / 100) * img.width;
     const centerY = (playPos.y / 100) * img.height;
@@ -126,7 +129,6 @@ export function PlayGenerator() {
     ctx.save();
     ctx.globalAlpha = opacity / 100;
     
-    // Sombra
     if (style.shadow) {
       ctx.shadowColor = 'rgba(0,0,0,0.5)';
       ctx.shadowBlur = 15 * scale;
@@ -134,20 +136,17 @@ export function PlayGenerator() {
       ctx.shadowOffsetY = 5 * scale;
     }
 
-    // Círculo
     ctx.beginPath();
     ctx.arc(centerX, centerY, playSize, 0, Math.PI * 2);
     ctx.fillStyle = style.bgColor;
     ctx.fill();
 
-    // Borda
     if (style.border) {
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 4 * scale;
       ctx.stroke();
     }
 
-    // Triângulo Play
     const triangleSize = playSize * 0.4;
     ctx.beginPath();
     ctx.moveTo(centerX + triangleSize, centerY);
@@ -159,24 +158,17 @@ export function PlayGenerator() {
 
     ctx.restore();
 
-    // Exportar
     const finalDataUrl = canvas.toDataURL(format, quality / 100);
     
-    // Download
-    const link = document.createElement('a');
-    link.download = `shopee-play-${Date.now()}.${format.split('/')[1]}`;
-    link.href = finalDataUrl;
-    link.click();
+    const downloadLink = document.createElement('a');
+    downloadLink.download = `shopee-play-${Date.now()}.${format.split('/')[1]}`;
+    downloadLink.href = finalDataUrl;
+    downloadLink.click();
 
-    // Salvar no Storage e DB (Simulação simplificada: em prod usaríamos upload real)
-    // Para o MVP, salvamos as URLs de data no DB (limite de tamanho se aplica)
-    // Em um cenário real, faríamos upload para o bucket do Supabase.
-    
     try {
-      // Tentar upload real para o storage futuramente. Por agora, apenas registrar o sucesso visual.
       saveMutation.mutate({
-        originalUrl: image.substring(0, 100), // Placeholder
-        finalUrl: finalDataUrl.substring(0, 100), // Placeholder
+        originalUrl: image.substring(0, 50),
+        finalUrl: finalDataUrl.substring(0, 50),
         settings: { playPos, size, opacity, styleId: style.id, quality, format }
       });
     } catch (e) {
@@ -196,7 +188,6 @@ export function PlayGenerator() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-      {/* Editor Lateral */}
       <div className="lg:col-span-4 space-y-6 order-2 lg:order-1">
         <Card>
           <CardContent className="pt-6">
@@ -204,7 +195,7 @@ export function PlayGenerator() {
               <TabsList className="grid w-full grid-cols-3 mb-4">
                 <TabsTrigger value="style"><Palette className="h-4 w-4 mr-2" /> Estilo</TabsTrigger>
                 <TabsTrigger value="layout"><Layout className="h-4 w-4 mr-2" /> Layout</TabsTrigger>
-                <TabsTrigger value="config"><Settings className="h-4 w-4 mr-2" /> Export</TabsTrigger>
+                <TabsTrigger value="config"><SettingsIcon className="h-4 w-4 mr-2" /> Export</TabsTrigger>
               </TabsList>
 
               <TabsContent value="style" className="space-y-4">
@@ -237,7 +228,7 @@ export function PlayGenerator() {
                   </div>
                   <Slider 
                     value={[opacity]} 
-                    onValueChange={([v]) => setOpacity(v)} 
+                    onValueChange={(vals) => setOpacity(vals[0] ?? 80)} 
                     max={100} 
                     step={1} 
                   />
@@ -252,7 +243,7 @@ export function PlayGenerator() {
                   </div>
                   <Slider 
                     value={[size]} 
-                    onValueChange={([v]) => setSize(v)} 
+                    onValueChange={(vals) => setSize(vals[0] ?? 100)} 
                     min={40}
                     max={300} 
                     step={1} 
@@ -288,7 +279,7 @@ export function PlayGenerator() {
                   </div>
                   <Slider 
                     value={[quality]} 
-                    onValueChange={([v]) => setQuality(v)} 
+                    onValueChange={(vals) => setQuality(vals[0] ?? 90)} 
                     min={10}
                     max={100} 
                     step={1} 
@@ -304,16 +295,15 @@ export function PlayGenerator() {
           </CardContent>
         </Card>
 
-        {/* Histórico */}
         <div className="space-y-2">
           <Label className="text-lg font-bold">Histórico Recente</Label>
           <div className="space-y-2">
             {isLoadingAssets ? (
               <div className="text-center py-4 text-muted-foreground text-sm">Carregando...</div>
-            ) : assets?.length === 0 ? (
+            ) : !assets || assets.length === 0 ? (
               <div className="text-center py-4 text-muted-foreground text-sm">Nenhuma imagem gerada ainda.</div>
             ) : (
-              assets?.slice(0, 5).map((asset: any) => (
+              assets.slice(0, 5).map((asset: any) => (
                 <div key={asset.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg border text-sm">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-black rounded flex items-center justify-center overflow-hidden">
@@ -321,7 +311,7 @@ export function PlayGenerator() {
                     </div>
                     <div>
                       <div className="font-medium truncate max-w-[120px]">Imagem {new Date(asset.created_at).toLocaleDateString()}</div>
-                      <div className="text-[10px] text-muted-foreground">{asset.settings.format.split('/')[1].toUpperCase()} • {asset.settings.styleId}</div>
+                      <div className="text-[10px] text-muted-foreground">{asset.settings?.format?.split('/')[1]?.toUpperCase() || 'JPG'}</div>
                     </div>
                   </div>
                   <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => deleteMutation.mutate(asset.id)}>
@@ -334,7 +324,6 @@ export function PlayGenerator() {
         </div>
       </div>
 
-      {/* Preview Principal */}
       <div className="lg:col-span-8 space-y-4 order-1 lg:order-2">
         {!image ? (
           <div className="aspect-video w-full border-2 border-dashed rounded-xl flex flex-col items-center justify-center bg-muted/20 gap-4 p-8 text-center">
@@ -368,16 +357,14 @@ export function PlayGenerator() {
                 draggable={false}
               />
               
-              {/* Overlay do Botão PLAY */}
               <div 
-                className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-transform duration-75"
+                className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
                 style={{ 
                   left: `${playPos.x}%`, 
                   top: `${playPos.y}%`,
                   width: `${size}px`,
                   height: `${size}px`,
-                  opacity: opacity / 100,
-                  transition: 'none'
+                  opacity: opacity / 100
                 }}
               >
                 <div 
@@ -408,7 +395,6 @@ export function PlayGenerator() {
         )}
       </div>
 
-      {/* Canvas Oculto para Renderização */}
       <canvas ref={canvasRef} className="hidden" />
     </div>
   );
