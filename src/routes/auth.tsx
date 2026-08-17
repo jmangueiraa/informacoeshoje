@@ -45,18 +45,12 @@ function AuthPage() {
         navigate({ to: redirect || '/dashboard' })
       } else {
         const dest = redirect || '/dashboard'
-        console.log('Login successful, waiting for session sync...')
         toast.success('Entrando...')
         
-        // Wait a small moment for Supabase to persist the session to localStorage
-        // before performing a hard navigation
+        // Brief pause to allow state to settle, then navigate via router
         setTimeout(() => {
-          if (typeof window !== 'undefined') {
-            window.location.href = dest
-          } else {
-            navigate({ to: dest })
-          }
-        }, 800)
+          navigate({ to: dest })
+        }, 500)
       }
     } catch (error: any) {
       console.error('Auth handler error:', error)

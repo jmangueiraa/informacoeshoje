@@ -121,11 +121,11 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state change:', event)
       
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        router.invalidate();
+        await router.invalidate();
       }
       
       if (event === 'SIGNED_OUT') {

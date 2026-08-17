@@ -6,35 +6,35 @@ import { Toaster } from '@/components/ui/sonner'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async ({ location }) => {
-    // Attempt to get session, allowing a small window for hydration if needed
-    let session = null
-    const { data } = await supabase.auth.getSession()
-    session = data.session
+    // Attempt to get session
+    const { data: { session } } = await supabase.auth.getSession()
 
-    // If no session, wait a brief moment and check again to be sure it's not a slow hydration
-    if (!session && typeof window !== 'undefined') {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      const { data: retryData } = await supabase.auth.getSession()
-      session = retryData.session
-    }
-    
     if (!session) {
-      // Final check for indicators of an in-progress auth flow
+      // Check if there's any sign of a token in localStorage before redirecting
+      const supabaseProjectID = import.meta.env['VITE_SUPABASE_PROJECT_ID'];
+      const storageKey = `sb-${supabaseProjectID}-auth-token`;
+      const hasTokenInStorage = typeof window !== 'undefined' && !!window.localStorage.getItem(storageKey);
+      
       const isAuthCallback = typeof window !== 'undefined' && 
         (window.location.hash.includes('access_token=') || 
-         window.location.search.includes('code=') ||
-         window.localStorage.getItem('sb-' + import.meta.env['VITE_SUPABASE_PROJECT_ID'] + '-auth-token') !== null);
+         window.location.search.includes('code='));
 
-      if (!isAuthCallback) {
-        throw redirect({
-          to: '/auth',
-          search: {
-            redirect: location.href,
-          },
-        })
+      // If we have a token or are in a callback, wait a bit longer for the SDK to hydrate
+      if (hasTokenInStorage || isAuthCallback) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const { data: { session: retriedSession } } = await supabase.auth.getSession();
+        if (retriedSession) return { session: retriedSession, userId: retriedSession.user.id };
       }
+
+      // No session found after checks, redirect to auth
+      throw redirect({
+        to: '/auth',
+        search: {
+          redirect: location.href,
+        },
+      })
     }
-    return { session, userId: session?.user?.id }
+    return { session, userId: session.user.id }
   },
   component: AuthenticatedLayout,
 })
