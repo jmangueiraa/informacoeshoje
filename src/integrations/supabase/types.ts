@@ -445,9 +445,10 @@ export type Database = {
         }
         Returns: boolean
       }
-      increment_link_clicks:
-        | { Args: { link_id: string }; Returns: undefined }
-        | { Args: { link_id: string; visitor_ip?: string }; Returns: undefined }
+      increment_link_clicks: {
+        Args: { link_id: string; visitor_ip: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
