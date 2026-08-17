@@ -95,6 +95,39 @@ export type Database = {
         }
         Relationships: []
       }
+      trending_topics: {
+        Row: {
+          created_at: string | null
+          id: string
+          image_url: string | null
+          mentions: number | null
+          source: string | null
+          subject: string
+          suggested_title: string | null
+          trending_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          mentions?: number | null
+          source?: string | null
+          subject: string
+          suggested_title?: string | null
+          trending_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          mentions?: number | null
+          source?: string | null
+          subject?: string
+          suggested_title?: string | null
+          trending_at?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
