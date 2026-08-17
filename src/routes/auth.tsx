@@ -71,8 +71,8 @@ function AuthPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-3xl font-bold tracking-tight text-primary">FakeNews Studio</CardTitle>
-          <CardDescription>Crie notícias virais profissionais em segundos</CardDescription>
+          <CardTitle className="text-3xl font-bold tracking-tight text-primary">LinkShopee</CardTitle>
+          <CardDescription>Gerencie seus links de afiliado com inteligência</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid grid-cols-1 gap-2">
