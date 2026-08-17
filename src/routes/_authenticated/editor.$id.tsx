@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Card } from '@/components/ui/card'
 import { Upload, Type, Download, Trash2, Sparkles, Image as ImageIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -29,8 +30,8 @@ function EditorPage() {
   // Atualiza a imagem quando muda via busca (ex: vindo do Viral Agora)
   useEffect(() => {
     if (initialImageUrl) setImageUrl(initialImageUrl)
-    if (initialTitle) setTitle(initialTitle)
-    if (initialSource) setSource(initialSource)
+    if (initialTitle) setTitle(initialTitle || '')
+    if (initialSource) setSource(initialSource || '')
   }, [initialImageUrl, initialTitle, initialSource])
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
