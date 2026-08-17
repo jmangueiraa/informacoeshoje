@@ -189,7 +189,7 @@ function LinksPage() {
                 <Input 
                   id="custom_domain" 
                   placeholder="ajp.com.br" 
-                  value={newLink.custom_domain}
+                  value={newLink.custom_domain || ''}
                   onChange={(e) => setNewLink({...newLink, custom_domain: e.target.value})}
                 />
                 <p className="text-[10px] text-muted-foreground">
