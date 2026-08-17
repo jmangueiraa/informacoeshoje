@@ -4,7 +4,7 @@ import { PlusCircle, Link2, BarChart3, MousePointer2, ArrowUpRight, Copy, Extern
 import { Link } from "@tanstack/react-router"
 import { useQuery } from "@tanstack/react-query"
 import { getDashboardStats } from "@/lib/analytics.functions"
-import { getUserLinks } from "@/lib/links.functions"
+import { getUserLinks, getUserProfile } from "@/lib/links.functions"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 
