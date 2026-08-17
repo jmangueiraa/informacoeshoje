@@ -1,48 +1,24 @@
-# Plano de Implementação: Módulo de Tendências e Imagens Virais
+---
+title: Corrigir falha no redirecionamento de login
+---
 
-Adição de funcionalidade de pesquisa de tendências e sugestão de imagens/títulos para o FakeNews Studio.
+## Problema
+O usuário relatou que "não está fazendo login na página". Ao investigar os logs e o código, observamos que o fluxo de autenticação por e-mail no arquivo `src/routes/auth.tsx` pode estar falhando em completar o redirecionamento ou capturar erros silenciosos, e o `_authenticated` layout pode estar bloqueando acessos legítimos se o estado da sessão não for sincronizado corretamente.
 
-## 1. Banco de Dados (Lovable Cloud)
+## Solução
+1.  **Refatorar o fluxo de login**: Garantir que o `supabase.auth.signInWithPassword` limpe qualquer estado anterior e que o redirecionamento use o parâmetro `redirect` da busca (search params) se disponível.
+2.  **Melhorar o feedback de erro**: Adicionar logs detalhados e garantir que o `toast.error` capture a mensagem real do backend.
+3.  **Ajustar a guarda de rota**: Garantir que o `beforeLoad` em `src/routes/_authenticated.tsx` seja resiliente a verificações de sessão assíncronas.
 
-*   **Tabela `trending_topics`**:
-    *   `id` (uuid, primary key)
-    *   `subject` (text)
-    *   `image_url` (text)
-    *   `source` (text)
-    *   `mentions` (integer)
-    *   `trending_at` (timestamp with time zone)
-    *   `suggested_title` (text)
-    *   `created_at` (timestamp with time zone)
+## Etapas de implementação
 
-*   **Segurança**: RLS habilitado (SELECT público ou para authenticated).
+### Frontend
+- **src/routes/auth.tsx**:
+    - Atualizar `handleEmailAuth` para usar o parâmetro de redirecionamento da URL após login bem-sucedido.
+    - Adicionar log de console para depuração em tempo real durante falhas.
+- **src/routes/_authenticated.tsx**:
+    - Refinar a lógica de `beforeLoad` para garantir que a sessão seja verificada corretamente antes de disparar o redirecionamento para `/auth`.
 
-## 2. API e Lógica de Servidor (TanStack Start)
-
-*   **Server Function `getTrendingTopics`**:
-    *   Responsável por buscar dados em alta (inicialmente mockado com dados reais simulados, preparado para integração com Google Trends/News API).
-    *   Atualiza a tabela `trending_topics`.
-*   **Server Function `searchImages`**:
-    *   Busca imagens relacionadas ao tema usando APIs públicas (Unsplash/Pexels via Lovable Cloud connectors se disponível, ou mock robusto).
-
-## 3. Frontend e UI
-
-*   **Dashboard - Área "Em Alta Agora"**:
-    *   Novo componente `TrendingSection.tsx` integrado ao `DashboardHome.tsx`.
-    *   Grid de cards com: Assunto, Imagem, Fonte, Data/Hora, Menções.
-    *   Botão "Usar imagem": Redireciona para o editor injetando os dados (imagem e título sugerido).
-*   **Editor - Integração**:
-    *   Funcionalidade "Imagem em Alta" dentro do editor para pesquisar e atualizar temas sem sair da edição.
-    *   Botão "Atualizar" para forçar nova busca de tendências.
-
-## 4. Fluxo de Trabalho
-
-1.  Criar migração para a tabela `trending_topics`.
-2.  Implementar `src/lib/news/trends.functions.ts` para lógica de busca e sugestão.
-3.  Criar componente `TrendingSection` e adicionar ao Dashboard.
-4.  Implementar botão de atualização de tendências.
-5.  Integrar a seleção de tendência com o redirecionamento/preenchimento do Editor.
-
-## Detalhes Técnicos
-
-*   **IA Gateway**: Usar modelos Gemini ou GPT para gerar títulos criativos e sugestivos baseados no assunto em alta.
-*   **Realtime**: (Opcional) Usar Supabase Realtime para atualizar a lista quando novos tópicos forem detectados.
+## Validação
+- Executar script Playwright para simular login e verificar se o redirecionamento para `/dashboard` (ou a URL pretendida) ocorre.
+- Verificar se erros de "Invalid credentials" são exibidos corretamente via toast.
