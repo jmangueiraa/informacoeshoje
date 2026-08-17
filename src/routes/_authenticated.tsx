@@ -23,7 +23,7 @@ export const Route = createFileRoute('/_authenticated')({
       const isAuthCallback = typeof window !== 'undefined' && 
         (window.location.hash.includes('access_token=') || 
          window.location.search.includes('code=') ||
-         window.localStorage.getItem('sb-' + import.meta.env.VITE_SUPABASE_PROJECT_ID + '-auth-token') !== null);
+         window.localStorage.getItem('sb-' + import.meta.env['VITE_SUPABASE_PROJECT_ID'] + '-auth-token') !== null);
 
       if (!isAuthCallback) {
         throw redirect({
