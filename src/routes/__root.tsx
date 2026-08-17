@@ -122,14 +122,17 @@ function RootComponent() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state change:', event)
+      
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         router.invalidate();
       }
       
       if (event === 'SIGNED_OUT') {
         queryClient.clear();
-        // Only navigate if we are currently in an authenticated route
-        if (window.location.pathname !== '/auth') {
+        // Only navigate if we are currently in an authenticated route and not in the process of a new login
+        const isAuthPage = window.location.pathname === '/auth';
+        if (!isAuthPage) {
           router.navigate({ to: '/auth' });
         }
       }
