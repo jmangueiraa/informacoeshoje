@@ -380,6 +380,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_link_clicks: { Args: { link_id: string }; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
