@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { PlusCircle, Link2, BarChart3, CursorClick, ArrowUpRight, Copy, ExternalLink, Activity } from "lucide-react"
+import { PlusCircle, Link2, BarChart3, MousePointer2, ArrowUpRight, Copy, ExternalLink, Activity } from "lucide-react"
 import { Link } from "@tanstack/react-router"
 import { useQuery } from "@tanstack/react-query"
 import { getDashboardStats } from "@/lib/analytics.functions"
