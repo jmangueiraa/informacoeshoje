@@ -31,7 +31,7 @@ export function AppSidebar() {
     if (error) {
       toast.error("Erro ao sair")
     } else {
-      navigate({ to: '/auth' })
+      navigate({ to: '/' })
       window.location.reload() // Ensure all states are cleared
     }
   }
