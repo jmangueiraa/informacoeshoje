@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { z } from "zod";
 
 export type ContentType = 'image' | 'video';
@@ -31,15 +30,14 @@ const TRENDING_MOCK = [
 ];
 
 export const getViralContent = createServerFn({ method: "GET" })
-  .inputValidator((data) => z.object({ category: z.string().optional() }).parse(data))
+  .validator((data: { category?: string }) => data)
   .handler(async ({ data }) => {
-    // Import helper dynamic to avoid type issues before schema sync if needed
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     
     let query = supabaseAdmin.from('viral_contents').select('*');
     
     if (data.category && data.category !== 'trending') {
-      query = query.eq('category', data.category as any);
+      query = query.eq('category', data.category);
     }
     
     const { data: results, error } = await query.order('score', { ascending: false });
@@ -47,12 +45,12 @@ export const getViralContent = createServerFn({ method: "GET" })
     if (error) throw error;
     
     if (!results || results.length === 0) {
-      await supabaseAdmin.from('viral_contents').insert(TRENDING_MOCK as any);
+      await supabaseAdmin.from('viral_contents').insert(TRENDING_MOCK);
       const { data: seeded } = await supabaseAdmin.from('viral_contents').select('*').order('score', { ascending: false });
-      return (seeded || []) as any[];
+      return seeded || [];
     }
     
-    return results as any[];
+    return results;
   });
 
 export const refreshViralRadar = createServerFn({ method: "POST" })
@@ -62,11 +60,11 @@ export const refreshViralRadar = createServerFn({ method: "POST" })
     
     if (existing) {
       for (const item of existing) {
-        const newScore = Math.min(100, Math.max(0, (item as any).score + (Math.random() * 10 - 5)));
+        const newScore = Math.min(100, Math.max(0, item.score + (Math.random() * 10 - 5)));
         await supabaseAdmin.from('viral_contents').update({ 
           score: Math.floor(newScore),
           updated_at: new Date().toISOString()
-        } as any).eq('id', (item as any).id);
+        }).eq('id', item.id);
       }
     }
     
