@@ -121,10 +121,15 @@ function ViralAgoraPage() {
                     className="w-full h-full object-cover transition-transform group-hover:scale-105"
                   />
                 )}
-                <div className="absolute top-2 right-2 flex gap-2">
+                <div className="absolute top-2 right-2 flex flex-col items-end gap-2">
                   <Badge className={`${getScoreColor(item.score ?? 0)} border-none font-bold backdrop-blur-md`}>
                     🔥 {item.score ?? 0}/100
                   </Badge>
+                  {['UOL', 'O Globo', 'G1'].some(source => item.source?.includes(source)) && (
+                    <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 text-[10px] backdrop-blur-md">
+                      ✓ Fonte Verificada
+                    </Badge>
+                  )}
                   {item.type === 'video' && (
                     <Badge variant="secondary" className="backdrop-blur-md bg-black/50 text-white border-none">
                       <Play className="h-3 w-3 mr-1 fill-white" /> VÍDEO
