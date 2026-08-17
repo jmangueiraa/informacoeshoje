@@ -201,7 +201,7 @@ export const updateProfileDomain = createServerFn({ method: "POST" })
 
 export const updateProfileSettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) => z.object({
+  .inputValidator((data: unknown) => z.object({
     shopee_app_id: z.string().optional(),
     shopee_app_secret: z.string().optional(),
     shopee_api_key: z.string().optional(),
