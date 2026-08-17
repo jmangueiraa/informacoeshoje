@@ -1,5 +1,5 @@
 import * as React from "react"
-import { LayoutDashboard, PlusCircle, History, Settings, LogOut, Flame } from "lucide-react"
+import { LayoutDashboard, PlusCircle, Link2, BarChart3, Settings, LogOut, CreditCard } from "lucide-react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import { supabase } from "@/integrations/supabase/client"
 import {
@@ -33,9 +33,9 @@ export function AppSidebar() {
       <SidebarHeader className="p-4 border-b">
         <div className="flex items-center gap-2 font-bold text-xl tracking-tight text-primary">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground">
-            FN
+            LS
           </div>
-          <span>FakeNews<span className="text-foreground">Studio</span></span>
+          <span>Link<span className="text-foreground">Shopee</span></span>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -52,18 +52,26 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Criar Notícia">
-                  <Link to="/editor/$id" params={{ id: 'new' }} className="flex items-center gap-3 py-2">
-                    <PlusCircle className="h-5 w-5" />
-                    <span>Criar Notícia</span>
+                <SidebarMenuButton asChild tooltip="Meus Links">
+                  <Link to="/dashboard" className="flex items-center gap-3 py-2">
+                    <Link2 className="h-5 w-5" />
+                    <span>Meus Links</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Viral Agora">
-                  <Link to="/viral" className="flex items-center gap-3 py-2">
-                    <Flame className="h-5 w-5 text-orange-500" />
-                    <span>Viral Agora</span>
+                <SidebarMenuButton asChild tooltip="Criar Link">
+                  <Link to="/dashboard" className="flex items-center gap-3 py-2">
+                    <PlusCircle className="h-5 w-5 text-primary" />
+                    <span>Criar Link</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Estatísticas">
+                  <Link to="/dashboard" className="flex items-center gap-3 py-2">
+                    <BarChart3 className="h-5 w-5" />
+                    <span>Estatísticas</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -73,6 +81,14 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-4 border-t">
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Planos">
+              <Link to="/dashboard" className="flex items-center gap-3 py-2">
+                <CreditCard className="h-5 w-5" />
+                <span>Assinatura</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <Link to="/dashboard" className="flex items-center gap-3">

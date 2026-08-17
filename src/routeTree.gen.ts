@@ -10,15 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SlugRouteImport } from './routes/$slug'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
-import { Route as AuthenticatedViralRouteImport } from './routes/_authenticated/viral'
-import { Route as AuthenticatedEditorIdRouteImport } from './routes/_authenticated/editor.$id'
+import { Route as AuthenticatedLinksRouteImport } from './routes/_authenticated/links'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SlugRoute = SlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -35,57 +40,53 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedViralRoute = AuthenticatedViralRouteImport.update({
-  id: '/viral',
-  path: '/viral',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedEditorIdRoute = AuthenticatedEditorIdRouteImport.update({
-  id: '/editor/$id',
-  path: '/editor/$id',
+const AuthenticatedLinksRoute = AuthenticatedLinksRouteImport.update({
+  id: '/links',
+  path: '/links',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/$slug': typeof SlugRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/viral': typeof AuthenticatedViralRoute
-  '/editor/$id': typeof AuthenticatedEditorIdRoute
+  '/links': typeof AuthenticatedLinksRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/$slug': typeof SlugRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/viral': typeof AuthenticatedViralRoute
-  '/editor/$id': typeof AuthenticatedEditorIdRoute
+  '/links': typeof AuthenticatedLinksRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/$slug': typeof SlugRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
-  '/_authenticated/viral': typeof AuthenticatedViralRoute
-  '/_authenticated/editor/$id': typeof AuthenticatedEditorIdRoute
+  '/_authenticated/links': typeof AuthenticatedLinksRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/dashboard' | '/viral' | '/editor/$id'
+  fullPaths: '/' | '/$slug' | '/auth' | '/dashboard' | '/links'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/dashboard' | '/viral' | '/editor/$id'
+  to: '/' | '/$slug' | '/auth' | '/dashboard' | '/links'
   id:
     | '__root__'
     | '/'
+    | '/$slug'
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/dashboard'
-    | '/_authenticated/viral'
-    | '/_authenticated/editor/$id'
+    | '/_authenticated/links'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SlugRoute: typeof SlugRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthRoute: typeof AuthRoute
 }
@@ -97,6 +98,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/$slug': {
+      id: '/$slug'
+      path: '/$slug'
+      fullPath: '/$slug'
+      preLoaderRoute: typeof SlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -120,18 +128,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/viral': {
-      id: '/_authenticated/viral'
-      path: '/viral'
-      fullPath: '/viral'
-      preLoaderRoute: typeof AuthenticatedViralRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/editor/$id': {
-      id: '/_authenticated/editor/$id'
-      path: '/editor/$id'
-      fullPath: '/editor/$id'
-      preLoaderRoute: typeof AuthenticatedEditorIdRouteImport
+    '/_authenticated/links': {
+      id: '/_authenticated/links'
+      path: '/links'
+      fullPath: '/links'
+      preLoaderRoute: typeof AuthenticatedLinksRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
   }
@@ -139,14 +140,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
-  AuthenticatedViralRoute: typeof AuthenticatedViralRoute
-  AuthenticatedEditorIdRoute: typeof AuthenticatedEditorIdRoute
+  AuthenticatedLinksRoute: typeof AuthenticatedLinksRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
-  AuthenticatedViralRoute: AuthenticatedViralRoute,
-  AuthenticatedEditorIdRoute: AuthenticatedEditorIdRoute,
+  AuthenticatedLinksRoute: AuthenticatedLinksRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -155,6 +154,7 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SlugRoute: SlugRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthRoute: AuthRoute,
 }
