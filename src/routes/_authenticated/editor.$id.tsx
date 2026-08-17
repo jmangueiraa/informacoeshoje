@@ -184,10 +184,10 @@ function EditorPage() {
         <div className="flex gap-2">
           {imageUrl && (
             <>
-              <Button variant="outline" onClick={() => { setImageUrl(null); setCuriosity(''); }} className="text-destructive hover:text-destructive">
+              <Button variant="outline" onClick={() => { setImageUrl(null); setCuriosity(''); setTitle(''); }} disabled={isGenerating} className="text-destructive hover:text-destructive">
                 <Trash2 className="h-4 w-4 mr-2" /> Limpar
               </Button>
-              <Button onClick={downloadImage}>
+              <Button onClick={downloadImage} disabled={isGenerating}>
                 <Download className="h-4 w-4 mr-2" /> Exportar
               </Button>
             </>
