@@ -54,7 +54,7 @@ function EditorPage() {
       "O Brasil é um dos países que mais consome notícias via redes sociais."
     ]
     const random = curiosities[Math.floor(Math.random() * curiosities.length)]
-    setCuriosity(random)
+    setCuriosity(random || "")
     toast.success("Curiosidade gerada!")
   }
 
@@ -120,6 +120,14 @@ function EditorPage() {
         ctx.fillText(line, canvas.width * 0.05, y)
       }
 
+      // Fonte
+      if (source) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
+        ctx.font = `italic ${Math.floor(canvas.width * 0.025)}px Inter, sans-serif`
+        ctx.textAlign = 'left'
+        ctx.fillText(`Fonte: ${source}`, canvas.width * 0.05, canvas.height * 0.95)
+      }
+
       // Marca d'água
       ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'
       ctx.font = `${Math.floor(canvas.width * 0.02)}px Inter, sans-serif`
@@ -130,7 +138,7 @@ function EditorPage() {
 
   useEffect(() => {
     drawCanvas()
-  }, [imageUrl, title, curiosity])
+  }, [imageUrl, title, curiosity, source])
 
   const downloadImage = () => {
     const canvas = canvasRef.current
