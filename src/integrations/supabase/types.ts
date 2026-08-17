@@ -146,6 +146,51 @@ export type Database = {
         }
         Relationships: []
       }
+      viral_contents: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: string
+          image_url: string | null
+          mentions: number | null
+          score: number | null
+          source: string | null
+          subject: string
+          suggested_title: string | null
+          type: string
+          updated_at: string | null
+          video_url: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          mentions?: number | null
+          score?: number | null
+          source?: string | null
+          subject: string
+          suggested_title?: string | null
+          type: string
+          updated_at?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          mentions?: number | null
+          score?: number | null
+          source?: string | null
+          subject?: string
+          suggested_title?: string | null
+          type?: string
+          updated_at?: string | null
+          video_url?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
