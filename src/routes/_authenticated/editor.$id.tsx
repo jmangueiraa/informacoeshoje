@@ -154,11 +154,7 @@ function EditorPage() {
         ctx.fillText(`Fonte: ${source}`, canvas.width * 0.05, canvas.height * 0.95)
       }
 
-      // Marca d'água
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'
-      ctx.font = `${Math.floor(canvas.width * 0.02)}px Inter, sans-serif`
-      ctx.textAlign = 'right'
-      ctx.fillText('FakeNews Studio', canvas.width - 20, canvas.height - 20)
+      // Marca d'água removida a pedido do usuário
     }
   }
 
