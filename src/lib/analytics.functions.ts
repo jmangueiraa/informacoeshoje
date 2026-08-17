@@ -74,7 +74,9 @@ export const registerClick = createServerFn({ method: "POST" })
     });
 
     // 5. Incrementar contador de cliques no link via RPC (com filtro de IP de 24h)
-    await supabase.rpc('increment_link_clicks', { 
+    // Usamos supabaseAdmin para ignorar restrições de execução da função security definer
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.rpc('increment_link_clicks', { 
       link_id: link.id,
       visitor_ip: ip
     });
