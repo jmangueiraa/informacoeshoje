@@ -47,7 +47,7 @@ export const Route = createFileRoute('/_authenticated/links')({
 function LinksPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [newLink, setNewLink] = useState({ title: '', slug: '', affiliate_url: '' })
+  const [newLink, setNewLink] = useState({ title: '', slug: '', affiliate_url: '', custom_domain: '' })
   
   const queryClient = useQueryClient()
 
@@ -60,7 +60,8 @@ function LinksPage() {
     mutationFn: (data: any) => createCustomLink({ data: {
       affiliateUrl: data.affiliate_url,
       slug: data.slug,
-      title: data.title
+      title: data.title,
+      customDomain: data.custom_domain
     }}),
     onSuccess: (result: any) => {
       if (result?.error) {
@@ -69,7 +70,7 @@ function LinksPage() {
         queryClient.invalidateQueries({ queryKey: ['user-links'] })
         toast.success("Link criado com sucesso!")
         setIsCreateOpen(false)
-        setNewLink({ title: '', slug: '', affiliate_url: '' })
+        setNewLink({ title: '', slug: '', affiliate_url: '', custom_domain: '' })
       }
     }
   })
@@ -82,8 +83,9 @@ function LinksPage() {
     }
   })
 
-  const copyToClipboard = (slug: string) => {
-    const url = `${window.location.origin}/${slug}`
+  const copyToClipboard = (link: any) => {
+    const domain = link.custom_domain || window.location.origin
+    const url = domain.startsWith('http') ? `${domain}/${link.slug}` : `https://${domain}/${link.slug}`
     navigator.clipboard.writeText(url)
     toast.success("Link copiado!")
   }
@@ -137,7 +139,9 @@ function LinksPage() {
               <div className="grid gap-2">
                 <Label htmlFor="slug">Slug Personalizado</Label>
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground text-sm">linkshopee.app/</span>
+                  <span className="text-muted-foreground text-sm truncate">
+                    {newLink.custom_domain || "linkshopee.app"}/
+                  </span>
                   <Input 
                     id="slug" 
                     placeholder="tenis-promo" 
@@ -145,6 +149,18 @@ function LinksPage() {
                     onChange={(e) => setNewLink({...newLink, slug: e.target.value})}
                   />
                 </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="custom_domain">Domínio Personalizado (Opcional)</Label>
+                <Input 
+                  id="custom_domain" 
+                  placeholder="ajp.com.br" 
+                  value={newLink.custom_domain}
+                  onChange={(e) => setNewLink({...newLink, custom_domain: e.target.value})}
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Apenas para usuários Premium. Certifique-se de que o DNS está configurado.
+                </p>
               </div>
             </div>
             <DialogFooter>
@@ -218,7 +234,7 @@ function LinksPage() {
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="icon" onClick={() => copyToClipboard(link.slug)} title="Copiar Link">
+                      <Button variant="outline" size="icon" onClick={() => copyToClipboard(link)} title="Copiar Link">
                         <Copy className="h-4 w-4" />
                       </Button>
                       
