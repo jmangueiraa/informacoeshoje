@@ -97,7 +97,7 @@ export const createCustomLink = createServerFn({ method: "POST" })
 
     const { data: link, error } = await authenticatedSupabase
       .from("links")
-      .insert(insertData)
+      .insert(insertData as any)
       .select()
       .single();
 

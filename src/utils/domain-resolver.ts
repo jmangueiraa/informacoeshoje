@@ -13,7 +13,7 @@ export async function resolveDomain(hostname: string): Promise<ResolvedDomain | 
   // 1. Se for o domínio principal da plataforma
   if (normalizedHost === PLATFORM_DOMAIN || normalizedHost.includes('lovable.app') || normalizedHost.includes('localhost')) {
     return {
-      userId: '', // Não associado a um usuário específico (conteúdo geral ou admin)
+      userId: '',
       domain: normalizedHost,
       type: 'platform'
     };
@@ -22,18 +22,11 @@ export async function resolveDomain(hostname: string): Promise<ResolvedDomain | 
   // 2. Buscar no banco de dados por user_domains
   const { data, error } = await supabase
     .from("user_domains")
-    .select("user_id, domain, domain_type, verification_status")
+    .select("id, user_id, domain, domain_type, verification_status")
     .eq("domain", normalizedHost)
     .maybeSingle();
 
   if (error || !data) {
-    // Tentar verificar se é um subdomínio no formato user.plataforma.com.br
-    if (normalizedHost.endsWith(`.${PLATFORM_DOMAIN}`)) {
-      const subdomain = normalizedHost.split('.')[0];
-      // Poderíamos fazer uma busca pelo subdomínio aqui se necessário, 
-      // mas o insert já garante que subdomínios estão na tabela user_domains.
-      return null;
-    }
     return null;
   }
 
