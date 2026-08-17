@@ -67,6 +67,7 @@ export type Database = {
           clicks_count: number | null
           created_at: string
           custom_domain: string | null
+          domain_id: string | null
           expires_at: string | null
           id: string
           slug: string
@@ -80,6 +81,7 @@ export type Database = {
           clicks_count?: number | null
           created_at?: string
           custom_domain?: string | null
+          domain_id?: string | null
           expires_at?: string | null
           id?: string
           slug: string
@@ -93,6 +95,7 @@ export type Database = {
           clicks_count?: number | null
           created_at?: string
           custom_domain?: string | null
+          domain_id?: string | null
           expires_at?: string | null
           id?: string
           slug?: string
@@ -101,7 +104,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "links_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "user_domains"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       news_projects: {
         Row: {
