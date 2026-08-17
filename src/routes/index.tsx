@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { Button } from "@/components/ui/button"
 import { Link } from "@tanstack/react-router"
-import { ShoppingBag, Zap, BarChart3, ShieldCheck, ArrowRight, CheckCircle2 } from "lucide-react"
+import { ShoppingBag, Zap, BarChart3, ShieldCheck, ArrowRight, CheckCircle2, Video } from "lucide-react"
 
 export const Route = createFileRoute('/')({
   component: LandingPage,
@@ -74,6 +74,13 @@ function LandingPage() {
                 </div>
                 <h3 className="text-xl font-bold">Analytics Completo</h3>
                 <p className="text-muted-foreground">Saiba de onde vêm seus cliques, qual dispositivo usam e muito mais.</p>
+              </div>
+              <div className="flex flex-col items-center space-y-4 text-center p-6 bg-background rounded-xl border shadow-sm">
+                <div className="p-3 bg-primary/10 rounded-full">
+                  <Video className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold">Gerador de Play</h3>
+                <p className="text-muted-foreground">Adicione botões de play profissionais às suas imagens para aumentar cliques e conversões.</p>
               </div>
               <div className="flex flex-col items-center space-y-4 text-center p-6 bg-background rounded-xl border shadow-sm">
                 <div className="p-3 bg-primary/10 rounded-full">
