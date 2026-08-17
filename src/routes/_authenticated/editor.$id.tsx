@@ -267,6 +267,7 @@ function EditorPage() {
                   onChange={(e) => setCuriosity(e.target.value)}
                   className="w-full min-h-[100px] p-3 text-sm rounded-md border border-input bg-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   placeholder="Uma curiosidade que gere impacto..."
+                  disabled={isGenerating}
                 />
               </div>
 
@@ -276,6 +277,7 @@ function EditorPage() {
                   value={source} 
                   onChange={(e) => setSource(e.target.value)}
                   placeholder="Ex: UOL Notícias"
+                  disabled={isGenerating}
                 />
               </div>
             </div>
