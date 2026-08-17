@@ -20,17 +20,13 @@ const menuItems = [
   {
     title: "Dashboard",
     icon: LayoutDashboard,
-    url: "/dashboard",
+    url: "/dashboard" as const,
   },
   {
     title: "Criar Notícia",
     icon: PlusCircle,
-    url: "/editor/new",
-  },
-  {
-    title: "Histórico",
-    icon: History,
-    url: "/dashboard", // Por enquanto no dashboard
+    url: "/editor/$id" as const,
+    params: { id: 'new' }
   },
 ]
 
@@ -42,7 +38,7 @@ export function AppSidebar() {
     if (error) {
       toast.error("Erro ao sair")
     } else {
-      navigate({ to: "/auth" })
+      navigate({ to: '/auth' })
     }
   }
 
@@ -64,7 +60,11 @@ export function AppSidebar() {
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild tooltip={item.title}>
-                    <Link to={item.url} className="flex items-center gap-3 py-2">
+                    <Link 
+                      to={item.url} 
+                      params={'params' in item ? item.params : undefined}
+                      className="flex items-center gap-3 py-2"
+                    >
                       <item.icon className="h-5 w-5" />
                       <span>{item.title}</span>
                     </Link>
