@@ -90,8 +90,8 @@ export function PlayGenerator() {
   const handleDrag = (e: React.MouseEvent | React.TouchEvent) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    const clientX = 'touches' in e ? (e.touches[0]?.clientX || 0) : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? (e.touches[0]?.clientY || 0) : (e as React.MouseEvent).clientY;
     
     let x = ((clientX - rect.left) / rect.width) * 100;
     let y = ((clientY - rect.top) / rect.height) * 100;
