@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { Upload, Type, Download, Trash2, Sparkles, Image as ImageIcon } from 'lucide-react'
 import { toast } from 'sonner'
+import { generateViralContentFromImage } from '@/lib/news/editor.functions'
+import { useServerFn } from '@tanstack/react-start'
 
 export const Route = createFileRoute('/_authenticated/editor/$id')({
   validateSearch: z.object({
@@ -23,6 +25,9 @@ function EditorPage() {
   const [title, setTitle] = useState(initialTitle || '')
   const [source, setSource] = useState(initialSource || '')
   const [curiosity, setCuriosity] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  
+  const generateViralContent = useServerFn(generateViralContentFromImage)
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -45,6 +50,26 @@ function EditorPage() {
     }
   }
 
+  const handleGenerateAI = async () => {
+    if (!imageUrl) {
+      toast.error("Suba uma imagem primeiro para gerar conteúdo contextual.")
+      return
+    }
+
+    setIsGenerating(true)
+    try {
+      const result = await generateViralContent({ data: { imageUrl } })
+      setTitle(result.suggestedTitle)
+      setCuriosity(result.suggestedCuriosity)
+      toast.success("Notícia gerada com sucesso!")
+    } catch (error) {
+      console.error(error)
+      toast.error("Erro ao gerar conteúdo via IA.")
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   const generateCuriosity = () => {
     const curiosities = [
       "Você sabia que o primeiro site da web ainda está no ar?",
@@ -55,7 +80,7 @@ function EditorPage() {
     ]
     const random = curiosities[Math.floor(Math.random() * curiosities.length)]
     setCuriosity(random || "")
-    toast.success("Curiosidade gerada!")
+    toast.success("Curiosidade genérica gerada!")
   }
 
   const drawCanvas = () => {
@@ -159,10 +184,10 @@ function EditorPage() {
         <div className="flex gap-2">
           {imageUrl && (
             <>
-              <Button variant="outline" onClick={() => { setImageUrl(null); setCuriosity(''); }} className="text-destructive hover:text-destructive">
+              <Button variant="outline" onClick={() => { setImageUrl(null); setCuriosity(''); setTitle(''); }} disabled={isGenerating} className="text-destructive hover:text-destructive">
                 <Trash2 className="h-4 w-4 mr-2" /> Limpar
               </Button>
-              <Button onClick={downloadImage}>
+              <Button onClick={downloadImage} disabled={isGenerating}>
                 <Download className="h-4 w-4 mr-2" /> Exportar
               </Button>
             </>
@@ -204,9 +229,26 @@ function EditorPage() {
                   value={title} 
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Ex: Novo recorde mundial..."
+                  disabled={isGenerating}
                 />
               </div>
               
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium">Fake News IA</label>
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    onClick={handleGenerateAI}
+                    disabled={isGenerating || !imageUrl}
+                    className="h-7 text-[10px] bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 border-none shadow-lg"
+                  >
+                    <Sparkles className={`h-3 w-3 mr-1 ${isGenerating ? 'animate-spin' : ''}`} /> 
+                    {isGenerating ? 'Analisando Imagem...' : 'Inventar Fake News'}
+                  </Button>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-sm font-medium">Curiosidade</label>
@@ -214,9 +256,10 @@ function EditorPage() {
                     variant="ghost" 
                     size="sm" 
                     onClick={generateCuriosity}
+                    disabled={isGenerating}
                     className="h-7 text-[10px] text-primary hover:text-primary hover:bg-primary/10"
                   >
-                    <Sparkles className="h-3 w-3 mr-1" /> Gerar IA
+                    <Sparkles className="h-3 w-3 mr-1" /> Aleatória
                   </Button>
                 </div>
                 <textarea 
@@ -224,6 +267,7 @@ function EditorPage() {
                   onChange={(e) => setCuriosity(e.target.value)}
                   className="w-full min-h-[100px] p-3 text-sm rounded-md border border-input bg-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   placeholder="Uma curiosidade que gere impacto..."
+                  disabled={isGenerating}
                 />
               </div>
 
@@ -233,6 +277,7 @@ function EditorPage() {
                   value={source} 
                   onChange={(e) => setSource(e.target.value)}
                   placeholder="Ex: UOL Notícias"
+                  disabled={isGenerating}
                 />
               </div>
             </div>
