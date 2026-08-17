@@ -34,38 +34,74 @@ export const createCustomLink = createServerFn({ method: "POST" })
     const user = session?.user;
     if (!user) throw new Error("Não autorizado");
 
-    // Verificar limite do plano (simplificado por enquanto)
-    const { data: profile } = await supabase
+    console.log("Criando link para usuário:", user.id);
+
+    // Buscar perfil para verificar limite e plano
+    let { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("plan_id, plans(max_links)")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
-    const { count } = await supabase
+    if (profileError) {
+      console.error("Erro ao buscar perfil:", profileError);
+    }
+
+    // Se o perfil não tem plano, atribuir o plano gratuito por padrão
+    if (!profile?.plan_id) {
+      console.log("Usuário sem plano. Atribuindo plano gratuito.");
+      const { data: freePlan } = await supabase
+        .from("plans")
+        .select("id")
+        .eq("name", "Gratuito")
+        .single();
+      
+      if (freePlan) {
+        await supabase.from("profiles").update({ plan_id: freePlan.id }).eq("id", user.id);
+        // Recarregar perfil
+        const { data: updatedProfile } = await supabase
+          .from("profiles")
+          .select("plan_id, plans(max_links)")
+          .eq("id", user.id)
+          .single();
+        profile = updatedProfile;
+      }
+    }
+
+    const { count, error: countError } = await supabase
       .from("links")
       .select("*", { count: 'exact', head: true })
       .eq("user_id", user.id);
+
+    if (countError) {
+      console.error("Erro ao contar links:", countError);
+    }
 
     const maxLinks = (profile?.plans as any)?.max_links || 10;
     if (count !== null && count >= maxLinks) {
       throw new Error(`Limite de links atingido para o plano atual (${maxLinks})`);
     }
 
+    const insertData = {
+      user_id: user.id,
+      slug: data.slug,
+      affiliate_url: data.affiliateUrl,
+      title: data.title || null,
+      expires_at: data.expiresAt || null,
+      custom_domain: data.customDomain || null,
+      status: 'active'
+    };
+
+    console.log("Dados de inserção:", insertData);
+
     const { data: link, error } = await supabase
       .from("links")
-      .insert({
-        user_id: user.id,
-        slug: data.slug,
-        affiliate_url: data.affiliateUrl,
-        title: data.title ?? null,
-        expires_at: data.expiresAt ?? null,
-        custom_domain: data.customDomain ?? null,
-        status: 'active'
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (error) {
+      console.error("Erro na inserção do link:", error);
       if (error.code === '23505') throw new Error("Este slug já está em uso.");
       throw error;
     }

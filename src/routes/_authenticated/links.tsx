@@ -88,14 +88,20 @@ function LinksPage() {
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       console.log("Enviando dados para criação:", data);
-      return createCustomLink({ 
-        data: {
-          affiliateUrl: data.affiliate_url,
-          slug: data.slug,
-          title: data.title || undefined,
-          customDomain: data.custom_domain || null
-        }
-      });
+      try {
+        const result = await createCustomLink({ 
+          data: {
+            affiliateUrl: data.affiliate_url,
+            slug: data.slug,
+            title: data.title || undefined,
+            customDomain: data.custom_domain || null
+          }
+        });
+        return result;
+      } catch (err: any) {
+        console.error("Erro capturado na mutação:", err);
+        throw err;
+      }
     },
     onSuccess: (result: any) => {
       if (result?.error) {
@@ -106,6 +112,10 @@ function LinksPage() {
         setIsCreateOpen(false)
         setNewLink({ title: '', slug: '', affiliate_url: '', custom_domain: '' })
       }
+    },
+    onError: (error: any) => {
+      console.error("Erro na mutação:", error);
+      toast.error(error.message || "Erro ao criar link. Verifique os dados e tente novamente.");
     }
   })
 
