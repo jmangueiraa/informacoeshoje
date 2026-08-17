@@ -122,15 +122,21 @@ function RootComponent() {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log(`Auth event: ${event}`, session ? 'User signed in' : 'User signed out');
+      
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        router.invalidate();
+      }
+      
       if (event === 'SIGNED_OUT') {
         queryClient.clear();
+        router.navigate({ to: '/auth' });
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [queryClient]);
+  }, [queryClient, router]);
 
   return (
     <QueryClientProvider client={queryClient}>
