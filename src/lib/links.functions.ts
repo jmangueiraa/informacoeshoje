@@ -30,7 +30,7 @@ export const checkSlugAvailability = createServerFn({ method: "GET" })
 
 export const createCustomLink = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) => createLinkSchema.parse(data))
+  .inputValidator((data: unknown) => createLinkSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { userId, supabase: authenticatedSupabase } = context;
 
