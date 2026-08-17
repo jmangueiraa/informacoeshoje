@@ -10,7 +10,7 @@ export const registerClick = createServerFn({ method: "POST" })
     userAgent: z.string().optional(),
     referrer: z.string().optional(),
   }).parse(data))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, request }) => {
     // 1. Buscar o link pelo slug e opcionalmente pelo domínio
     let query = supabase
       .from("links")
