@@ -118,3 +118,46 @@ export const toggleLinkStatus = createServerFn({ method: "POST" })
     if (error) throw error;
     return { success: true };
   });
+
+export const getUserProfile = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Não autenticado" };
+
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    if (error) return { error: error.message };
+    return profile;
+  });
+
+export const updateProfileDomain = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ domain: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Não autenticado" };
+
+    // 1. Atualizar o domínio no perfil
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update({ custom_domain: data.domain })
+      .eq("id", user.id);
+
+    if (profileError) return { error: profileError.message };
+
+    // 2. Registrar na tabela de domínios para o redirect engine
+    const { error: domainError } = await supabase
+      .from("user_domains")
+      .upsert({ 
+        user_id: user.id, 
+        domain: data.domain,
+        is_verified: true
+      }, { onConflict: 'domain' });
+
+    if (domainError) return { error: domainError.message };
+
+    return { success: true };
+  });
