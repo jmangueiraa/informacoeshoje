@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { PlusCircle, Newspaper, TrendingUp, Clock } from "lucide-react"
 import { Link } from "@tanstack/react-router"
@@ -54,7 +54,6 @@ export function DashboardHome() {
             <p className="text-xs text-muted-foreground">Imagens geradas no total</p>
           </CardContent>
         </Card>
-        {/* Adicionar mais stats aqui */}
       </div>
 
       <div className="space-y-4">

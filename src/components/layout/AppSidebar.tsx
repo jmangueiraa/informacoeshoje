@@ -16,20 +16,6 @@ import {
 } from "@/components/ui/sidebar"
 import { toast } from "sonner"
 
-const menuItems = [
-  {
-    title: "Dashboard",
-    icon: LayoutDashboard,
-    url: "/dashboard" as const,
-  },
-  {
-    title: "Criar Notícia",
-    icon: PlusCircle,
-    url: "/editor/$id" as const,
-    params: { id: 'new' }
-  },
-]
-
 export function AppSidebar() {
   const navigate = useNavigate()
 
@@ -57,20 +43,22 @@ export function AppSidebar() {
           <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild tooltip={item.title}>
-                    <Link 
-                      to={item.url} 
-                      params={'params' in item ? item.params : undefined}
-                      className="flex items-center gap-3 py-2"
-                    >
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Dashboard">
+                  <Link to="/dashboard" className="flex items-center gap-3 py-2">
+                    <LayoutDashboard className="h-5 w-5" />
+                    <span>Dashboard</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Criar Notícia">
+                  <Link to="/editor/$id" params={{ id: 'new' }} className="flex items-center gap-3 py-2">
+                    <PlusCircle className="h-5 w-5" />
+                    <span>Criar Notícia</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
