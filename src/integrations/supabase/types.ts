@@ -102,6 +102,7 @@ export type Database = {
           image_url: string | null
           mentions: number | null
           source: string | null
+          source_url: string | null
           subject: string
           suggested_title: string | null
           trending_at: string | null
@@ -112,6 +113,7 @@ export type Database = {
           image_url?: string | null
           mentions?: number | null
           source?: string | null
+          source_url?: string | null
           subject: string
           suggested_title?: string | null
           trending_at?: string | null
@@ -122,6 +124,7 @@ export type Database = {
           image_url?: string | null
           mentions?: number | null
           source?: string | null
+          source_url?: string | null
           subject?: string
           suggested_title?: string | null
           trending_at?: string | null
@@ -155,6 +158,7 @@ export type Database = {
           mentions: number | null
           score: number | null
           source: string | null
+          source_url: string | null
           subject: string
           suggested_title: string | null
           type: string
@@ -169,6 +173,7 @@ export type Database = {
           mentions?: number | null
           score?: number | null
           source?: string | null
+          source_url?: string | null
           subject: string
           suggested_title?: string | null
           type: string
@@ -183,6 +188,7 @@ export type Database = {
           mentions?: number | null
           score?: number | null
           source?: string | null
+          source_url?: string | null
           subject?: string
           suggested_title?: string | null
           type?: string
