@@ -138,7 +138,7 @@ function EditorPage() {
 
   useEffect(() => {
     drawCanvas()
-  }, [imageUrl, title, curiosity])
+  }, [imageUrl, title, curiosity, source])
 
   const downloadImage = () => {
     const canvas = canvasRef.current
