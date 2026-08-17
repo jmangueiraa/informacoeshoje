@@ -76,12 +76,12 @@ function LinksPage() {
     }
   });
 
-  // Garantir que o domínio ajpvip.com.br esteja configurado se solicitado
+  // Garantir que o domínio noticiasviraisctv.lovable.app esteja configurado se solicitado
   useEffect(() => {
     if (profile && !('error' in profile) && !profile.custom_domain) {
       // Aqui poderíamos forçar a atualização, mas vamos apenas garantir que a UI o use se o usuário desejar
-      // Como o usuário respondeu que quer ajpvip.com.br como padrão:
-      updateDomainMutation.mutate('ajpvip.com.br');
+      // Como o usuário respondeu que quer noticiasviraisctv.lovable.app como padrão:
+      updateDomainMutation.mutate('noticiasviraisctv.lovable.app');
     }
   }, [profile]);
 
@@ -198,12 +198,12 @@ function LinksPage() {
                 <Label htmlFor="custom_domain">Domínio Personalizado (Opcional)</Label>
                 <Input 
                   id="custom_domain" 
-                  placeholder="ajp.com.br" 
+                  placeholder="noticiasviraisctv.lovable.app" 
                   value={newLink.custom_domain || ''}
                   onChange={(e) => setNewLink({...newLink, custom_domain: e.target.value})}
                 />
                 <p className="text-[10px] text-muted-foreground">
-                  Apenas para usuários Premium. Configure seu domínio `ajpvip.com.br` com um registro CNAME apontando para `noticiasviraisctv.lovable.app`.
+                  Apenas para usuários Premium. Configure seu domínio `noticiasviraisctv.lovable.app` com um registro CNAME apontando para `noticiasviraisctv.lovable.app`.
                 </p>
               </div>
             </div>
