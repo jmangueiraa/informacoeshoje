@@ -6,7 +6,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const registerClick = createServerFn({ method: "POST" })
-  .validator((data: unknown) => z.object({
+  .inputValidator((data: unknown) => z.object({
     slug: z.string(),
     host: z.string().optional(),
     userAgent: z.string().optional(),
