@@ -4,6 +4,7 @@ import { PlusCircle, Newspaper, TrendingUp, Clock } from "lucide-react"
 import { Link } from "@tanstack/react-router"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
+import { TrendingSection } from "./TrendingSection"
 
 export function DashboardHome() {
   const { data: stats } = useQuery({
@@ -55,6 +56,9 @@ export function DashboardHome() {
           </CardContent>
         </Card>
       </div>
+
+      <TrendingSection />
+
 
       <div className="space-y-4">
         <h2 className="text-xl font-semibold tracking-tight">Criações Recentes</h2>
