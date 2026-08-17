@@ -1,233 +1,259 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getViralContent, refreshViralRadar, Category } from '@/lib/news/viral.functions'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Flame, Play, Eye, ExternalLink, RefreshCcw, Download, TrendingUp } from 'lucide-react'
-import { toast } from 'sonner'
+import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
-import { Skeleton } from '@/components/ui/skeleton'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { getUserLinks, createLink, deleteLink, updateLink } from '@/lib/links.functions'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { 
+  PlusCircle, 
+  Link2, 
+  Copy, 
+  Trash2, 
+  ExternalLink, 
+  Search, 
+  Filter,
+  MoreVertical,
+  BarChart3,
+  Calendar,
+  MousePointer2,
+  Settings2
+} from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Label } from '@/components/ui/label'
 
-export const Route = createFileRoute('/_authenticated/viral')({
-  component: ViralAgoraPage,
+export const Route = createFileRoute('/_authenticated/links')({
+  component: LinksPage,
 })
 
-const CATEGORIES: { label: string; value: Category; icon: string }[] = [
-  { label: 'Mais viralizados', value: 'trending', icon: '🔥' },
-  { label: 'Notícias', value: 'news', icon: '📰' },
-  { label: 'Humor', value: 'humor', icon: '😂' },
-  { label: 'Esportes', value: 'sports', icon: '⚽' },
-  { label: 'Entretenimento', value: 'entertainment', icon: '🎬' },
-  { label: 'Curiosidades', value: 'curiosities', icon: '👀' },
-  { label: 'Mundo', value: 'world', icon: '🌎' },
-  { label: 'Brasil', value: 'brazil', icon: '🇧🇷' },
-  { label: 'Redes sociais', value: 'social', icon: '📱' },
-  { label: 'Games', value: 'games', icon: '🎮' },
-  { label: 'Automóveis', value: 'automotive', icon: '🚗' },
-]
-
-function ViralAgoraPage() {
-  const [activeCategory, setActiveCategory] = useState<Category>('trending')
+function LinksPage() {
+  const [searchTerm, setSearchTerm] = useState('')
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [newLink, setNewLink] = useState({ title: '', slug: '', affiliate_url: '' })
+  
   const queryClient = useQueryClient()
-  const navigate = useNavigate()
 
-  const { data: contents, isLoading } = useQuery({
-    queryKey: ['viral-content', activeCategory],
-    queryFn: () => getViralContent({ data: { category: activeCategory } }),
+  const { data: links, isLoading } = useQuery({
+    queryKey: ['user-links'],
+    queryFn: () => getUserLinks(),
   })
 
-  const refreshMutation = useMutation({
-    mutationFn: () => refreshViralRadar(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['viral-content'] })
-      toast.success("Radar Viral atualizado com sucesso!")
+  const createMutation = useMutation({
+    mutationFn: (data: any) => createLink({ data }),
+    onSuccess: (result) => {
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['user-links'] })
+        toast.success("Link criado com sucesso!")
+        setIsCreateOpen(false)
+        setNewLink({ title: '', slug: '', affiliate_url: '' })
+      }
     }
   })
 
-  const handleUseContent = (item: any) => {
-    navigate({
-      to: '/editor/$id',
-      params: { id: 'new' },
-      search: {
-        imageUrl: item.image_url || undefined,
-        title: item.suggested_title || item.subject,
-        source: item.source || undefined
-      }
-    })
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteLink({ data: { id } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-links'] })
+      toast.success("Link excluído com sucesso!")
+    }
+  })
+
+  const copyToClipboard = (slug: string) => {
+    const url = `${window.location.origin}/${slug}`
+    navigator.clipboard.writeText(url)
+    toast.success("Link copiado!")
   }
 
-  const getScoreColor = (score: number) => {
-    if (score >= 90) return 'text-orange-600 bg-orange-100 dark:bg-orange-950/30'
-    if (score >= 70) return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-950/30'
-    return 'text-blue-600 bg-blue-100 dark:bg-blue-950/30'
-  }
+  const filteredLinks = links?.filter(link => 
+    link.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    link.slug.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   return (
-    <div className="container mx-auto p-6 space-y-8 animate-in fade-in duration-500">
+    <div className="container mx-auto p-6 space-y-8 max-w-7xl">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            VIRAL AGORA <Flame className="text-orange-500 fill-orange-500" />
-          </h1>
-          <p className="text-muted-foreground">Monitore o que está bombando na internet em tempo real.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Meus Links</h1>
+          <p className="text-muted-foreground">Gerencie e monitore o desempenho dos seus links Shopee.</p>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={() => refreshMutation.mutate()} 
-          disabled={refreshMutation.isPending}
-          className="gap-2"
-        >
-          <RefreshCcw className={`h-4 w-4 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
-          Atualizar Radar
+        
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <PlusCircle className="h-4 w-4" />
+              Criar Link
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Novo Link Personalizado</DialogTitle>
+              <DialogDescription>
+                Insira a URL do produto Shopee e escolha um slug curto.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="title">Título Interno</Label>
+                <Input 
+                  id="title" 
+                  placeholder="Ex: Tênis Esportivo Promoção" 
+                  value={newLink.title}
+                  onChange={(e) => setNewLink({...newLink, title: e.target.value})}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="url">URL Shopee</Label>
+                <Input 
+                  id="url" 
+                  placeholder="https://shopee.com.br/..." 
+                  value={newLink.affiliate_url}
+                  onChange={(e) => setNewLink({...newLink, affiliate_url: e.target.value})}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="slug">Slug Personalizado</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground text-sm">linkshopee.app/</span>
+                  <Input 
+                    id="slug" 
+                    placeholder="tenis-promo" 
+                    value={newLink.slug}
+                    onChange={(e) => setNewLink({...newLink, slug: e.target.value})}
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
+              <Button onClick={() => createMutation.mutate(newLink)} disabled={createMutation.isPending}>
+                Criar Link
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Pesquisar por título ou slug..." 
+            className="pl-10"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <Button variant="outline" className="gap-2">
+          <Filter className="h-4 w-4" />
+          Filtros
         </Button>
       </div>
 
-      <Tabs defaultValue="trending" onValueChange={(v) => setActiveCategory(v as Category)}>
-        <TabsList className="w-full flex flex-wrap h-auto bg-transparent border-b rounded-none p-0 gap-6 justify-start overflow-x-auto pb-2">
-          {CATEGORIES.map((cat) => (
-            <TabsTrigger 
-              key={cat.value} 
-              value={cat.value}
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 pb-2 font-medium transition-all hover:text-primary"
-            >
-              <span className="mr-2">{cat.icon}</span>
-              {cat.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-8">
-          {isLoading ? (
-            Array(8).fill(0).map((_, i) => (
-              <Card key={i} className="overflow-hidden">
-                <Skeleton className="h-48 w-full" />
-                <CardHeader>
-                  <Skeleton className="h-6 w-3/4" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-4 w-1/2" />
-                </CardContent>
-              </Card>
-            ))
-          ) : contents?.filter((item, index, self) => 
-            index === self.findIndex((t) => t.subject === item.subject)
-          ).map((item) => (
-            <Card key={item.id} className="group overflow-hidden border-border/50 hover:border-primary/50 transition-all hover:shadow-xl hover:-translate-y-1">
-              <div className="relative aspect-video overflow-hidden bg-muted">
-                {item.image_url && (
-                  <img 
-                    src={item.image_url} 
-                    alt={item.subject}
-                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                  />
-                )}
-                <div className="absolute top-2 right-2 flex flex-col items-end gap-2">
-                  <Badge className={`${getScoreColor(item.score ?? 0)} border-none font-bold backdrop-blur-md`}>
-                    🔥 {item.score ?? 0}/100
-                  </Badge>
-                  {['UOL', 'O Globo', 'G1'].some(source => item.source?.includes(source)) && (
-                    <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 text-[10px] backdrop-blur-md">
-                      ✓ Fonte Verificada
-                    </Badge>
-                  )}
-                  {item.type === 'video' && (
-                    <Badge variant="secondary" className="backdrop-blur-md bg-black/50 text-white border-none">
-                      <Play className="h-3 w-3 mr-1 fill-white" /> VÍDEO
-                    </Badge>
-                  )}
-                </div>
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                  <Button size="icon" variant="secondary" className="rounded-full">
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="secondary" className="rounded-full">
-                    <Download className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <CardHeader className="p-4 pb-2">
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="outline" className="text-[10px] uppercase tracking-wider px-1.5 py-0 h-5">
-                    {CATEGORIES.find(c => c.value === item.category)?.label}
-                  </Badge>
-                  <span className="text-[10px] text-muted-foreground">
-                    {item.created_at ? new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                  </span>
-                </div>
-                <CardTitle className="text-lg line-clamp-2 leading-tight group-hover:text-primary transition-colors">
-                  {item.subject}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
-                  <a 
-                    href={item.source_url || '#'} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 hover:text-primary transition-colors"
-                  >
-                    <ExternalLink className="h-3 w-3" /> {item.source || 'Desconhecido'}
-                  </a>
-                  <span className="flex items-center gap-1 font-medium text-orange-500">
-                    <TrendingUp className="h-3 w-3" /> {(item.mentions ?? 0).toLocaleString()} menções
-                  </span>
+      <div className="grid gap-6">
+        {isLoading ? (
+          Array(3).fill(0).map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <div className="h-32 bg-muted/20"></div>
+            </Card>
+          ))
+        ) : filteredLinks?.length === 0 ? (
+          <div className="text-center py-12 border-2 border-dashed rounded-lg bg-muted/10">
+            <Link2 className="mx-auto h-12 w-12 text-muted-foreground/30" />
+            <h3 className="mt-4 text-lg font-medium">Nenhum link encontrado</h3>
+            <p className="text-muted-foreground">Comece criando seu primeiro link personalizado.</p>
+          </div>
+        ) : (
+          filteredLinks?.map((link) => (
+            <Card key={link.id} className="group hover:border-primary/50 transition-all">
+              <CardContent className="p-0">
+                <div className="flex flex-col md:flex-row md:items-center">
+                  <div className="p-6 flex-1 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xl font-bold group-hover:text-primary transition-colors">/{link.slug}</h3>
+                      <Badge variant={link.status === 'active' ? 'secondary' : 'outline'} className={link.status === 'active' ? 'bg-green-500/10 text-green-500' : ''}>
+                        {link.status === 'active' ? 'Ativo' : 'Inativo'}
+                      </Badge>
+                    </div>
+                    <p className="text-sm font-medium text-foreground line-clamp-1">{link.title || "Sem título"}</p>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {new Date(link.created_at).toLocaleDateString()}
+                      </span>
+                      <span className="flex items-center gap-1 max-w-[300px] truncate">
+                        <ExternalLink className="h-3 w-3" />
+                        {link.affiliate_url}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="px-6 pb-6 md:pb-0 md:py-6 flex items-center gap-8 border-t md:border-t-0 md:border-l">
+                    <div className="text-center min-w-[80px]">
+                      <div className="text-2xl font-bold">{link.clicks_count || 0}</div>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Cliques</p>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="icon" onClick={() => copyToClipboard(link.slug)} title="Copiar Link">
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                          <DropdownMenuItem asChild>
+                            <a href={`${window.location.origin}/${link.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                              <ExternalLink className="h-4 w-4" /> Abrir Link
+                            </a>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2">
+                            <BarChart3 className="h-4 w-4" /> Estatísticas
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2">
+                            <Settings2 className="h-4 w-4" /> Configurações
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            className="text-destructive focus:bg-destructive/10 focus:text-destructive gap-2"
+                            onClick={() => deleteMutation.mutate(link.id)}
+                          >
+                            <Trash2 className="h-4 w-4" /> Excluir Link
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
-              <CardFooter className="p-4 pt-0 grid grid-cols-2 gap-2">
-                {item.type === 'video' ? (
-                  <>
-                    <Button variant="outline" size="sm" className="w-full text-xs" asChild>
-                      <a href={item.source_url || item.video_url || '#'} target="_blank" rel="noopener noreferrer">
-                        Abrir Original
-                      </a>
-                    </Button>
-                    <Button size="sm" className="w-full text-xs" onClick={() => handleUseContent(item)}>
-                      Usar Referência
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button variant="outline" size="sm" className="w-full text-xs" asChild>
-                      <a href={item.source_url || '#'} target="_blank" rel="noopener noreferrer">
-                        Abrir Original
-                      </a>
-                    </Button>
-                    <Button size="sm" className="w-full text-xs" onClick={() => handleUseContent(item)}>
-                      Usar Imagem
-                    </Button>
-                  </>
-                )}
-              </CardFooter>
             </Card>
-          ))}
-        </div>
-      </Tabs>
-
-      <Card className="bg-gradient-to-br from-orange-500/5 to-primary/5 border-primary/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-xl">
-            <TrendingUp className="text-primary" /> Radar Viral — Agente IA
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <h4 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider">Crescimento Rápido</h4>
-              <p className="text-sm">Assuntos como <span className="font-bold">"Futebol"</span> e <span className="font-bold">"Tecnologia"</span> estão acelerando nas últimas 2 horas.</p>
-            </div>
-            <div className="space-y-2">
-              <h4 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider">Atenção do Público</h4>
-              <p className="text-sm">Conteúdos de <span className="font-bold">Humor</span> possuem a maior taxa de compartilhamento atual.</p>
-            </div>
-            <div className="space-y-2">
-              <h4 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider">Próximos Virais</h4>
-              <p className="text-sm">Radar identifica potencial viral em notícias de <span className="font-bold">Curiosidades Espaciais</span>.</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          ))
+        )}
+      </div>
     </div>
   )
 }
