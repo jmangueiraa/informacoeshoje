@@ -48,3 +48,37 @@ export const checkIsAdmin = createServerFn({ method: "GET" })
 
     return !!isAdmin;
   });
+
+export const getAdminUsers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { userId, supabase: authenticatedSupabase } = context;
+
+    // Verificar se o usuário é admin
+    const { data: isAdmin, error: roleError } = await authenticatedSupabase.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin'
+    });
+
+    if (roleError || !isAdmin) {
+      throw new Error("Não autorizado: Acesso administrativo apenas.");
+    }
+
+    // Buscar todos os perfis com informações de plano
+    const { data: users, error } = await authenticatedSupabase
+      .from("profiles")
+      .select(`
+        *,
+        plans (
+          name
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Erro ao buscar usuários:", error);
+      throw new Error("Erro ao carregar lista de usuários.");
+    }
+
+    return users || [];
+  });
