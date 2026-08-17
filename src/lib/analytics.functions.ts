@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { UAParser } from "ua-parser-js";
-import { getWebRequest } from "@tanstack/react-start/server";
+import { getRequest } from "@tanstack/react-start/server";
 
 export const registerClick = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({
