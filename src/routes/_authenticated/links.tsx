@@ -120,7 +120,7 @@ function LinksPage() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteLink({ data: { id } }),
+    mutationFn: (id: string) => deleteLink({ data: id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-links'] })
       toast.success("Link excluído com sucesso!")
