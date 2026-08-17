@@ -49,8 +49,9 @@ function AuthenticatedLayout() {
           <div className="flex-1">
             <Outlet />
           </div>
-          <footer className="p-4 border-t text-center text-xs text-muted-foreground bg-card/50">
-            Criado pela empresa de entretenimento AJP-19981356505
+          <footer className="p-4 border-t text-center text-xs text-muted-foreground bg-card/50 flex flex-col gap-1">
+            <p>Desenvolvido pela AJP Entretenimento, responsável pela criação e produção deste projeto</p>
+            <p className="font-semibold">CONTATO: 19981356505</p>
           </footer>
         </main>
       </div>
