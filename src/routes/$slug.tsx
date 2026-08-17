@@ -17,6 +17,7 @@ function RedirectPage() {
         const result = await registerClick({
           data: {
             slug,
+            host: window.location.host,
             userAgent: navigator.userAgent,
             referrer: document.referrer,
           }
