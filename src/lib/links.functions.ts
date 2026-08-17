@@ -173,7 +173,7 @@ export const getUserProfile = createServerFn({ method: "GET" })
 
 export const updateProfileDomain = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) => z.object({ domain: z.string() }).parse(data))
+  .inputValidator((data: unknown) => z.object({ domain: z.string() }).parse(data))
   .handler(async ({ data, context }) => {
     const { userId, supabase: authenticatedSupabase } = context;
 
