@@ -46,7 +46,13 @@ function AuthPage() {
       } else {
         const dest = redirect || '/dashboard'
         console.log('Login successful, navigating to:', dest)
-        navigate({ to: dest })
+        
+        // Use window.location for a hard navigation to ensure session is picked up correctly by all route guards
+        if (typeof window !== 'undefined') {
+          window.location.href = dest
+        } else {
+          navigate({ to: dest })
+        }
       }
     } catch (error: any) {
       console.error('Auth handler error:', error)
