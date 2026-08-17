@@ -4,29 +4,25 @@ O usuário relatou que ao clicar na "fonte" a informação não está carregando
 
 ## Alterações Propostas
 
-### 1. Backend (Funções de Servidor)
-- **Tabelas do Banco de Dados**: Verificar se a coluna para o link original (URL) existe e está populada.
+### 1. Banco de Dados (Migração)
+- Criar migração para adicionar a coluna `source_url` nas tabelas `viral_contents` e `trending_topics`.
+- A coluna `source_url` armazenará o link original da notícia.
+
+### 2. Backend (Funções de Servidor)
 - **`src/lib/news/viral.functions.ts`**:
-    - Atualizar o `TRENDING_MOCK` com URLs reais para as fontes (UOL, G1, O Globo).
-    - Adicionar uma coluna `source_url` ou similar se não existir no mock e garantir que seja salva no banco.
+    - Atualizar `TRENDING_MOCK` para incluir links reais (`source_url`) para UOL, G1, etc.
+    - Garantir que o `upsert` inclua o novo campo.
 - **`src/lib/news/trends.functions.ts`**:
-    - Adicionar links reais para os assuntos em alta.
+    - Atualizar `TRENDS_MOCK` para incluir links reais (`source_url`).
 
-### 2. Frontend (Interface)
+### 3. Frontend (Interface)
 - **`src/routes/_authenticated/viral.tsx`**:
-    - Ajustar o botão "Abrir Original" para usar a URL real da notícia.
-    - Garantir que o clique na fonte leve ao link externo.
+    - Corrigir o botão "Abrir Original" para usar o campo `source_url`.
+    - Adicionar um link clicável no nome da fonte dentro do card.
 - **`src/components/dashboard/TrendingSection.tsx`**:
-    - Tornar o nome da fonte um link clicável que abre em uma nova aba.
-
-### 3. Banco de Dados (Migração)
-- Adicionar coluna `source_url` nas tabelas `viral_contents` e `trending_topics` caso não existam.
-- Popular com dados reais de exemplo.
-
-## Detalhes Técnicos
-- Utilizar `target="_blank"` e `rel="noopener noreferrer"` para todos os links externos.
-- Validar as URLs com Zod nas server functions.
+    - Transformar o texto da "Fonte" em um link clicável para a `source_url`.
 
 ## Verificação
-- Testar os links no Dashboard.
-- Testar os links na página Viral Agora.
+- Validar se o clique no botão "Abrir Original" no módulo Viral Agora abre o site da fonte em nova aba.
+- Validar se os links no Dashboard estão funcionando e apontando para os portais corretos.
+
