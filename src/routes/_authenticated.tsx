@@ -6,24 +6,19 @@ import { Toaster } from '@/components/ui/sonner'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async ({ location }) => {
-    // Check session on every load to ensure persistence
+    // getSession() checks local storage first, which is what we need for persistence
     const { data: { session } } = await supabase.auth.getSession()
     console.log('Session check in _authenticated:', session ? 'Found' : 'Not found')
     
     if (!session) {
-      // Check if we have a hash indicating a redirect back from OAuth
-      const isAuthRedirect = typeof window !== 'undefined' && (window.location.hash || window.location.search.includes('code='));
-      
-      if (!isAuthRedirect) {
-        throw redirect({
-          to: '/auth',
-          search: {
-            redirect: location.href,
-          },
-        })
-      }
+      throw redirect({
+        to: '/auth',
+        search: {
+          redirect: location.href,
+        },
+      })
     }
-    return { session, userId: session?.user?.id }
+    return { session, userId: session.user.id }
   },
   component: AuthenticatedLayout,
 })
