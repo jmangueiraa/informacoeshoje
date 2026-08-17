@@ -324,23 +324,35 @@ export type Database = {
         Row: {
           created_at: string
           domain: string
+          domain_type: string | null
           id: string
+          is_primary: boolean | null
           is_verified: boolean | null
+          updated_at: string | null
           user_id: string
+          verification_status: string | null
         }
         Insert: {
           created_at?: string
           domain: string
+          domain_type?: string | null
           id?: string
+          is_primary?: boolean | null
           is_verified?: boolean | null
+          updated_at?: string | null
           user_id: string
+          verification_status?: string | null
         }
         Update: {
           created_at?: string
           domain?: string
+          domain_type?: string | null
           id?: string
+          is_primary?: boolean | null
           is_verified?: boolean | null
+          updated_at?: string | null
           user_id?: string
+          verification_status?: string | null
         }
         Relationships: []
       }
