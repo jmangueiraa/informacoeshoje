@@ -6,15 +6,15 @@ import { Toaster } from '@/components/ui/sonner'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async ({ location }) => {
-    // We check for session presence. If not found, we redirect to auth.
-    // persistSession: true in the client ensures the session is kept in localStorage.
+    // getSession() is appropriate for client-side auth state checks
     const { data: { session } } = await supabase.auth.getSession()
     
     if (!session) {
-      // Small delay to allow potential hydration of session if it's just slow
-      // This is a common pattern for SPAs where the storage read might be async-ish
+      // Check if this is an OAuth callback or a recent sign-in to avoid premature redirection
       const isAuthCallback = typeof window !== 'undefined' && 
-        (window.location.hash.includes('access_token=') || window.location.search.includes('code='));
+        (window.location.hash.includes('access_token=') || 
+         window.location.search.includes('code=') ||
+         window.localStorage.getItem('supabase.auth.token') !== null);
 
       if (!isAuthCallback) {
         throw redirect({
