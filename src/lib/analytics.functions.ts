@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { UAParser } from "ua-parser-js";
+import { getWebRequest } from "@tanstack/react-start/server";
 
 export const registerClick = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({
@@ -10,7 +11,9 @@ export const registerClick = createServerFn({ method: "POST" })
     userAgent: z.string().optional(),
     referrer: z.string().optional(),
   }).parse(data))
-  .handler(async ({ data, request }) => {
+  .handler(async ({ data }) => {
+    const request = getWebRequest();
+    
     // 1. Buscar o link pelo slug e opcionalmente pelo domínio
     let query = supabase
       .from("links")
@@ -45,9 +48,9 @@ export const registerClick = createServerFn({ method: "POST" })
     const browser = `${result.browser.name} ${result.browser.version}`;
     const os = `${result.os.name} ${result.os.version}`;
 
-    // 3. Obter IP do visitante (pode vir de headers no handler)
-    const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || 
-               request.headers.get("cf-connecting-ip") || 
+    // 3. Obter IP do visitante
+    const ip = request?.headers.get("x-forwarded-for")?.split(",")[0] || 
+               request?.headers.get("cf-connecting-ip") || 
                "unknown";
 
     // 4. Registrar o clique
@@ -59,13 +62,13 @@ export const registerClick = createServerFn({ method: "POST" })
       operating_system: os,
       referrer: data.referrer ?? null,
       ip_address: ip,
-    });
+    } as any);
 
     // 5. Incrementar contador de cliques no link (agora com filtro de IP na RPC)
-    await supabase.rpc('increment_link_clicks', { 
+    await supabase.rpc('increment_link_clicks' as any, { 
       link_id: link.id,
       visitor_ip: ip
-    });
+    } as any);
 
     return { url: link.affiliate_url };
   });
