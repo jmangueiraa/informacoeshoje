@@ -1,24 +1,29 @@
+# Plano de Correção: Criação de Conta (Sign-up)
+
+O usuário relatou que não está conseguindo criar uma conta no FakeNews Studio. O sistema utiliza Supabase Auth para gerenciar usuários e possui uma trigger no banco de dados para criar perfis automaticamente.
+
+## Problemas Identificados / Hipóteses
+1. **Confirmação de E-mail**: O Supabase, por padrão, exige confirmação de e-mail. Se o usuário tentar logar imediatamente após o cadastro sem confirmar, o login falhará.
+2. **Erros Silenciosos**: O feedback visual pode não estar capturando erros específicos do processo de `signUp`.
+3. **Trigger de Banco de Dados**: Se a trigger `handle_new_user` falhar (por exemplo, erro de permissão ou violação de restrição), a criação do usuário no Auth também falha.
+
+## Ações Propostas
+
+### 1. Diagnóstico e Visibilidade
+- Adicionar logs mais detalhados no processo de `signUp` no arquivo `src/routes/auth.tsx`.
+- Garantir que o `toast` exiba a mensagem de erro retornada pelo Supabase.
+
+### 2. Melhoria da UX de Cadastro
+- No `src/routes/auth.tsx`, após um `signUp` bem-sucedido, exibir uma mensagem clara instruindo o usuário a verificar a caixa de entrada (incluindo spam).
+- Adicionar um estado visual indicando que o e-mail de confirmação foi enviado.
+
+### 3. Ajustes de Banco de Dados (se necessário)
+- Verificar se a trigger `handle_new_user` tem as permissões corretas para inserir em `profiles` e `user_roles`. (Já revisado: a função é `SECURITY DEFINER`, o que é correto).
+
+## Detalhes Técnicos
+- **Arquivo**: `src/routes/auth.tsx`
+- **Função**: `handleEmailAuth`
+- **Melhoria**: Adicionar tratamento específico para o retorno do `signUp`, diferenciando entre erro real e necessidade de confirmação.
+
 ---
-title: Corrigir falha no redirecionamento de login
----
-
-## Problema
-O usuário relatou que "não está fazendo login na página". Ao investigar os logs e o código, observamos que o fluxo de autenticação por e-mail no arquivo `src/routes/auth.tsx` pode estar falhando em completar o redirecionamento ou capturar erros silenciosos, e o `_authenticated` layout pode estar bloqueando acessos legítimos se o estado da sessão não for sincronizado corretamente.
-
-## Solução
-1.  **Refatorar o fluxo de login**: Garantir que o `supabase.auth.signInWithPassword` limpe qualquer estado anterior e que o redirecionamento use o parâmetro `redirect` da busca (search params) se disponível.
-2.  **Melhorar o feedback de erro**: Adicionar logs detalhados e garantir que o `toast.error` capture a mensagem real do backend.
-3.  **Ajustar a guarda de rota**: Garantir que o `beforeLoad` em `src/routes/_authenticated.tsx` seja resiliente a verificações de sessão assíncronas.
-
-## Etapas de implementação
-
-### Frontend
-- **src/routes/auth.tsx**:
-    - Atualizar `handleEmailAuth` para usar o parâmetro de redirecionamento da URL após login bem-sucedido.
-    - Adicionar log de console para depuração em tempo real durante falhas.
-- **src/routes/_authenticated.tsx**:
-    - Refinar a lógica de `beforeLoad` para garantir que a sessão seja verificada corretamente antes de disparar o redirecionamento para `/auth`.
-
-## Validação
-- Executar script Playwright para simular login e verificar se o redirecionamento para `/dashboard` (ou a URL pretendida) ocorre.
-- Verificar se erros de "Invalid credentials" são exibidos corretamente via toast.
+*Nota: Como este é um ambiente de sandbox, a criação de conta real depende da configuração do projeto Supabase. Se o e-mail de confirmação estiver ativado, o usuário precisará de um e-mail válido.*
