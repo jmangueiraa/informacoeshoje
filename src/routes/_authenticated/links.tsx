@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getUserLinks, createCustomLink, deleteLink, toggleLinkStatus, getUserProfile, updateProfileDomain } from '@/lib/links.functions'
@@ -46,6 +46,7 @@ export const Route = createFileRoute('/_authenticated/links')({
 })
 
 function LinksPage() {
+  const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newLink, setNewLink] = useState<{ title: string; slug: string; affiliate_url: string; custom_domain: string | null }>({ title: '', slug: '', affiliate_url: '', custom_domain: '' })
@@ -120,7 +121,7 @@ function LinksPage() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteLink({ data: { id } }),
+    mutationFn: (id: string) => deleteLink({ data: id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-links'] })
       toast.success("Link excluído com sucesso!")
@@ -290,15 +291,20 @@ function LinksPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                          <DropdownMenuItem asChild>
-                            <a href={`${window.location.origin}/${link.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
-                              <ExternalLink className="h-4 w-4" /> Abrir Link
-                            </a>
+                          <DropdownMenuItem onClick={() => {
+                            const domain = link.custom_domain || window.location.origin
+                            const url = domain.startsWith('http') ? `${domain}/${link.slug}` : `https://${domain}/${link.slug}`
+                            window.open(url, '_blank', 'noopener,noreferrer')
+                          }} className="gap-2">
+                            <ExternalLink className="h-4 w-4" /> Abrir Link
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2">
+                          <DropdownMenuItem onClick={() => copyToClipboard(link)} className="gap-2">
+                            <Copy className="h-4 w-4" /> Copiar Link
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate({ to: '/dashboard' })} className="gap-2">
                             <BarChart3 className="h-4 w-4" /> Estatísticas
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2">
+                          <DropdownMenuItem onClick={() => navigate({ to: '/settings' })} className="gap-2">
                             <Settings2 className="h-4 w-4" /> Configurações
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
