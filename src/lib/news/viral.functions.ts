@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
 
 export type ContentType = 'image' | 'video';
 export type Category = 'trending' | 'news' | 'humor' | 'sports' | 'entertainment' | 'curiosities' | 'world' | 'brazil' | 'social' | 'games' | 'automotive';
@@ -60,7 +59,8 @@ export const refreshViralRadar = createServerFn({ method: "POST" })
     
     if (existing) {
       for (const item of existing) {
-        const newScore = Math.min(100, Math.max(0, item.score + (Math.random() * 10 - 5)));
+        const currentScore = item.score ?? 0;
+        const newScore = Math.min(100, Math.max(0, currentScore + (Math.random() * 10 - 5)));
         await supabaseAdmin.from('viral_contents').update({ 
           score: Math.floor(newScore),
           updated_at: new Date().toISOString()

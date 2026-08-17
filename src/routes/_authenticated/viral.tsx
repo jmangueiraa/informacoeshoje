@@ -1,11 +1,11 @@
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getViralContent, refreshViralRadar, Category } from '@/lib/news/viral.functions'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Flame, Play, Eye, ExternalLink, RefreshCcw, Download, Share2, TrendingUp, Image as ImageIcon } from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Flame, Play, Eye, ExternalLink, RefreshCcw, Download, TrendingUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { useState } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -51,9 +51,9 @@ function ViralAgoraPage() {
       to: '/editor/$id',
       params: { id: 'new' },
       search: {
-        imageUrl: item.image_url,
+        imageUrl: item.image_url || undefined,
         title: item.suggested_title || item.subject,
-        source: item.source
+        source: item.source || undefined
       }
     })
   }
@@ -114,14 +114,16 @@ function ViralAgoraPage() {
           ) : contents?.map((item) => (
             <Card key={item.id} className="group overflow-hidden border-border/50 hover:border-primary/50 transition-all hover:shadow-xl hover:-translate-y-1">
               <div className="relative aspect-video overflow-hidden bg-muted">
-                <img 
-                  src={item.image_url} 
-                  alt={item.subject}
-                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                />
+                {item.image_url && (
+                  <img 
+                    src={item.image_url} 
+                    alt={item.subject}
+                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                  />
+                )}
                 <div className="absolute top-2 right-2 flex gap-2">
-                  <Badge className={`${getScoreColor(item.score)} border-none font-bold backdrop-blur-md`}>
-                    🔥 {item.score}/100
+                  <Badge className={`${getScoreColor(item.score ?? 0)} border-none font-bold backdrop-blur-md`}>
+                    🔥 {item.score ?? 0}/100
                   </Badge>
                   {item.type === 'video' && (
                     <Badge variant="secondary" className="backdrop-blur-md bg-black/50 text-white border-none">
@@ -144,7 +146,7 @@ function ViralAgoraPage() {
                     {CATEGORIES.find(c => c.value === item.category)?.label}
                   </Badge>
                   <span className="text-[10px] text-muted-foreground">
-                    {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {item.created_at ? new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                   </span>
                 </div>
                 <CardTitle className="text-lg line-clamp-2 leading-tight group-hover:text-primary transition-colors">
@@ -154,10 +156,10 @@ function ViralAgoraPage() {
               <CardContent className="p-4 pt-0">
                 <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
                   <span className="flex items-center gap-1">
-                    <ExternalLink className="h-3 w-3" /> {item.source}
+                    <ExternalLink className="h-3 w-3" /> {item.source || 'Desconhecido'}
                   </span>
                   <span className="flex items-center gap-1 font-medium text-orange-500">
-                    <TrendingUp className="h-3 w-3" /> {item.mentions.toLocaleString()} menções
+                    <TrendingUp className="h-3 w-3" /> {(item.mentions ?? 0).toLocaleString()} menções
                   </span>
                 </div>
               </CardContent>
@@ -165,7 +167,7 @@ function ViralAgoraPage() {
                 {item.type === 'video' ? (
                   <>
                     <Button variant="outline" size="sm" className="w-full text-xs" asChild>
-                      <a href={item.video_url} target="_blank" rel="noopener noreferrer">
+                      <a href={item.video_url || '#'} target="_blank" rel="noopener noreferrer">
                         Abrir Original
                       </a>
                     </Button>
@@ -189,7 +191,6 @@ function ViralAgoraPage() {
         </div>
       </Tabs>
 
-      {/* Seção Radar Viral (Agente IA) */}
       <Card className="bg-gradient-to-br from-orange-500/5 to-primary/5 border-primary/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-xl">
