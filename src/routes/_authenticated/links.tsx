@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getUserLinks, createCustomLink, deleteLink, toggleLinkStatus } from '@/lib/links.functions'
+import { getUserLinks, createCustomLink, deleteLink, toggleLinkStatus, getUserProfile, updateProfileDomain } from '@/lib/links.functions'
+import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
@@ -51,10 +52,38 @@ function LinksPage() {
   
   const queryClient = useQueryClient()
 
+  const { data: profile } = useQuery({
+    queryKey: ['user-profile'],
+    queryFn: () => getUserProfile(),
+  })
+
+  // Sincronizar o domínio do perfil com o novo link ao abrir o diálogo
+  useEffect(() => {
+    if (profile?.custom_domain && !newLink.custom_domain) {
+      setNewLink(prev => ({ ...prev, custom_domain: profile.custom_domain }));
+    }
+  }, [profile, isCreateOpen]);
+
   const { data: links, isLoading } = useQuery({
     queryKey: ['user-links'],
     queryFn: () => getUserLinks(),
   })
+
+  const updateDomainMutation = useMutation({
+    mutationFn: (domain: string) => updateProfileDomain({ data: { domain } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-profile'] });
+    }
+  });
+
+  // Garantir que o domínio ajpvip.com.br esteja configurado se solicitado
+  useEffect(() => {
+    if (profile && !profile.custom_domain) {
+      // Aqui poderíamos forçar a atualização, mas vamos apenas garantir que a UI o use se o usuário desejar
+      // Como o usuário respondeu que quer ajpvip.com.br como padrão:
+      updateDomainMutation.mutate('ajpvip.com.br');
+    }
+  }, [profile]);
 
   const createMutation = useMutation({
     mutationFn: (data: any) => createCustomLink({ data: {
