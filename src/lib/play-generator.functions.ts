@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const savePlayAsset = createServerFn({ method: "POST" })
@@ -11,10 +10,10 @@ export const savePlayAsset = createServerFn({ method: "POST" })
     settings: z.any()
   }).parse(data))
   .handler(async ({ data, context }) => {
-    const { userId } = context;
+    const { userId, supabase: authenticatedSupabase } = context;
     
-    const { data: asset, error } = await supabase
-      .from("play_assets" as any) // Tabela criada via migração
+    const { data: asset, error } = await authenticatedSupabase
+      .from("play_assets" as any)
       .insert({
         user_id: userId,
         original_url: data.originalUrl,
@@ -31,9 +30,9 @@ export const savePlayAsset = createServerFn({ method: "POST" })
 export const getPlayAssets = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { userId } = context;
+    const { userId, supabase: authenticatedSupabase } = context;
     
-    const { data: assets, error } = await supabase
+    const { data: assets, error } = await authenticatedSupabase
       .from("play_assets" as any)
       .select("*")
       .eq("user_id", userId)
@@ -49,9 +48,9 @@ export const deletePlayAsset = createServerFn({ method: "POST" })
     id: z.string()
   }).parse(data))
   .handler(async ({ data, context }) => {
-    const { userId } = context;
+    const { userId, supabase: authenticatedSupabase } = context;
     
-    const { error } = await supabase
+    const { error } = await authenticatedSupabase
       .from("play_assets" as any)
       .delete()
       .eq("id", data.id)
