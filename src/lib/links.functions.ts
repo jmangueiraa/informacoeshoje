@@ -36,10 +36,10 @@ export const createCustomLink = createServerFn({ method: "POST" })
 
     console.log("Criando link para usuário:", userId);
 
-    // Buscar perfil para verificar limite e plano
+    // Buscar perfil para verificar limite, plano e trial
     let { data: profile, error: profileError } = await authenticatedSupabase
       .from("profiles")
-      .select("plan_id, plans(max_links)")
+      .select("plan_id, trial_expires_at, is_trial, plans(max_links)")
       .eq("id", userId)
       .maybeSingle();
 
@@ -47,25 +47,18 @@ export const createCustomLink = createServerFn({ method: "POST" })
       console.error("Erro ao buscar perfil:", profileError);
     }
 
-    // Se o perfil não tem plano, atribuir o plano gratuito por padrão
-    if (!profile?.plan_id) {
-      console.log("Usuário sem plano. Atribuindo plano gratuito.");
-      const { data: freePlan } = await authenticatedSupabase
-        .from("plans")
-        .select("id")
-        .eq("name", "Gratuito")
-        .single();
-      
-      if (freePlan) {
-        await authenticatedSupabase.from("profiles").update({ plan_id: freePlan.id }).eq("id", userId);
-        // Recarregar perfil
-        const { data: updatedProfile } = await authenticatedSupabase
-          .from("profiles")
-          .select("plan_id, plans(max_links)")
-          .eq("id", userId)
-          .single();
-        profile = updatedProfile;
-      }
+    // Cast profile as any since TypeScript doesn't know about the new trial columns yet
+    const profileAny = profile as any;
+    const trialExpiresAt = profileAny?.trial_expires_at;
+    const isTrial = profileAny?.is_trial;
+
+    // Lógica de Trial e Limite de Links
+    const now = new Date();
+    const isTrialActive = isTrial && trialExpiresAt && new Date(trialExpiresAt) > now;
+    
+    // Se o trial expirou e o usuário ainda está marcado como trial
+    if (isTrial && trialExpiresAt && new Date(trialExpiresAt) <= now) {
+      console.log("Trial expirado para o usuário:", userId);
     }
 
     const { count, error: countError } = await authenticatedSupabase
@@ -77,9 +70,17 @@ export const createCustomLink = createServerFn({ method: "POST" })
       console.error("Erro ao contar links:", countError);
     }
 
-    const maxLinks = (profile?.plans as any)?.max_links || 10;
+    // Regra: Novos usuários têm 10 links durante o trial de 24h.
+    const maxLinks = isTrialActive ? 10 : (profileAny?.plans?.max_links || 0);
+
     if (count !== null && count >= maxLinks) {
-      throw new Error(`Limite de links atingido para o plano atual (${maxLinks})`);
+      if (isTrialActive) {
+        throw new Error(`Limite de links do período de teste atingido (Máximo: 10).`);
+      } else if (isTrial) {
+        throw new Error(`Seu período de teste de 24 horas expirou. Assine um plano para continuar criando links.`);
+      } else {
+        throw new Error(`Limite de links atingido para o plano atual (${maxLinks}).`);
+      }
     }
 
     const insertData = {
