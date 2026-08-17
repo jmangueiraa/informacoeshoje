@@ -105,36 +105,6 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Database className="h-5 w-5 text-orange-500" />
-              Shopee Affiliate API
-            </CardTitle>
-            <CardDescription>Configurações necessárias para integração com a plataforma Shopee.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="shopee_app_id">App ID</Label>
-              <Input
-                id="shopee_app_id"
-                value={formData.shopee_app_id}
-                onChange={(e) => setFormData({ ...formData, shopee_app_id: e.target.value })}
-                placeholder="Ex: 123456789"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="shopee_app_secret">App Secret</Label>
-              <Input
-                id="shopee_app_secret"
-                type="password"
-                value={formData.shopee_app_secret}
-                onChange={(e) => setFormData({ ...formData, shopee_app_secret: e.target.value })}
-                placeholder="••••••••••••••••"
-              />
-            </div>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader>
