@@ -101,7 +101,7 @@ export const getDashboardStats = createServerFn({ method: "GET" })
       .select("id, clicks_count, status")
       .eq("user_id", userId);
 
-    const totalClicks = links?.reduce((acc, curr) => acc + (curr.clicks_count || 0), 0) || 0;
+    const totalClicks = links?.reduce((acc, curr) => acc + (Number(curr.clicks_count) || 0), 0) || 0;
     const activeLinks = links?.filter(l => l.status === 'active').length || 0;
 
     // Cliques nas últimas 24h

@@ -141,7 +141,7 @@ export function DashboardHome() {
                         </div>
                       </td>
                       <td className="p-4 text-center font-semibold">
-                        {link.clicks_count || 0}
+                        {Number(link.clicks_count) || 0}
                       </td>
                       <td className="p-4 text-center">
                         <Badge variant={link.status === 'active' ? 'secondary' : 'outline'} className={link.status === 'active' ? 'bg-green-500/10 text-green-500 hover:bg-green-500/20' : ''}>
