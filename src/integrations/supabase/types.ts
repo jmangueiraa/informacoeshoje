@@ -449,6 +449,7 @@ export type Database = {
         Args: { link_id: string; visitor_ip: string }
         Returns: undefined
       }
+      sync_all_link_clicks: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
