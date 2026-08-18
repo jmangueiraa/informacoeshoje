@@ -125,16 +125,18 @@ function LinksPage() {
   })
 
   const copyToClipboard = (link: any) => {
-    let baseUrl = window.location.origin
+    // Usar a URL atual como base para links sem domínio customizado específico
+    const currentOrigin = window.location.origin
     
-    // Se o link tem um domínio associado e ele está verificado (a info viria no join do link se necessário)
-    // Para simplificar, usamos o domínio principal do usuário se disponível
+    // Priorizar o domínio associado ao link ou o domínio principal do usuário
     const userPrimaryDomain = domains?.find((d: any) => d.is_primary && d.verification_status === 'verified')
     
+    let baseUrl = currentOrigin
+    
     if (userPrimaryDomain) {
-      baseUrl = userPrimaryDomain.domain.startsWith('http') 
-        ? userPrimaryDomain.domain 
-        : `https://${userPrimaryDomain.domain}`
+      // Garantir que o domínio tenha protocolo
+      const domainName = userPrimaryDomain.domain
+      baseUrl = domainName.startsWith('http') ? domainName : `https://${domainName}`
     }
 
     const url = `${baseUrl}/${link.slug}`
@@ -307,9 +309,8 @@ function LinksPage() {
                             const userPrimaryDomain = domains?.find((d: any) => d.is_primary && d.verification_status === 'verified')
                             let baseUrl = window.location.origin
                             if (userPrimaryDomain) {
-                              baseUrl = userPrimaryDomain.domain.startsWith('http') 
-                                ? userPrimaryDomain.domain 
-                                : `https://${userPrimaryDomain.domain}`
+                              const domainName = userPrimaryDomain.domain
+                              baseUrl = domainName.startsWith('http') ? domainName : `https://${domainName}`
                             }
                             const url = `${baseUrl}/${link.slug}`
                             window.open(url, '_blank', 'noopener,noreferrer')

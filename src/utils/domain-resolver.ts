@@ -8,10 +8,16 @@ export interface ResolvedDomain {
 }
 
 export async function resolveDomain(hostname: string): Promise<ResolvedDomain | null> {
-  const normalizedHost = hostname.toLowerCase().trim();
+  const normalizedHost = hostname.toLowerCase().trim().replace(/^www\./, '');
+  const platformDomainNormalized = PLATFORM_DOMAIN.toLowerCase().trim().replace(/^www\./, '');
 
-  // 1. Se for o domínio principal da plataforma
-  if (normalizedHost === PLATFORM_DOMAIN || normalizedHost.includes('lovable.app') || normalizedHost.includes('localhost')) {
+  // 1. Se for o domínio principal da plataforma ou ambiente de desenvolvimento
+  if (
+    normalizedHost === platformDomainNormalized || 
+    normalizedHost.includes('lovable.app') || 
+    normalizedHost.includes('localhost') ||
+    normalizedHost.includes('127.0.0.1')
+  ) {
     return {
       userId: '',
       domain: normalizedHost,
