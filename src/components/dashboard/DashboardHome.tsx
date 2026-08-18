@@ -9,9 +9,10 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 
 export function DashboardHome() {
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: () => getDashboardStats(),
+    refetchOnWindowFocus: true,
   })
 
   const { data: links, isLoading: linksLoading } = useQuery({
