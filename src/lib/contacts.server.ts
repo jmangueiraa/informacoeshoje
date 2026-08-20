@@ -96,7 +96,8 @@ Retorne estritamente o JSON:
     };
 
     console.log("[DEBUG] Iniciando chamada via SDK do Gemini...");
-    const result = await model.generateContent([prompt, imagePart]);
+    // @ts-ignore - A tipagem do SDK às vezes conflita com a estrutura InlineDataPart mas funciona em runtime
+    const result = await model.generateContent([prompt, imagePart as any]);
     const responseText = result.response.text();
     console.log("[GEMINI_SDK_SUCCESS]:", responseText);
 
