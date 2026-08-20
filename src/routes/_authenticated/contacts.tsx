@@ -588,46 +588,80 @@ function ContactsPage() {
                       </TableRow>
                     ) : (
                       filteredContacts?.map((contact: any) => (
-                        <TableRow key={contact.id} className="group hover:bg-muted/30 transition-colors">
-                          <TableCell className="font-medium">
-                            {contact.name}
-                            {contact.needs_review && (
-                              <p className="text-[10px] text-red-500 font-normal mt-0.5">
-                                Motivo: {contact.review_reason || 'Revisão manual necessária'}
-                              </p>
-                            )}
-                            <p className="text-[9px] text-muted-foreground mt-0.5">
-                              ID: {contact.id.substring(0, 8)} | User: {contact.user_id?.substring(0, 8)}
-                            </p>
-                          </TableCell>
-                          <TableCell>
-                            <span className="inline-flex items-center px-2 py-1 rounded bg-primary/10 text-primary text-xs font-mono">
-                              {formatPhone(contact.phone_normalized)}
+                    <TableRow 
+                      key={contact.id} 
+                      className={cn(
+                        "group hover:bg-muted/30 transition-colors",
+                        calculateDaysUntilNextSend(contact) === 0 && "bg-red-50/50 hover:bg-red-100/50"
+                      )}
+                    >
+                      <TableCell className="font-medium">
+                        {contact.name}
+                        {contact.needs_review && (
+                          <p className="text-[10px] text-red-500 font-normal mt-0.5">
+                            Motivo: {contact.review_reason || 'Revisão manual necessária'}
+                          </p>
+                        )}
+                        <p className="text-[9px] text-muted-foreground mt-0.5">
+                          ID: {contact.id.substring(0, 8)} | Criado em: {format(parseISO(contact.created_at), 'dd/MM/yy')}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center px-2 py-1 rounded bg-primary/10 text-primary text-xs font-mono">
+                          {formatPhone(contact.phone_normalized)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          {contact.needs_review ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-100 w-fit">
+                              <AlertCircle className="h-3 w-3" />
+                              Revisar
                             </span>
-                          </TableCell>
-                          <TableCell>
-                            {contact.needs_review ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-100">
-                                <AlertCircle className="h-3 w-3" />
-                                Revisar
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-100 w-fit">
+                              <CheckCircle2 className="h-3 w-3" />
+                              OK
+                            </span>
+                          )}
+                          
+                          {(() => {
+                            const daysLeft = calculateDaysUntilNextSend(contact)
+                            return daysLeft === 0 ? (
+                              <span className="text-[10px] font-bold text-red-600 animate-pulse">
+                                Envio Pendente
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-100">
-                                <CheckCircle2 className="h-3 w-3" />
-                                OK
+                              <span className="text-[10px] text-muted-foreground">
+                                Faltam {daysLeft} dias para o envio
                               </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right flex items-center justify-end gap-2">
+                            )
+                          })()}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {calculateDaysUntilNextSend(contact) === 0 ? (
+                            <Button 
+                              variant="default" 
+                              size="sm" 
+                              className="h-8 gap-2 bg-red-600 hover:bg-red-700 text-white transition-all shadow-sm"
+                              onClick={() => handleSendMessage(contact)}
+                            >
+                              <Phone className="h-3.5 w-3.5" />
+                              Enviar Mensagem
+                            </Button>
+                          ) : (
                             <Button 
                               variant="outline" 
                               size="sm" 
                               className="h-8 gap-2 hover:bg-green-500 hover:text-white transition-all"
-                              onClick={() => window.open(`https://wa.me/55${contact.phone_normalized}`, '_blank')}
+                              onClick={() => handleSendMessage(contact)}
                             >
                               <Phone className="h-3.5 w-3.5" />
                               WhatsApp
                             </Button>
+                          )}
                             <Button
                               variant="ghost"
                               size="icon"
