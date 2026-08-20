@@ -23,6 +23,7 @@ export const getContacts = createServerFn({ method: "GET" })
   });
 
 export const processImageOCR = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: any) => z.object({
     imageBase64: z.string(),
     filename: z.string().optional(),

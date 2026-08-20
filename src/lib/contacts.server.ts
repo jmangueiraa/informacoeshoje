@@ -43,15 +43,17 @@ export function normalizeBrazilianPhone(phone: string | null | undefined): { nor
   };
 }
 
+/**
+ * Função principal para analisar a imagem e extrair contatos
+ */
 export async function analyzeImageForContacts(imageBase64: string, filename: string = "arquivo_upload.jpg", mimeType: string = "image/jpeg") {
-  console.log(`\n========== CAPTURA GEMINI SDK DEBUG ==========`);
+  console.log(`\n========== CAPTURA GEMINI DEBUG ==========`);
   console.log(`[DEBUG] Arquivo: ${filename}`);
   console.log(`[DEBUG] MimeType: ${mimeType}`);
   console.log(`[DEBUG] Tamanho Base64 recebido: ${imageBase64?.length}`);
   
   const apiKey = process.env['GEMINI_API_KEY'];
-  console.log("[DEBUG] API Key presente?:", !!apiKey);
-
+  
   if (!apiKey) {
     console.error("10. LOCAL DA DECISÃO: analyzeImageForContacts - Erro: GEMINI_API_KEY ausente");
     return {
@@ -62,84 +64,76 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
   }
 
   try {
-    const { GoogleGenerativeAI } = await import("@google/generative-ai");
-    const genAI = new GoogleGenerativeAI(apiKey);
-    
     // Garante que o base64 está limpo (sem prefixo data:image/...)
     const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.1,
-      }
-    });
-
-    const prompt = `Você é um extrator de dados de comprovantes de logística e entrega da Shopee.
-Localize a seção "Informações do recebedor" ou "Destinatário".
-Extraia:
-- name: Nome da pessoa (remova pontuações soltas como _ das pontas).
-- phone: Número de telefone completo (apenas dígitos, sem texto).
-
-Retorne estritamente o JSON:
-{
-  "name": "Nome",
-  "phone": "Telefone com DDD"
-}`;
-
-    const imagePart = {
-      inlineData: {
-        data: cleanBase64,
-        mimeType: mimeType || "image/jpeg"
-      }
-    };
-
-    console.log("[DEBUG] Iniciando chamada via SDK do Gemini...");
-    // @ts-ignore - A tipagem do SDK às vezes conflita com a estrutura InlineDataPart mas funciona em runtime
-    const result = await model.generateContent([prompt, imagePart as any]);
-    const responseText = result.response.text();
-    console.log("[GEMINI_SDK_SUCCESS]:", responseText);
-
-    if (!responseText) {
-      throw new Error("Resposta do Gemini vazia ou sem conteúdo textual");
-    }
+    // Tentativa com v1 (mais estável em alguns ambientes edge)
+    const promptText = "Você é um extrator de contatos de comprovantes de entrega da Shopee. Encontre o bloco 'Informações do recebedor' ou destinatário. Extraia o nome da pessoa e o telefone com DDD. Retorne estritamente um JSON: {\"name\": \"...\", \"phone\": \"...\"}";
     
     let contactsData: any[] = [];
+    
     try {
-      const parsed = JSON.parse(responseText);
-      const items = Array.isArray(parsed) ? parsed : [parsed];
-      contactsData = items.map(item => ({
-        name: item.name || "",
-        phone: item.phone || "",
-        ...item
-      }));
-    } catch (e) {
-      console.error("[IMPORT] Erro ao parsear JSON do Gemini SDK:", e);
-      // Fallback: tentar encontrar JSON no texto se houver lixo em volta
-      const jsonMatch = responseText.match(/\[.*\]|\{.*\}/s);
-      if (jsonMatch) {
-        try {
-          const parsedMatch = JSON.parse(jsonMatch[0]);
-          const items = Array.isArray(parsedMatch) ? parsedMatch : [parsedMatch];
-          contactsData = items.map(item => ({
-            name: item.name || "",
-            phone: item.phone || ""
-          }));
-        } catch (innerError) {
-          console.error("[IMPORT] Falha no fallback de parse SDK:", innerError);
+      console.log("[DEBUG] Iniciando fetch para Gemini API v1...");
+      const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: promptText },
+              { inline_data: { mime_type: mimeType || "image/jpeg", data: cleanBase64 } }
+            ]
+          }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`[DEBUG] v1 falhou (${response.status}): ${errorText}. Tentando v1beta...`);
+        
+        // Fallback para v1beta
+        const betaUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        const betaResponse = await fetch(betaUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: promptText },
+                { inline_data: { mime_type: mimeType || "image/jpeg", data: cleanBase64 } }
+              ]
+            }],
+            generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
+          })
+        });
+
+        if (!betaResponse.ok) {
+          throw new Error(`Gemini API falhou em v1 e v1beta.`);
         }
+        
+        const betaJson = await betaResponse.json();
+        contactsData = parseGeminiJson(betaJson);
+      } else {
+        const v1Json = await response.json();
+        contactsData = parseGeminiJson(v1Json);
       }
+    } catch (apiErr) {
+      console.error("[DEBUG] Erro em ambas as versões da API:", apiErr);
+      throw apiErr;
     }
 
+    // Processamento e normalização dos contatos extraídos
     const processedContacts = contactsData.map(content => {
       const rawName = content.name || "";
       const rawPhone = content.phone || "";
       
       const phoneResult = normalizeBrazilianPhone(rawPhone);
       const cleanName = rawName
-        .replace(/Tel|Nome|Contato|Recebedor/gi, "") // Remove palavras de sistema
-        .replace(/^[^a-zA-ZáéíóúÁÉÍÓÚñÑ]+|[^a-zA-ZáéíóúÁÉÍÓÚñÑ]+$/g, "") // Remove caracteres não alfabéticos das bordas
+        .replace(/Tel|Nome|Contato|Recebedor|Destinatário/gi, "")
+        .replace(/^[^a-zA-ZáéíóúÁÉÍÓÚñÑ]+|[^a-zA-ZáéíóúÁÉÍÓÚñÑ]+$/g, "")
         .replace(/\s+/g, " ")
         .trim();
       
@@ -154,13 +148,8 @@ Retorne estritamente o JSON:
         finalNeedsReview = true;
         reviewReason = "Nome não identificado claramente";
       } else if (!isPhoneValid) {
-        if (phoneResult.normalized.length >= 8 && phoneResult.normalized.length < 10) {
-          finalNeedsReview = true;
-          reviewReason = "Telefone capturado sem DDD";
-        } else {
-          finalNeedsReview = true;
-          reviewReason = phoneResult.reason || "Telefone inválido";
-        }
+        finalNeedsReview = true;
+        reviewReason = phoneResult.reason || "Telefone inválido";
       }
 
       if (isNameValid && isPhoneValid) {
@@ -184,11 +173,38 @@ Retorne estritamente o JSON:
     };
 
   } catch (error) {
-    console.error("10. LOCAL DA DECISÃO: analyzeImageForContacts - Exceção Gemini SDK:", error);
+    console.error("10. LOCAL DA DECISÃO: analyzeImageForContacts - Exceção:", error);
     return {
       contacts: [],
       needsReview: true,
-      reviewReason: "Erro no processamento Gemini SDK: " + (error instanceof Error ? error.message : String(error))
+      reviewReason: "Erro no processamento Gemini: " + (error instanceof Error ? error.message : String(error))
     };
+  }
+}
+
+/**
+ * Helper para extrair JSON da resposta da API
+ */
+function parseGeminiJson(responseJson: any): any[] {
+  const rawContent = responseJson.candidates?.[0]?.content?.parts?.[0]?.text;
+  console.log("[GEMINI_RAW_RESPONSE]:", rawContent);
+  
+  if (!rawContent) return [];
+  
+  try {
+    const cleanJson = rawContent.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(cleanJson);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch (e) {
+    const jsonMatch = rawContent.match(/\[.*\]|\{.*\}/s);
+    if (jsonMatch) {
+      try {
+        const parsedMatch = JSON.parse(jsonMatch[0]);
+        return Array.isArray(parsedMatch) ? parsedMatch : [parsedMatch];
+      } catch (inner) {
+        return [];
+      }
+    }
+    return [];
   }
 }
