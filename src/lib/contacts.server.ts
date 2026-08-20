@@ -72,6 +72,11 @@ export async function analyzeImageForContacts(imageBase64: string): Promise<Anal
     const result = await response.json();
     const content = JSON.parse(result.choices[0].message.content);
     
+    // Safeguard to ensure only first name is used
+    if (content.name) {
+      content.name = content.name.split(' ')[0].split('_')[0].trim();
+    }
+    
     return AnalysisResultSchema.parse(content);
   } catch (error) {
     console.error("Error analyzing image:", error);
