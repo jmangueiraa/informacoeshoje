@@ -89,7 +89,7 @@ export const saveContact = createServerFn({ method: "POST" })
     if (insertError) {
       console.error(`[CAPTURA] Supabase insert response ERROR:`, insertError);
       // Retornamos um objeto que o frontend consiga interpretar como erro de banco, mas sem quebrar a execução
-      throw new Error(`DB_INSERT_ERROR: ${insertError.message}`);
+      throw new Error(`DB_INSERT_ERROR: ${insertError.code} - ${insertError.message} - ${insertError.details}`);
     }
 
     console.log(`[CAPTURA] Supabase insert response SUCCESS:`, contact);

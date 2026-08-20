@@ -385,7 +385,7 @@ function ContactsPage() {
                       <div>Telefone válido: {String(res.isPhoneValid)}</div>
                       <div className="font-bold">Status calculado: {res.statusCalculated}</div>
                       <div className="font-bold">Status banco: {res.statusSaved}</div>
-                      <div className="font-bold">Status frontend: {res.statusSaved === 'duplicate' ? 'duplicate' : (res.statusCalculated === 'new' ? 'new' : 'review')}</div>
+                      <div className="font-bold">Status real: {res.statusSaved === 'duplicate' ? 'duplicate' : (res.statusSaved === 'DB_ERROR' ? 'DB_ERROR' : (res.statusSaved === 'new' ? 'new' : 'review'))}</div>
                     </div>
                   ))}
                   
