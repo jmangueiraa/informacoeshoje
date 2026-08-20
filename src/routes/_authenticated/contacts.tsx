@@ -29,7 +29,7 @@ function ContactsPage() {
   const [progress, setProgress] = useState(0)
   const [searchTerm, setSearchTerm] = useState('')
   const [summary, setSummary] = useState<{ processed: number; new: number; duplicates: number; review: number } | null>(null)
-  const [debugData, setDebugData] = useState<any>(null)
+  
   
   // Estado para a chave da API do Gemini
   const [geminiKey, setGeminiKey] = useState('')
