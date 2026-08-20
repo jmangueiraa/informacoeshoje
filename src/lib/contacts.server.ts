@@ -159,8 +159,9 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
       }
       
       const isNameIllegible = cleanName === "ILEGÍVEL";
+      let finalNeedsReview = false;
+      let reviewReason = "";
 
-      
       // phoneResult já foi declarado na linha 133
       const isPhoneValid = phoneResult.isValid || (phoneResult.normalized.length >= 8 && phoneResult.normalized.length <= 15);
 
