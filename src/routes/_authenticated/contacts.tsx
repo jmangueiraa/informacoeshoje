@@ -86,9 +86,10 @@ function ContactsPage() {
       })
 
       try {
-        console.log(`\n========== CAPTURA DEBUG (FRONTEND) ==========\n1. ARQUIVO:\n   nome: ${file.name}\n   tipo: ${file.type}\n   tamanho: ${Math.round(file.size / 1024)} KB`);
+        console.log(`[IMPORT] Iniciando extração do arquivo: ${file.name}`);
         
         const result = await processImageOCR({ data: { imageBase64: base64, filename: file.name } });
+        console.log(`[IMPORT] Resposta da extração para ${file.name}:`, result);
         
         const phoneDigits = result.phone ? result.phone.replace(/\D/g, '') : '';
 
