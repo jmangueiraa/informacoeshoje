@@ -40,8 +40,7 @@ export const saveContact = createServerFn({ method: "POST" })
     phone: z.string(),
     needsReview: z.boolean().optional(),
     reviewReason: z.string().nullish(),
-    rawData: z.any().optional(),
-    status: z.string().optional() // Campo status opcional para facilitar controle do frontend
+    rawData: z.any().optional()
   }).parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as any;
@@ -95,7 +94,12 @@ export const saveContact = createServerFn({ method: "POST" })
     let cleanName = sanitizedName;
     if (sanitizedName !== nextSequentialName) {
       const firstName = sanitizedName.split(' ')[0] || "Cliente";
-      cleanName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+      const cleaned = firstName.replace(/[^a-zA-ZÀ-ÿ]/g, '');
+      if (cleaned.length < 3) {
+        cleanName = nextSequentialName;
+      } else {
+        cleanName = cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
+      }
     }
     
     const phoneDigits = data.phone.replace(/\D/g, '');
