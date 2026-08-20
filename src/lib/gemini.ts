@@ -16,8 +16,8 @@ export async function extractContactFromGemini(imageBase64: string, mimeType: st
   const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
 
   // Lista de modelos para tentativa de fallback
-  // Nota: gemini-2.0-flash é o modelo atual estável/disponível no momento
-  const models = ["gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash"];
+  // Modelos conforme configuração do Google AI Studio do usuário
+  const models = ["gemini-3-flash-preview", "gemini-2.5-flash", "gemini-2.0-flash"];
   let lastError = "";
 
   for (const model of models) {
