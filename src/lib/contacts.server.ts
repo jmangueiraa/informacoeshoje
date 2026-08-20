@@ -165,7 +165,7 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
         cleanName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
       }
       
-      const phoneResult = normalizeBrazilianPhone(rawPhone);
+      // phoneResult já foi declarado na linha 133
       const isPhoneValid = phoneResult.isValid || (phoneResult.normalized.length >= 8 && phoneResult.normalized.length <= 15);
 
       // Regra: Se o telefone for válido, o status é OK (não precisa de revisão)
