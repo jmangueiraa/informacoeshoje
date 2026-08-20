@@ -89,74 +89,83 @@ function ContactsPage() {
       try {
         console.log(`[IMPORT] Iniciando extração do arquivo: ${file.name}`);
         
-        const result = await processImageOCR({ data: { imageBase64: base64, filename: file.name } });
-        console.log(`[IMPORT] Resposta da extração para ${file.name}:`, result);
+        const response = await processImageOCR({ data: { imageBase64: base64, filename: file.name } });
+        console.log(`[IMPORT] Resposta da extração para ${file.name}:`, response);
         
-        const phoneDigits = result.phone ? result.phone.replace(/\D/g, '') : '';
+        const extractedContacts = response.contacts || [];
 
-        const currentDebug: any = {
-          filename: file.name,
-          rawResult: result.raw_data,
-          extractedName: result.name,
-          extractedPhone: result.phone,
-          normalizedName: result.name,
-          normalizedPhone: result.phone,
-          isNameValid: result.name.length >= 2 && !result.name.toLowerCase().includes("erro"),
-          isPhoneValid: phoneDigits.length >= 10,
-          confidence: result.raw_data?.confidence,
-          serverStatus: result.needsReview ? 'review' : 'valid',
-          reviewReason: result.reviewReason,
-          decisionStep: 'servidor',
-          decisionRule: `needsReview === ${result.needsReview}`
-        };
-
-        // 1. Verificar duplicata no mesmo lote
-        if (phoneDigits && batchPhones.has(phoneDigits)) {
-          console.log(`[IMPORT] Duplicata no lote detectada: ${phoneDigits}`);
-          dupCount++;
-          currentDebug.statusSentToDB = 'duplicate-batch';
-          setDebugData(currentDebug);
-          setProgress(((i + 1) / files.length) * 100);
+        if (extractedContacts.length === 0) {
+          revCount++;
+          toast.error(`Nenhum contato identificado em ${file.name}`);
           continue;
         }
-        
-        if (phoneDigits) {
-          batchPhones.add(phoneDigits);
-        }
 
-        // 2. Persistência com tratamento de status
-        try {
-          const savedContact = await saveContact({ 
-            data: { 
-              name: result.name || 'Cliente', 
-              phone: result.phone,
-              needsReview: !!result.needsReview,
-              reviewReason: result.reviewReason || null,
-              rawData: result.raw_data || null
-            } 
-          });
-          
-          // Sucesso na gravação
-          if (savedContact.needs_review) {
-            revCount++;
-          } else {
-            newCount++;
-          }
-          currentDebug.statusSavedInDB = savedContact.needs_review ? 'review' : 'new';
-        } catch (err: any) {
-          if (err.message === 'DUPLICATE_CONTACT') {
-            console.log(`[IMPORT] Duplicata no banco detectada para: ${phoneDigits}`);
+        for (const contactData of extractedContacts) {
+          const phoneDigits = contactData.phone ? contactData.phone.replace(/\D/g, '') : '';
+
+          const currentDebug: any = {
+            filename: file.name,
+            rawResult: contactData.raw_data,
+            extractedName: contactData.name,
+            extractedPhone: contactData.phone,
+            normalizedName: contactData.name,
+            normalizedPhone: contactData.phone,
+            isNameValid: contactData.name.length >= 2 && !contactData.name.toLowerCase().includes("erro"),
+            isPhoneValid: phoneDigits.length >= 10,
+            serverStatus: contactData.needsReview ? 'review' : 'valid',
+            reviewReason: contactData.reviewReason,
+            decisionStep: 'servidor',
+            decisionRule: `needsReview === ${contactData.needsReview}`
+          };
+
+          // 1. Verificar duplicata no mesmo lote
+          if (phoneDigits && batchPhones.has(phoneDigits)) {
+            console.log(`[IMPORT] Duplicata no lote detectada: ${phoneDigits}`);
             dupCount++;
-            currentDebug.statusSavedInDB = 'duplicate';
-          } else {
-            console.error(`[IMPORT_ERROR] Falha na gravação do contato:`, err);
-            revCount++;
-            currentDebug.statusSavedInDB = 'error';
-            toast.error(`Erro ao salvar contato ${result.name}: ${err.message}`);
+            currentDebug.statusSentToDB = 'duplicate-batch';
+            setDebugData(currentDebug);
+            continue;
           }
+          
+          if (phoneDigits) {
+            batchPhones.add(phoneDigits);
+          }
+
+          // 2. Persistência com tratamento de status
+          try {
+            const savedContact = await saveContact({ 
+              data: { 
+                name: contactData.name || 'Cliente', 
+                phone: contactData.phone,
+                needsReview: !!contactData.needsReview,
+                reviewReason: contactData.reviewReason || null,
+                rawData: contactData.raw_data || null,
+                status: 'new'
+              } 
+            });
+            
+            // Sucesso na gravação
+            if (savedContact.needs_review) {
+              revCount++;
+            } else {
+              newCount++;
+            }
+            currentDebug.statusSavedInDB = savedContact.needs_review ? 'review' : 'new';
+          } catch (err: any) {
+            if (err.message === 'DUPLICATE_CONTACT') {
+              console.log(`[IMPORT] Duplicata no banco detectada para: ${phoneDigits}`);
+              dupCount++;
+              currentDebug.statusSavedInDB = 'duplicate';
+            } else {
+              console.error(`[IMPORT_ERROR] Falha na gravação do contato:`, err);
+              revCount++;
+              currentDebug.statusSavedInDB = 'error';
+              toast.error(`Erro ao salvar contato ${contactData.name}: ${err.message}`);
+            }
+          }
+          
+          setDebugData(currentDebug);
         }
-        
-        setDebugData(currentDebug);
       } catch (err: any) {
         console.error("[IMPORT_ERROR]:", err);
         const errorMessage = err.message || "Erro desconhecido ao processar imagem";
@@ -487,11 +496,12 @@ function ContactsPage() {
                           <TableCell><div className="h-4 w-32 bg-muted animate-pulse rounded" /></TableCell>
                           <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded" /></TableCell>
                           <TableCell><div className="h-8 w-full bg-muted animate-pulse rounded" /></TableCell>
+                          <TableCell><div className="h-8 w-full bg-muted animate-pulse rounded" /></TableCell>
                         </TableRow>
                       ))
                     ) : filteredContacts?.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} className="h-32 text-center text-muted-foreground">
+                        <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
                           {searchTerm ? 'Nenhum contato encontrado para esta busca.' : 'Nenhum contato capturado ainda.'}
                         </TableCell>
                       </TableRow>
@@ -527,7 +537,7 @@ function ContactsPage() {
                               </span>
                             )}
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right flex items-center justify-end gap-2">
                             <Button 
                               variant="outline" 
                               size="sm" 
@@ -536,6 +546,23 @@ function ContactsPage() {
                             >
                               <Phone className="h-3.5 w-3.5" />
                               WhatsApp
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                              onClick={async () => {
+                                if (confirm('Excluir este contato?')) {
+                                  const { error } = await supabase.from('contacts').delete().eq('id', contact.id);
+                                  if (error) toast.error('Erro ao excluir');
+                                  else {
+                                    toast.success('Contato excluído');
+                                    queryClient.invalidateQueries({ queryKey: ['contacts'] });
+                                  }
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </TableCell>
                         </TableRow>
