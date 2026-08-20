@@ -8,12 +8,6 @@ const AnalysisResultSchema = z.object({
 
 type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 
-/**
- * Nota para o Agente Lovable:
- * O endpoint correto para o AI Gateway é "https://api.lovable.dev/v1/ai/chat/completions".
- * Se receber 404, verifique se a conexão AI Gateway está ativa no painel do projeto.
- */
-
 export async function analyzeImageForContacts(imageBase64: string): Promise<AnalysisResult> {
   const apiKey = process.env['LOVABLE_API_KEY'];
   
@@ -25,6 +19,7 @@ export async function analyzeImageForContacts(imageBase64: string): Promise<Anal
   const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
 
   try {
+    // Tentando o endpoint padrão do AI Gateway que deveria funcionar
     const response = await fetch("https://api.lovable.dev/v1/ai/chat/completions", {
       method: "POST",
       headers: {
@@ -40,25 +35,23 @@ export async function analyzeImageForContacts(imageBase64: string): Promise<Anal
             Seu objetivo é extrair APENAS o NOME e o TELEFONE do recebedor/cliente.
 
             CONTEXTO DA IMAGEM:
-            - Frequentemente são prints de apps como Shopee, iFood, Loggi.
-            - O nome do recebedor geralmente aparece acima do telefone.
-            - O telefone pode vir precedido de "Tel", "Telefone", "Celular" ou ícones.
-            - Procure por campos como "Informações do recebedor" ou "Destinatário".
+            - A imagem é um print de detalhes de pedido (ex: Shopee).
+            - O nome do recebedor geralmente aparece abaixo de "Informações do recebedor".
+            - O telefone aparece logo abaixo ou ao lado do nome, geralmente com "+55".
 
             Regras CRÍTICAS:
             1. Retorne um JSON: {"name": string, "phone": string, "needsReview": boolean}.
-            2. "name": Extraia APENAS o primeiro nome. Se o nome for "Jéssica De Araújo Dos Santos_", retorne "Jéssica". Remova qualquer caractere especial como "_" no final.
-            3. "phone": Extraia o número de telefone completo. Remova parênteses, espaços e hifens. Mantenha o código do país se disponível (ex: 5516994345806).
-            4. "needsReview": Defina como FALSE se você encontrou um nome e um telefone. Só defina como TRUE se não encontrar NADA.
-            5. NUNCA ignore o telefone se ele estiver visível na imagem, mesmo que esteja em formato internacional.
-            6. Seja extremamente literal com o que vê na imagem.`
+            2. "name": Extraia APENAS o primeiro nome. Exemplo: "Jéssica De Araújo..." -> "Jéssica". Limpe caracteres como "_".
+            3. "phone": Extraia o número completo (ex: 5516994345806).
+            4. "needsReview": SEMPRE defina como FALSE se encontrar um telefone válido (8+ dígitos).
+            5. Procure por padrões numéricos longos caso não encontre etiquetas claras.`
           },
           {
             role: "user",
             content: [
               {
                 type: "text",
-                text: "Extraia o nome e telefone desta imagem."
+                text: "Extraia o nome e telefone desta imagem de entrega."
               },
               {
                 type: "image_url",
@@ -77,20 +70,20 @@ export async function analyzeImageForContacts(imageBase64: string): Promise<Anal
     if (!response.ok) {
       const errorText = await response.text();
       console.error("AI Gateway error:", response.status, errorText);
-      throw new Error(`AI Gateway error (${response.status}): ${errorText || response.statusText}`);
+      throw new Error(`AI Gateway error (${response.status})`);
     }
 
     const result = await response.json();
     const content = JSON.parse(result.choices[0].message.content);
     
-    // Safeguard to ensure only first name is used and cleaned
+    // Limpeza extra garantida no servidor
     if (content.name) {
       const cleaned = content.name.replace(/[_\W]+$/, '');
       content.name = cleaned.split(' ')[0].split('_')[0].trim();
     }
     
-    // Additional phone validation
-    if (content.phone && content.phone.length >= 8) {
+    // Força validade se houver telefone
+    if (content.phone && content.phone.replace(/\D/g, '').length >= 8) {
       content.needsReview = false;
     }
     
