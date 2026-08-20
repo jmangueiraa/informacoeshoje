@@ -68,7 +68,7 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
     const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
 
     // Tentativa com v1 (mais estável em alguns ambientes edge)
-    const promptText = "Você é um extrator de contatos de comprovantes de entrega da Shopee. Encontre o bloco 'Informações do recebedor' ou destinatário. Extraia o nome da pessoa e o telefone com DDD. Retorne estritamente um JSON: {\"name\": \"...\", \"phone\": \"...\"}";
+    const promptText = "Você é um especialista em OCR para logística. Analise esta imagem de comprovante da Shopee e extraia o NOME e TELEFONE do recebedor/destinatário. O telefone geralmente está próximo ao nome ou no campo 'Contato'. Extraia apenas o NOME e o TELEFONE com DDD. Responda APENAS um JSON no formato: {\"name\": \"...\", \"phone\": \"...\"}. Se encontrar múltiplos, retorne uma lista de objetos JSON.";
     
     let contactsData: any[] = [];
     
@@ -139,7 +139,7 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
       
       const isErrorString = (s: string) => ["erro", "null", "undefined", "cliente", "desconhecido"].includes(s.toLowerCase());
       const isNameValid = cleanName.length >= 2 && !isErrorString(cleanName) && !cleanName.toLowerCase().includes("shopee") && !cleanName.toLowerCase().includes("entrega");
-      const isPhoneValid = phoneResult.isValid || (phoneResult.normalized.length >= 8 && phoneResult.normalized.length <= 13);
+      const isPhoneValid = phoneResult.isValid || (phoneResult.normalized.length >= 8 && phoneResult.normalized.length <= 15);
 
       let finalNeedsReview = false;
       let reviewReason = "";
@@ -192,7 +192,7 @@ function parseGeminiJson(responseJson: any): any[] {
   if (!rawContent) return [];
   
   try {
-    const cleanJson = rawContent.replace(/```json|```/g, '').trim();
+    const cleanJson = rawContent.replace(/```json|```/gi, '').trim();
     const parsed = JSON.parse(cleanJson);
     return Array.isArray(parsed) ? parsed : [parsed];
   } catch (e) {
