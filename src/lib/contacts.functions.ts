@@ -204,13 +204,34 @@ export const runControlledTest = createServerFn({ method: "POST" })
     
     const phoneResult = normalizeBrazilianPhone(data.phone);
     
-    // Normalização agressiva: Captura apenas o primeiro nome em Title Case
-    const rawCleanedName = data.name.replace(/[_*]/g, " ").replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").replace(/\s+/g, " ").trim();
-    const firstName = rawCleanedName.split(' ')[0] || "Cliente";
-    const cleanName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+    // Regras de validação do Nome (sincronizada com o servidor)
+    const rawName = data.name.trim();
+    const hasEllipsis = rawName.includes("...");
+    const hasSpecialChars = /[#@$%&|\\/]/.test(rawName);
+    const hasAsterisks = /[*_]{2,}/.test(rawName);
     
-    const isErrorString = (s: string) => ["erro na ia", "null", "undefined", "cliente"].includes(s.toLowerCase());
-    const isNameValid = cleanName.length >= 2 && !isErrorString(cleanName) && !cleanName.toLowerCase().includes("shopee");
+    const cleanedForLength = rawName
+      .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    const firstNameForLength = cleanedForLength.split(' ')[0] || "";
+    const isNameTooShort = firstNameForLength.length < 3;
+
+    const isNameIllegible = !rawName || 
+                           rawName === "ILEGÍVEL" || 
+                           hasEllipsis || 
+                           hasSpecialChars || 
+                           hasAsterisks || 
+                           isNameTooShort;
+
+    let cleanName = "";
+    if (isNameIllegible) {
+      cleanName = "Cliente00000"; // Mock sequencial para teste
+    } else {
+      const firstName = rawName.split(' ')[0] || "Cliente";
+      cleanName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+    }
+    
     const isPhoneValid = phoneResult.isValid;
     
     let needsReview = false;
