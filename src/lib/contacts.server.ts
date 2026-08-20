@@ -73,8 +73,8 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
     let contactsData: any[] = [];
     
     try {
-      console.log("[DEBUG] Iniciando fetch para Gemini API v1...");
-      const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
+      console.log("[DEBUG] Iniciando fetch para Gemini API v1beta...");
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
       
       const response = await fetch(apiUrl, {
         method: "POST",
@@ -92,10 +92,10 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.warn(`[DEBUG] v1 falhou (${response.status}): ${errorText}. Tentando v1beta...`);
+        console.warn(`[DEBUG] Requisição falhou (${response.status}): ${errorText}. Tentando novamente com o mesmo modelo em v1beta...`);
         
         // Fallback para v1beta
-        const betaUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
+        const betaUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
         const betaResponse = await fetch(betaUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -111,7 +111,7 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
         });
 
         if (!betaResponse.ok) {
-          throw new Error(`Gemini API falhou em v1 e v1beta.`);
+          throw new Error(`Gemini API falhou em ambas as tentativas.`);
         }
         
         const betaJson = await betaResponse.json();
