@@ -74,7 +74,7 @@ export const saveContact = createServerFn({ method: "POST" })
           .filter((n: number | null) => n !== null);
         
         if (sequentials.length > 0) {
-          nextNumber = Math.max(...sequentials) + 1;
+          nextNumber = Math.max(...(sequentials as number[])) + 1;
         }
       }
       cleanName = `Cliente${String(nextNumber).padStart(5, '0')}`;
