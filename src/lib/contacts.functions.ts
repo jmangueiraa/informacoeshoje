@@ -40,6 +40,18 @@ export const saveContact = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as any;
     
+    // Fallback para userId se não estiver no context (embora deva estar via middleware)
+    let finalUserId = userId;
+    if (!finalUserId) {
+      const { data: { session } } = await supabase.auth.getSession();
+      finalUserId = session?.user?.id;
+    }
+    
+    if (!finalUserId) {
+      console.error("[CAPTURA] saveContact - Erro: userId não identificado.");
+      throw new Error("UNAUTHORIZED_SAVE");
+    }
+    
     // Normalização básica para garantir que o telefone esteja limpo antes do banco
     const cleanName = data.name.trim();
     const phoneDigits = data.phone.replace(/\D/g, '');
@@ -74,7 +86,7 @@ export const saveContact = createServerFn({ method: "POST" })
       needs_review: data.needsReview === true, 
       review_reason: data.reviewReason || null,
       raw_data: data.rawData || null,
-      user_id: userId // OBRIGATÓRIO PARA RLS
+      user_id: finalUserId
     };
 
     console.log(`[CAPTURA] saveContact - Payload Enviado ao Supabase:`, payload);
