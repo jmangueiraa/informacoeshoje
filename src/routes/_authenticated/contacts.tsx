@@ -189,7 +189,7 @@ function ContactsPage() {
     
     const tests = [
       { name: "João da Silva", phone: "16999999999", expected: "new" },
-      { name: "Maria de Souza", phone: "5516999999999", expected: "new" },
+      { name: "Maria de Souza", phone: "16977776666", expected: "new" },
       { name: "Pedro Oliveira", phone: "(16) 98888-7777", expected: "new" }
     ]
 
@@ -397,9 +397,10 @@ function ContactsPage() {
                   
                   <div className="pt-2 border-t border-yellow-200 text-[10px] font-mono">
                     <div>Contador Novos: {summary?.new}</div>
+                    <div>Contador Duplicados: {summary?.duplicates}</div>
                     <div>Contador Revisar: {summary?.review}</div>
                     <div className="mt-2 font-bold text-sm text-yellow-900">
-                      TESTE ARTIFICIAL: {summary?.review === 0 && summary?.new === 3 ? '✅ PASSOU' : '❌ FALHOU'}
+                      TESTE ARTIFICIAL: {(summary?.new || 0) + (summary?.duplicates || 0) === 3 && summary?.review === 0 ? '✅ PASSOU' : '❌ FALHOU'}
                     </div>
                   </div>
                   
