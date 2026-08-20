@@ -9,7 +9,7 @@ const AnalysisResultSchema = z.object({
 type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 
 export async function analyzeImageForContacts(imageBase64: string): Promise<AnalysisResult> {
-  const apiKey = process.env.LOVABLE_API_KEY;
+  const apiKey = process.env['LOVABLE_API_KEY'];
   
   if (!apiKey) {
     throw new Error("LOVABLE_API_KEY is not configured.");
