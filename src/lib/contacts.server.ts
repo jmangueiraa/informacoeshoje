@@ -66,17 +66,19 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
   try {
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const genAI = new GoogleGenerativeAI(apiKey);
-    // Chamada direta via fetch para diagnóstico detalhado
+    // Chamada direta via fetch para diagnóstico detalhado seguindo documentação v1beta
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
     const payload = {
       contents: [
         {
           parts: [
-            { text: prompt },
             {
-              inlineData: {
-                mimeType: mimeType || "image/jpeg",
+              text: "Você é um extrator de contatos de comprovantes de entrega. Extraia o nome da pessoa em 'Informações do recebedor' e o número de telefone com DDD. Retorne estritamente um JSON no formato: {\"name\": \"...\", \"phone\": \"...\"}"
+            },
+            {
+              inline_data: {
+                mime_type: mimeType || "image/jpeg",
                 data: base64Data
               }
             }
