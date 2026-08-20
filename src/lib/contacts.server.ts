@@ -44,7 +44,7 @@ export function normalizeBrazilianPhone(phone: string | null | undefined): { nor
 }
 
 export async function analyzeImageForContacts(imageBase64: string, filename: string = "arquivo_upload.jpg", mimeType: string = "image/jpeg") {
-  console.log(`\n========== CAPTURA GEMINI DEBUG ==========`);
+  console.log(`\n========== CAPTURA GEMINI SDK DEBUG ==========`);
   console.log(`[DEBUG] Arquivo: ${filename}`);
   console.log(`[DEBUG] MimeType: ${mimeType}`);
   console.log(`[DEBUG] Tamanho Base64 recebido: ${imageBase64?.length}`);
@@ -61,64 +61,52 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
     };
   }
 
-  const base64Data = imageBase64;
-
   try {
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const genAI = new GoogleGenerativeAI(apiKey);
-    // Chamada direta via fetch para diagnóstico detalhado seguindo documentação v1beta
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
-    const payload = {
-      contents: [
-        {
-          parts: [
-            {
-              text: "Você é um extrator de contatos de comprovantes de entrega. Extraia o nome da pessoa em 'Informações do recebedor' e o número de telefone com DDD. Retorne estritamente um JSON no formato: {\"name\": \"...\", \"phone\": \"...\"}"
-            },
-            {
-              inline_data: {
-                mime_type: mimeType || "image/jpeg",
-                data: base64Data
-              }
-            }
-          ]
-        }
-      ],
+    // Garante que o base64 está limpo (sem prefixo data:image/...)
+    const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
       generationConfig: {
         responseMimeType: "application/json",
-        temperature: 0.1
+        temperature: 0.1,
+      }
+    });
+
+    const prompt = `Você é um extrator de dados de comprovantes de logística e entrega da Shopee.
+Localize a seção "Informações do recebedor" ou "Destinatário".
+Extraia:
+- name: Nome da pessoa (remova pontuações soltas como _ das pontas).
+- phone: Número de telefone completo (apenas dígitos, sem texto).
+
+Retorne estritamente o JSON:
+{
+  "name": "Nome",
+  "phone": "Telefone com DDD"
+}`;
+
+    const imagePart = {
+      inlineData: {
+        data: cleanBase64,
+        mimeType: mimeType || "image/jpeg"
       }
     };
 
-    console.log("[DEBUG] Iniciando fetch para Gemini API...");
-    const fetchResponse = await fetch(apiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    console.log("[DEBUG] Iniciando chamada via SDK do Gemini...");
+    const result = await model.generateContent([prompt, imagePart]);
+    const responseText = result.response.text();
+    console.log("[GEMINI_SDK_SUCCESS]:", responseText);
 
-    if (!fetchResponse.ok) {
-      const errorText = await fetchResponse.text();
-      console.error("[DEBUG GEMINI ERROR RAW]:", fetchResponse.status, errorText);
-      throw new Error(`Gemini API falhou (${fetchResponse.status}): ${errorText}`);
-    }
-
-    const responseJson = await fetchResponse.json();
-    const rawContent = responseJson.candidates?.[0]?.content?.parts?.[0]?.text;
-    console.log("[DEBUG GEMINI SUCCESS TEXT]:", rawContent);
-    
-    if (!rawContent) {
+    if (!responseText) {
       throw new Error("Resposta do Gemini vazia ou sem conteúdo textual");
     }
     
     let contactsData: any[] = [];
     try {
-      // Limpeza de markdown e caracteres invisíveis
-      const cleanJson = rawContent.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(cleanJson);
-      
-      // Mapeia para garantir compatibilidade com o retorno esperado pelo processador
+      const parsed = JSON.parse(responseText);
       const items = Array.isArray(parsed) ? parsed : [parsed];
       contactsData = items.map(item => ({
         name: item.name || "",
@@ -126,9 +114,9 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
         ...item
       }));
     } catch (e) {
-      console.error("[IMPORT] Erro ao parsear JSON do Gemini:", e);
+      console.error("[IMPORT] Erro ao parsear JSON do Gemini SDK:", e);
       // Fallback: tentar encontrar JSON no texto se houver lixo em volta
-      const jsonMatch = rawContent.match(/\[.*\]|\{.*\}/s);
+      const jsonMatch = responseText.match(/\[.*\]|\{.*\}/s);
       if (jsonMatch) {
         try {
           const parsedMatch = JSON.parse(jsonMatch[0]);
@@ -138,7 +126,7 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
             phone: item.phone || ""
           }));
         } catch (innerError) {
-          console.error("[IMPORT] Falha no fallback de parse:", innerError);
+          console.error("[IMPORT] Falha no fallback de parse SDK:", innerError);
         }
       }
     }
@@ -174,7 +162,6 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
         }
       }
 
-      // Se encontrar nome e telefone válidos, garante que o status seja 'new' (needsReview: false)
       if (isNameValid && isPhoneValid) {
         finalNeedsReview = false;
         reviewReason = "";
@@ -196,11 +183,11 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
     };
 
   } catch (error) {
-    console.error("10. LOCAL DA DECISÃO: analyzeImageForContacts - Exceção Gemini:", error);
+    console.error("10. LOCAL DA DECISÃO: analyzeImageForContacts - Exceção Gemini SDK:", error);
     return {
       contacts: [],
       needsReview: true,
-      reviewReason: "Erro no processamento Gemini: " + (error instanceof Error ? error.message : String(error))
+      reviewReason: "Erro no processamento Gemini SDK: " + (error instanceof Error ? error.message : String(error))
     };
   }
 }
