@@ -37,6 +37,7 @@ function ContactsPage() {
   const [progress, setProgress] = useState(0)
   const [searchTerm, setSearchTerm] = useState('')
   const [summary, setSummary] = useState<{ processed: number; new: number; duplicates: number; review: number } | null>(null)
+  const [debugData, setDebugData] = useState<any>(null)
   
   const queryClient = useQueryClient()
   const { data: contacts, isLoading } = useQuery({
@@ -80,22 +81,29 @@ function ContactsPage() {
       })
 
       try {
-        console.log(`\n========== CAPTURA DEBUG ==========\n1. ARQUIVO:\n   nome: ${file.name}\n   tipo: ${file.type}\n   tamanho: ${Math.round(file.size / 1024)} KB`);
+        console.log(`\n========== CAPTURA DEBUG (FRONTEND) ==========\n1. ARQUIVO:\n   nome: ${file.name}\n   tipo: ${file.type}\n   tamanho: ${Math.round(file.size / 1024)} KB`);
         
         const result = await processImageOCR({ data: { imageBase64: base64, filename: file.name } });
         
-        console.log("2. RESULTADO BRUTO DO OCR/IA:", result.raw_data);
-        console.log(`3. DADOS EXTRAÍDOS:\n   nome = ${result.name}\n   telefone = ${result.phone}`);
-        console.log(`4. DADOS NORMALIZADOS:\n   nome = ${result.name}\n   telefone = ${result.phone}`);
-        console.log(`5. VALIDAÇÃO:\n   nome válido = ${!result.needsReview || result.reviewReason !== "Nome não identificado ou inválido"}\n   telefone válido = ${!result.needsReview || (result.reviewReason !== "Telefone muito curto" && !result.reviewReason?.includes("DDD"))}`);
-        console.log(`6. CONFIANÇA: (Ver resultado bruto)`);
-        console.log(`8. STATUS CALCULADO: ${result.needsReview ? 'review' : 'valid'}`);
-        console.log(`9. MOTIVO: ${result.reviewReason || 'Dados Claros'}`);
-        console.log("10. LOCAL DA DECISÃO: contacts.server.ts (analyzeImageForContacts)\n====================================\n");
+        const currentDebug: any = {
+          filename: file.name,
+          rawResult: result.raw_data,
+          extractedName: result.name,
+          extractedPhone: result.phone,
+          normalizedName: result.name,
+          normalizedPhone: result.phone,
+          isNameValid: !result.needsReview || result.reviewReason !== "Nome não identificado claramente",
+          isPhoneValid: !result.needsReview || (!result.reviewReason?.includes("Telefone inválido") && !result.reviewReason?.includes("sem DDD")),
+          confidence: result.raw_data?.confidence,
+          serverStatus: result.needsReview ? 'review' : 'valid',
+          reviewReason: result.reviewReason,
+          decisionStep: 'servidor',
+          decisionRule: `needsReview === ${result.needsReview}`
+        };
 
         if (result.phone && result.phone.length >= 8) {
           try {
-            await saveContact({ 
+            const savedContact = await saveContact({ 
               data: { 
                 name: result.name || 'Cliente', 
                 phone: result.phone,
@@ -105,24 +113,26 @@ function ContactsPage() {
               } 
             });
             
+            currentDebug.statusSentToDB = result.needsReview ? 'review' : 'new';
+            currentDebug.statusSavedInDB = savedContact.needs_review ? 'review' : 'new';
+            currentDebug.statusReturnedToFront = savedContact.needs_review ? 'review' : 'new';
+
             if (result.needsReview) {
-              console.log(`[CAPTURA] Contato salvo, mas enviado para REVISÃO: ${result.reviewReason}`);
               revCount++;
             } else {
-              console.log(`[CAPTURA] Contato NOVO cadastrado com sucesso.`);
               newCount++;
             }
           } catch (err: any) {
             if (err.message === 'DUPLICATE_CONTACT') {
-              console.log(`[CAPTURA] Contato DUPLICADO detectado.`);
               dupCount++;
+              currentDebug.isDuplicate = 'SIM';
             } else {
-              console.error("[CAPTURA] Erro ao salvar contato:", err);
               revCount++;
+              currentDebug.decisionStep = 'frontend-fallback';
+              currentDebug.decisionRule = 'catch error on save';
             }
           }
         } else {
-          console.log(`[CAPTURA] Telefone não identificado ou muito curto. Enviando para REVISÃO.`);
           try {
             await saveContact({ 
               data: { 
@@ -135,7 +145,11 @@ function ContactsPage() {
             });
           } catch (e) {}
           revCount++;
+          currentDebug.decisionStep = 'frontend';
+          currentDebug.decisionRule = 'phone.length < 8';
         }
+        
+        setDebugData(currentDebug);
       } catch (err) {
         console.error("[CAPTURA] Erro crítico ao processar imagem:", err);
         revCount++;
@@ -253,6 +267,51 @@ function ContactsPage() {
                     <div className="flex flex-col bg-red-500/10 p-2 rounded">
                       <span className="text-red-600">Revisar</span>
                       <span className="text-lg font-bold text-red-700">{summary.review}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {debugData && (
+                <div className="p-4 bg-slate-900 text-slate-100 rounded-xl border border-slate-700 space-y-3 font-mono text-[10px] overflow-x-auto">
+                  <div className="flex items-center gap-2 text-xs font-bold border-b border-slate-700 pb-2 mb-2 text-blue-400">
+                    <Search className="h-4 w-4" />
+                    🔎 Diagnóstico da Última Captura
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <div><span className="text-slate-400">Arquivo:</span> {debugData.filename}</div>
+                    <div>
+                      <span className="text-slate-400">Resultado bruto da IA/OCR:</span>
+                      <pre className="mt-1 p-2 bg-black/50 rounded max-h-32 overflow-y-auto whitespace-pre-wrap">
+                        {JSON.stringify(debugData.rawResult, null, 2)}
+                      </pre>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><span className="text-slate-400">Nome extraído:</span> {debugData.extractedName}</div>
+                      <div><span className="text-slate-400">Telefone extraído:</span> {debugData.extractedPhone}</div>
+                      <div><span className="text-slate-400">Nome normalizado:</span> {debugData.normalizedName}</div>
+                      <div><span className="text-slate-400">Telefone normalizado:</span> {debugData.normalizedPhone}</div>
+                      <div><span className="text-slate-400">Nome válido:</span> {debugData.isNameValid ? 'SIM' : 'NÃO'}</div>
+                      <div><span className="text-slate-400">Telefone válido:</span> {debugData.isPhoneValid ? 'SIM' : 'NÃO'}</div>
+                      <div><span className="text-slate-400">Confiança IA:</span> {debugData.confidence || 'N/A'}</div>
+                      <div><span className="text-slate-400">Duplicado:</span> {debugData.isDuplicate || 'NÃO'}</div>
+                    </div>
+
+                    <div className="border-t border-slate-700 pt-2 mt-2 space-y-1">
+                      <div><span className="text-slate-400">Status calculado pelo servidor:</span> <span className={debugData.serverStatus === 'review' ? 'text-red-400' : 'text-green-400'}>{debugData.serverStatus}</span></div>
+                      <div><span className="text-slate-400">Status enviado para o banco:</span> {debugData.statusSentToDB}</div>
+                      <div><span className="text-slate-400">Status efetivamente salvo:</span> {debugData.statusSavedInDB}</div>
+                      <div><span className="text-slate-400">Status retornado para o frontend:</span> {debugData.statusReturnedToFront}</div>
+                      <div><span className="text-slate-400">Motivo da revisão:</span> {debugData.reviewReason || 'Nenhum'}</div>
+                    </div>
+
+                    <div className="border-t border-slate-700 pt-2 mt-2 space-y-1">
+                      <div className="text-blue-400 font-bold">Etapa que classificou o contato:</div>
+                      <div>{debugData.decisionStep}</div>
+                      <div className="text-blue-400 font-bold">Regra que causou a classificação:</div>
+                      <div className="text-yellow-400">{debugData.decisionRule}</div>
                     </div>
                   </div>
                 </div>

@@ -138,6 +138,7 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
     console.log(`5. VALIDAÇÃO:\n   nome ok = ${isNameValid}\n   telefone ok = ${isPhoneValid}`);
 
     // LOGICA DE REVISÃO
+    // LOGICA DE REVISÃO (MUITO IMPORTANTE)
     let finalNeedsReview = false;
     let reviewReason = "";
 
@@ -145,19 +146,22 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
       finalNeedsReview = true;
       reviewReason = "Nome não identificado claramente";
     } else if (!isPhoneValid) {
-      finalNeedsReview = true;
-      reviewReason = phoneResult.reason || "Telefone inválido (faltando DDD?)";
+      // Se tiver pelo menos 8 dígitos, aceitamos salvar mas pedimos revisão para colocar DDD
+      if (phoneResult.normalized.length >= 8 && phoneResult.normalized.length < 10) {
+        finalNeedsReview = true;
+        reviewReason = "Telefone capturado sem DDD";
+      } else {
+        finalNeedsReview = true;
+        reviewReason = phoneResult.reason || "Telefone inválido";
+      }
     } else {
-      // Nome e Telefone parecem OK
+      // Nome válido (>= 3 chars) E Telefone válido (10-11 dígitos)
+      // REGRA DE OURO: Não vai para revisão se ambos forem válidos.
       finalNeedsReview = false;
       reviewReason = "";
     }
 
-    // Se o telefone for capturado MAS for curto, ainda salvamos mas pedimos revisão
-    if (!isPhoneValid && phoneResult.normalized.length >= 8) {
-       finalNeedsReview = true;
-       reviewReason = "Telefone capturado sem DDD";
-    }
+    // O bloco redundante foi removido e integrado na lógica acima.
 
     return {
       name: cleanName || "Cliente",
