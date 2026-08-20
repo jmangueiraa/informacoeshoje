@@ -132,38 +132,34 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
       
       const phoneResult = normalizeBrazilianPhone(rawPhone);
       
-      // Regras de validação do Nome solicitadas:
-      // 1. Contém reticências (...) ou caracteres especiais soltos
-      // 2. Parcialmente cortado/ocultado por tarjas (geralmente indicado por asteriscos ou caracteres especiais)
-      // 3. Menos de 3 letras válidas completas no primeiro nome
-      
-      const hasEllipsis = rawName.includes("...");
-      const hasSpecialChars = /[#@$%&|\\/]/.test(rawName); // Caracteres que indicam ruído ou tarja
-      const hasAsterisks = /[*_]{2,}/.test(rawName); // Tarjas costumam vir com múltiplos asteriscos
-      
-      const rawCleanedName = rawName
-        .replace(/Tel|Nome|Contato|Recebedor|Destinatário/gi, "")
-        .replace(/[_*]/g, " ")
-        .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
+      // Função de sanitização rigorosa conforme solicitado no backend/frontend
+      const cleanAndValidateName = (name: string): string => {
+        if (!name) return "ILEGÍVEL";
         
-      const firstName = rawCleanedName.split(' ')[0] || "";
-      const isNameTooShort = firstName.length < 3;
-      
-      const isNameIllegible = hasEllipsis || hasSpecialChars || hasAsterisks || isNameTooShort;
+        // 1. Remove pontos, sublinhados, traços, asteriscos, tils
+        const sanitized = name.replace(/[\._\-\*~]/g, '').trim();
+        
+        // 2. Se tiver menos de 3 letras válidas ou tiver caracteres de truncamento (..)
+        // Note: O regex /[\.]{2,}/.test(name) verifica o original para detectar truncamento/reticências
+        if (sanitized.length < 3 || /[\.]{2,}/.test(name)) {
+          return "ILEGÍVEL";
+        }
+        
+        return sanitized;
+      };
 
+      const sanitized = cleanAndValidateName(rawName);
       let cleanName = "";
-      let finalNeedsReview = false;
-      let reviewReason = "";
-
-      if (isNameIllegible) {
-        // Se ilegível, não tenta extrair pedaços: marca como placeholder
-        // O preenchimento sequencial Cliente00001 é feito no saveContact (functions)
+      
+      if (sanitized === "ILEGÍVEL") {
         cleanName = "ILEGÍVEL"; 
       } else {
+        const firstName = sanitized.split(' ')[0] || "";
         cleanName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
       }
+      
+      const isNameIllegible = cleanName === "ILEGÍVEL";
+
       
       // phoneResult já foi declarado na linha 133
       const isPhoneValid = phoneResult.isValid || (phoneResult.normalized.length >= 8 && phoneResult.normalized.length <= 15);
