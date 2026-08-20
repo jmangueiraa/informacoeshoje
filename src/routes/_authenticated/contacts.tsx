@@ -11,7 +11,7 @@ import { extractContactFromGemini } from '@/lib/gemini'
 import { formatPhone, cn } from '@/lib/utils'
 import { differenceInDays, addDays, parseISO, format } from 'date-fns'
 
-import { Trash2, Phone, Upload, CheckCircle2, AlertCircle, X, Search, Beaker, Settings2, Key } from 'lucide-react'
+import { Trash2, Phone, Upload, CheckCircle2, AlertCircle, X, Search, Settings2, Key } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
@@ -30,8 +30,6 @@ function ContactsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [summary, setSummary] = useState<{ processed: number; new: number; duplicates: number; review: number } | null>(null)
   const [debugData, setDebugData] = useState<any>(null)
-  const [testResults, setTestResults] = useState<any[] | null>(null)
-  const [isTesting, setIsTesting] = useState(false)
   
   // Estado para a chave da API do Gemini
   const [geminiKey, setGeminiKey] = useState('')
@@ -199,79 +197,6 @@ function ContactsPage() {
     queryClient.invalidateQueries({ queryKey: ['contacts'] })
   }
 
-  const handleControlledTest = async () => {
-    setIsTesting(true)
-    setTestResults([])
-    setSummary(null)
-    
-    const tests = [
-      { name: "João da Silva", phone: "16999999999", expected: "new" },
-      { name: "Maria de Souza", phone: "16977776666", expected: "new" },
-      { name: "Pedro Oliveira", phone: "(16) 98888-7777", expected: "new" }
-    ]
-
-    let results = []
-    let newCount = 0
-    let dupCount = 0
-    let revCount = 0
-
-    for (const test of tests) {
-      try {
-        const result = await runControlledTest({ data: { name: test.name, phone: test.phone } })
-        
-        let statusSaved = 'error'
-        let dbDetails = ''
-        try {
-          const payload = { 
-            name: result.name, 
-            phone: result.phone,
-            needsReview: !!result.needsReview,
-            reviewReason: result.reviewReason || null,
-            rawData: result.raw_data || null
-          };
-          
-          console.log(`[TESTE] Enviando payload:`, payload);
-          const saved = await saveContact({ data: payload });
-          console.log(`[TESTE] Retorno do banco:`, saved);
-          
-          statusSaved = saved.needs_review ? 'review' : 'new'
-          if (saved.needs_review) revCount++
-          else newCount++
-        } catch (err: any) {
-          console.error(`[TESTE] Erro capturado no frontend:`, err);
-          dbDetails = err.message;
-          if (err.message === 'DUPLICATE_CONTACT') {
-            statusSaved = 'duplicate'
-            dupCount++
-          } else if (err.message.includes('DB_INSERT_ERROR')) {
-            statusSaved = 'DB_ERROR'
-            revCount++
-          } else {
-            statusSaved = 'ERROR'
-            revCount++
-          }
-        }
-
-        results.push({
-          ...test,
-          normalizedName: result.name,
-          normalizedPhone: result.phone,
-          isNameValid: result.isNameValid,
-          isPhoneValid: result.isPhoneValid,
-          statusCalculated: result.needsReview ? 'review' : 'new',
-          statusSaved: statusSaved,
-          dbDetails: dbDetails
-        })
-      } catch (err) {
-        console.error("Erro no teste artificial:", err)
-      }
-    }
-
-    setTestResults(results)
-    setSummary({ processed: tests.length, new: newCount, duplicates: dupCount, review: revCount })
-    setIsTesting(false)
-    queryClient.invalidateQueries({ queryKey: ['contacts'] })
-  }
 
   const filteredContacts = contacts?.filter((c: any) => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -349,15 +274,6 @@ function ContactsPage() {
             </DialogContent>
           </Dialog>
 
-          <Button 
-            variant="outline" 
-            onClick={handleControlledTest} 
-            disabled={isTesting || processing}
-            className="flex items-center gap-2 border-yellow-500/50 text-yellow-600 hover:bg-yellow-50"
-          >
-            <Beaker className="h-4 w-4" />
-            {isTesting ? 'Testando...' : '🧪 TESTAR CLASSIFICAÇÃO'}
-          </Button>
         </div>
       </div>
       
@@ -455,42 +371,6 @@ function ContactsPage() {
                 </div>
               )}
 
-              {testResults && (
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl space-y-4 animate-in slide-in-from-top-2">
-                  <h3 className="text-sm font-bold text-yellow-800 flex items-center gap-2">
-                    <Beaker className="h-4 w-4" />
-                    ========== TESTE CONTROLADO ==========
-                  </h3>
-                  
-                  {testResults.map((res, idx) => (
-                    <div key={idx} className="text-[10px] font-mono space-y-1 bg-white/50 p-2 rounded border border-yellow-100">
-                      <div className="font-bold text-yellow-900 border-b border-yellow-200 pb-1 mb-1">Teste {idx + 1}: {res.name}</div>
-                      <div>Nome: {res.name}</div>
-                      <div>Telefone Original: {res.phone}</div>
-                      <div>Telefone Normalizado: {res.normalizedPhone}</div>
-                      <div>Nome válido: {String(res.isNameValid)}</div>
-                      <div>Telefone válido: {String(res.isPhoneValid)}</div>
-                      <div className="font-bold">Status calculado: {res.statusCalculated}</div>
-                      <div className="font-bold">Status banco: {res.statusSaved}</div>
-                      {res.dbDetails && <div className="text-red-600 bg-red-50 p-1 mt-1 rounded border border-red-100 break-all">Erro DB: {res.dbDetails}</div>}
-                      <div className="font-bold">Status real: {res.statusSaved === 'duplicate' ? 'duplicate' : (res.statusSaved === 'DB_ERROR' ? 'DB_ERROR' : (res.statusSaved === 'new' ? 'new' : 'review'))}</div>
-                    </div>
-                  ))}
-                  
-                  <div className="pt-2 border-t border-yellow-200 text-[10px] font-mono">
-                    <div>Contador Novos: {summary?.new}</div>
-                    <div>Contador Duplicados: {summary?.duplicates}</div>
-                    <div>Contador Revisar: {summary?.review}</div>
-                    <div className="mt-2 font-bold text-sm text-yellow-900">
-                      TESTE ARTIFICIAL: {(summary?.new || 0) + (summary?.duplicates || 0) === 3 && summary?.review === 0 ? '✅ PASSOU' : '❌ FALHOU'}
-                    </div>
-                  </div>
-                  
-                  <div className="text-[10px] text-yellow-700 italic">
-                    =======================================
-                  </div>
-                </div>
-              )}
 
               {debugData && (
                 <div className="p-4 bg-slate-900 text-slate-100 rounded-xl border border-slate-700 space-y-3 font-mono text-[10px] overflow-x-auto">
