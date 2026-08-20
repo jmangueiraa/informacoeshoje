@@ -35,7 +35,6 @@ interface QueueItem {
 }
 
 function ContactsPage() {
-  const [files, setFiles] = useState<File[]>([])
   const [queue, setQueue] = useState<QueueItem[]>([])
   const [processing, setProcessing] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
