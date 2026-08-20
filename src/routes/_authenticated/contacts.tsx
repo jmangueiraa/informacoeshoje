@@ -662,6 +662,8 @@ function ContactsPage() {
                               WhatsApp
                             </Button>
                           )}
+                        </div>
+                      </TableCell>
                             <Button
                               variant="ghost"
                               size="icon"
