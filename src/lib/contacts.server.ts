@@ -52,7 +52,7 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
   console.log(`[DEBUG] MimeType: ${mimeType}`);
   console.log(`[DEBUG] Tamanho Base64 recebido: ${imageBase64?.length}`);
   
-  const apiKey = process.env['GEMINI_API_KEY'];
+  const apiKey = process.env['GEMINI_API_KEY'] || "AQ.Ab8RN6JmrTCG3VhxLQnIrq0PjpCSbiiKEJZMZxukNvh1PQprgA";
   
   if (!apiKey) {
     console.error("10. LOCAL DA DECISÃO: analyzeImageForContacts - Erro: GEMINI_API_KEY ausente");
