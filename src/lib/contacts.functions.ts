@@ -11,7 +11,12 @@ export const getContacts = createServerFn({ method: "GET" })
       .select('*')
       .order('created_at', { ascending: false });
       
-    if (error) throw error;
+    if (error) {
+      console.error("[CAPTURA] Erro ao buscar contatos:", error);
+      throw error;
+    }
+    
+    console.log(`[CAPTURA] getContacts - Total retornados: ${data?.length || 0}`);
     return data;
   });
 
@@ -39,14 +44,26 @@ export const saveContact = createServerFn({ method: "POST" })
     const cleanName = data.name.trim();
     const phoneDigits = data.phone.replace(/\D/g, '');
     
+    console.log(`[CAPTURA] saveContact - Input:`, { 
+      name: cleanName, 
+      phone: phoneDigits, 
+      needsReview: data.needsReview, 
+      reviewReason: data.reviewReason 
+    });
+
     // Verificar se já existe (Duplicado)
-    const { data: existing } = await supabase
+    const { data: existing, error: checkError } = await supabase
       .from('contacts')
       .select('id')
       .eq('phone_normalized', phoneDigits)
       .maybeSingle();
 
+    if (checkError) {
+      console.error(`[CAPTURA] Erro ao verificar duplicidade:`, checkError);
+    }
+
     if (existing) {
+      console.log(`[CAPTURA] saveContact - DUPLICATE detected for ${phoneDigits}`);
       throw new Error('DUPLICATE_CONTACT');
     }
 
@@ -55,7 +72,7 @@ export const saveContact = createServerFn({ method: "POST" })
       .insert([{
         name: cleanName,
         phone_normalized: phoneDigits,
-        needs_review: data.needsReview === true, // Garante booleano estrito
+        needs_review: data.needsReview === true, 
         review_reason: data.reviewReason || null,
         raw_data: data.rawData || null
       }])
@@ -63,8 +80,17 @@ export const saveContact = createServerFn({ method: "POST" })
       .single();
       
     if (error) {
+      console.error(`[CAPTURA] saveContact - Erro no insert:`, error);
       throw error;
     }
+
+    console.log(`[CAPTURA] saveContact - Success:`, {
+      id: contact.id,
+      name: contact.name,
+      needs_review: contact.needs_review,
+      status: contact.needs_review ? 'review' : 'new'
+    });
+
     return contact;
   });
 

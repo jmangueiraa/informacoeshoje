@@ -128,6 +128,7 @@ function ContactsPage() {
               } 
             });
             
+            // Sincronizar com o banco: false -> 'new', true -> 'review'
             const finalStatus = savedContact.needs_review ? 'review' : 'new';
             currentDebug.statusSentToDB = result.needsReview ? 'review' : 'new';
             currentDebug.statusSavedInDB = finalStatus;
@@ -139,13 +140,14 @@ function ContactsPage() {
               newCount++;
             }
           } catch (err: any) {
+            console.error(`[CAPTURA] Erro ao salvar contato:`, err);
             if (err.message === 'DUPLICATE_CONTACT') {
               dupCount++;
               currentDebug.isDuplicate = 'SIM';
             } else {
               revCount++;
               currentDebug.decisionStep = 'frontend-fallback';
-              currentDebug.decisionRule = 'catch error on save';
+              currentDebug.decisionRule = `catch error on save: ${err.message}`;
             }
           }
         } else {
@@ -216,6 +218,7 @@ function ContactsPage() {
           if (saved.needs_review) revCount++
           else newCount++
         } catch (err: any) {
+          console.error(`[TESTE] Erro ao salvar contato controlado:`, err);
           if (err.message === 'DUPLICATE_CONTACT') {
             statusSaved = 'duplicate'
             dupCount++
@@ -497,9 +500,12 @@ function ContactsPage() {
                             {contact.name}
                             {contact.needs_review && (
                               <p className="text-[10px] text-red-500 font-normal mt-0.5">
-                                Motivo: {contact.review_reason}
+                                Motivo: {contact.review_reason || 'Revisão manual necessária'}
                               </p>
                             )}
+                            <p className="text-[9px] text-muted-foreground mt-0.5">
+                              ID: {contact.id.substring(0, 8)} | User: {contact.user_id?.substring(0, 8)}
+                            </p>
                           </TableCell>
                           <TableCell>
                             <span className="inline-flex items-center px-2 py-1 rounded bg-primary/10 text-primary text-xs font-mono">
