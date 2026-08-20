@@ -36,7 +36,7 @@ export async function analyzeImageForContacts(imageBase64: string): Promise<Anal
             
             Regras:
             1. Retorne um JSON com os campos: "name", "phone" e "needsReview".
-            2. "name": APENAS o primeiro nome do recebedor/cliente.
+            2. "name": APENAS o primeiro nome do recebedor/cliente (Ex: de "Jéssica De Araújo Dos Santos" pegue apenas "Jéssica").
             3. "phone": Número de telefone (mantenha como está no texto).
             4. "needsReview": true apenas se o telefone não for encontrado ou estiver claramente errado. Se encontrar um telefone válido no formato de apps de entrega (como o da segunda foto de referência), defina como false.
             5. Se não encontrar o dado, retorne null para o campo.
