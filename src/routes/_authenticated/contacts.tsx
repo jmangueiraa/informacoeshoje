@@ -190,10 +190,11 @@ function ContactsPage() {
     
     try {
       while (!cancelRef.current) {
-        const items = getItemsToProcess();
-        if (items.length === 0) break;
+        const currentItems = getItemsToProcess();
+        if (currentItems.length === 0) break;
 
-        const item = items[0]; // Process ONE at a time
+        const item = currentItems[0];
+        if (!item) break; // Extra safety for TS
 
         // Wait if paused
         while (pausedRef.current && !cancelRef.current) {
