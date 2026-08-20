@@ -5,7 +5,7 @@ import { z } from "zod";
  * Aceita formatos como: (16) 99999-9999, +55 16 99999-9999, 5516999999999, etc.
  * Retorna apenas os dígitos relevantes sem o prefixo DDI 55 (se presente).
  */
-export function normalizeBrazilianPhone(phone: string): { normalized: string; isValid: boolean; reason?: string } {
+export function normalizeBrazilianPhone(phone: string): { normalized: string; isValid: boolean; reason: string | undefined } {
   const digits = phone.replace(/\D/g, "");
   
   console.log(`[CAPTURA] Normalizando telefone bruto: "${phone}" -> dígitos: "${digits}"`);
