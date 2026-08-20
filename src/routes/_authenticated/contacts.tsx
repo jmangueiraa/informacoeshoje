@@ -203,6 +203,7 @@ function ContactsPage() {
         const result = await runControlledTest({ data: { name: test.name, phone: test.phone } })
         
         let statusSaved = 'error'
+        let dbDetails = ''
         try {
           const payload = { 
             name: result.name, 
@@ -212,13 +213,16 @@ function ContactsPage() {
             rawData: result.raw_data || null
           };
           
+          console.log(`[TESTE] Enviando payload:`, payload);
           const saved = await saveContact({ data: payload });
+          console.log(`[TESTE] Retorno do banco:`, saved);
           
           statusSaved = saved.needs_review ? 'review' : 'new'
           if (saved.needs_review) revCount++
           else newCount++
         } catch (err: any) {
-          console.error(`[TESTE] Erro ao salvar contato controlado:`, err.message);
+          console.error(`[TESTE] Erro capturado no frontend:`, err);
+          dbDetails = err.message;
           if (err.message === 'DUPLICATE_CONTACT') {
             statusSaved = 'duplicate'
             dupCount++
@@ -238,7 +242,8 @@ function ContactsPage() {
           isNameValid: result.isNameValid,
           isPhoneValid: result.isPhoneValid,
           statusCalculated: result.needsReview ? 'review' : 'new',
-          statusSaved: statusSaved
+          statusSaved: statusSaved,
+          dbDetails: dbDetails
         })
       } catch (err) {
         console.error("Erro no teste artificial:", err)
