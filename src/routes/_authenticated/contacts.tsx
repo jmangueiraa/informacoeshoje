@@ -80,24 +80,57 @@ function ContactsPage() {
       })
 
       try {
-        const result = await processImageOCR({ data: { imageBase64: base64 } })
+        console.log(`[CAPTURA] Processando arquivo: ${file.name}`);
+        const result = await processImageOCR({ data: { imageBase64: base64 } });
         
-        // Lógica de contagem baseada estritamente no resultado do servidor
+        console.log(`[CAPTURA] Resultado da IA para ${file.name}:`, result);
+
         if (result.phone && result.phone.length >= 8) {
           try {
-            await saveContact({ data: { name: result.name || 'Cliente', phone: result.phone } })
-            newCount++
-          } catch (err) {
-            // Se for erro de duplicidade, contamos como duplicado mas não como erro/revisão
-            dupCount++
+            await saveContact({ 
+              data: { 
+                name: result.name || 'Cliente', 
+                phone: result.phone,
+                needsReview: result.needsReview,
+                reviewReason: result.reviewReason,
+                rawData: result.raw_data
+              } 
+            });
+            
+            if (result.needsReview) {
+              console.log(`[CAPTURA] Contato salvo, mas enviado para REVISÃO: ${result.reviewReason}`);
+              revCount++;
+            } else {
+              console.log(`[CAPTURA] Contato NOVO cadastrado com sucesso.`);
+              newCount++;
+            }
+          } catch (err: any) {
+            if (err.message === 'DUPLICATE_CONTACT') {
+              console.log(`[CAPTURA] Contato DUPLICADO detectado.`);
+              dupCount++;
+            } else {
+              console.error("[CAPTURA] Erro ao salvar contato:", err);
+              revCount++;
+            }
           }
         } else {
-          // Se não tem telefone, obrigatoriamente vai para revisão
-          revCount++
+          console.log(`[CAPTURA] Telefone não identificado ou muito curto. Enviando para REVISÃO.`);
+          try {
+            await saveContact({ 
+              data: { 
+                name: result.name || 'Cliente', 
+                phone: result.phone || '00000000',
+                needsReview: true,
+                reviewReason: result.reviewReason || "Telefone não identificado",
+                rawData: result.raw_data
+              } 
+            });
+          } catch (e) {}
+          revCount++;
         }
       } catch (err) {
-        console.error("Erro ao processar imagem:", err)
-        revCount++
+        console.error("[CAPTURA] Erro crítico ao processar imagem:", err);
+        revCount++;
       }
 
       setProgress(((i + 1) / files.length) * 100)
@@ -246,6 +279,7 @@ function ContactsPage() {
                     <TableRow>
                       <TableHead>Nome</TableHead>
                       <TableHead>Telefone</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead className="w-[140px] text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -267,11 +301,31 @@ function ContactsPage() {
                     ) : (
                       filteredContacts?.map((contact: any) => (
                         <TableRow key={contact.id} className="group hover:bg-muted/30 transition-colors">
-                          <TableCell className="font-medium">{contact.name}</TableCell>
+                          <TableCell className="font-medium">
+                            {contact.name}
+                            {contact.needs_review && (
+                              <p className="text-[10px] text-red-500 font-normal mt-0.5">
+                                Motivo: {contact.review_reason}
+                              </p>
+                            )}
+                          </TableCell>
                           <TableCell>
                             <span className="inline-flex items-center px-2 py-1 rounded bg-primary/10 text-primary text-xs font-mono">
                               {formatPhone(contact.phone_normalized)}
                             </span>
+                          </TableCell>
+                          <TableCell>
+                            {contact.needs_review ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-100">
+                                <AlertCircle className="h-3 w-3" />
+                                Revisar
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-100">
+                                <CheckCircle2 className="h-3 w-3" />
+                                OK
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button 
