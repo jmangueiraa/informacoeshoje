@@ -1,6 +1,6 @@
 
 async function test() {
-  const url = "https://api.lovable.dev/v1/ai/chat/completions";
+  const url = "https://api.lovable.dev/v1/chat/completions";
   const apiKey = process.env['LOVABLE_API_KEY'];
   
   console.log("Testing URL:", url);
@@ -28,4 +28,5 @@ async function test() {
 }
 
 test();
+
 
