@@ -662,27 +662,26 @@ function ContactsPage() {
                               WhatsApp
                             </Button>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                            onClick={async () => {
+                              if (confirm('Excluir este contato?')) {
+                                const { error } = await supabase.from('contacts').delete().eq('id', contact.id);
+                                if (error) toast.error('Erro ao excluir');
+                                else {
+                                  toast.success('Contato excluído');
+                                  queryClient.invalidateQueries({ queryKey: ['contacts'] });
+                                }
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                              onClick={async () => {
-                                if (confirm('Excluir este contato?')) {
-                                  const { error } = await supabase.from('contacts').delete().eq('id', contact.id);
-                                  if (error) toast.error('Erro ao excluir');
-                                  else {
-                                    toast.success('Contato excluído');
-                                    queryClient.invalidateQueries({ queryKey: ['contacts'] });
-                                  }
-                                }
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
+                    </TableRow>
                       ))
                     )}
                   </TableBody>
