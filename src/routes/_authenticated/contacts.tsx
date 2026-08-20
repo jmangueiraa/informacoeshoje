@@ -116,7 +116,7 @@ function ContactsPage() {
   // Timer para o contador regressivo de espera (429)
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
-    if (isWaiting && waitTime > 0) {
+    if (isWaiting && waitTime > 0 && !isPaused) {
       timer = setInterval(() => {
         setWaitTime(prev => {
           if (prev <= 1) {
