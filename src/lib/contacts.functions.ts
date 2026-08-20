@@ -45,6 +45,14 @@ export const saveContact = createServerFn({ method: "POST" })
     const { userId, supabase: authenticatedSupabase } = context;
     const { name, phone } = data;
 
+    // Verificar se é admin
+    const { data: isAdmin } = await authenticatedSupabase.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin'
+    });
+
+    if (!isAdmin) throw new Error("Acesso negado: apenas administradores podem salvar contatos.");
+
     // Normalizar telefone
     const phoneNormalized = phone.replace(/\D/g, "");
 
@@ -69,6 +77,7 @@ export const saveContact = createServerFn({ method: "POST" })
 
     return saved;
   });
+
 
 export const deleteContact = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
