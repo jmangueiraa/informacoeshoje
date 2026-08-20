@@ -81,22 +81,29 @@ function ContactsPage() {
       })
 
       try {
-        console.log(`\n========== CAPTURA DEBUG ==========\n1. ARQUIVO:\n   nome: ${file.name}\n   tipo: ${file.type}\n   tamanho: ${Math.round(file.size / 1024)} KB`);
+        console.log(`\n========== CAPTURA DEBUG (FRONTEND) ==========\n1. ARQUIVO:\n   nome: ${file.name}\n   tipo: ${file.type}\n   tamanho: ${Math.round(file.size / 1024)} KB`);
         
         const result = await processImageOCR({ data: { imageBase64: base64, filename: file.name } });
         
-        console.log("2. RESULTADO BRUTO DO OCR/IA:", result.raw_data);
-        console.log(`3. DADOS EXTRAÍDOS:\n   nome = ${result.name}\n   telefone = ${result.phone}`);
-        console.log(`4. DADOS NORMALIZADOS:\n   nome = ${result.name}\n   telefone = ${result.phone}`);
-        console.log(`5. VALIDAÇÃO:\n   nome válido = ${!result.needsReview || result.reviewReason !== "Nome não identificado ou inválido"}\n   telefone válido = ${!result.needsReview || (result.reviewReason !== "Telefone muito curto" && !result.reviewReason?.includes("DDD"))}`);
-        console.log(`6. CONFIANÇA: (Ver resultado bruto)`);
-        console.log(`8. STATUS CALCULADO: ${result.needsReview ? 'review' : 'valid'}`);
-        console.log(`9. MOTIVO: ${result.reviewReason || 'Dados Claros'}`);
-        console.log("10. LOCAL DA DECISÃO: contacts.server.ts (analyzeImageForContacts)\n====================================\n");
+        const currentDebug: any = {
+          filename: file.name,
+          rawResult: result.raw_data,
+          extractedName: result.name,
+          extractedPhone: result.phone,
+          normalizedName: result.name,
+          normalizedPhone: result.phone,
+          isNameValid: !result.needsReview || result.reviewReason !== "Nome não identificado claramente",
+          isPhoneValid: !result.needsReview || (!result.reviewReason?.includes("Telefone inválido") && !result.reviewReason?.includes("sem DDD")),
+          confidence: result.raw_data?.confidence,
+          serverStatus: result.needsReview ? 'review' : 'valid',
+          reviewReason: result.reviewReason,
+          decisionStep: 'servidor',
+          decisionRule: `needsReview === ${result.needsReview}`
+        };
 
         if (result.phone && result.phone.length >= 8) {
           try {
-            await saveContact({ 
+            const savedContact = await saveContact({ 
               data: { 
                 name: result.name || 'Cliente', 
                 phone: result.phone,
@@ -106,24 +113,26 @@ function ContactsPage() {
               } 
             });
             
+            currentDebug.statusSentToDB = result.needsReview ? 'review' : 'new';
+            currentDebug.statusSavedInDB = savedContact.needs_review ? 'review' : 'new';
+            currentDebug.statusReturnedToFront = savedContact.needs_review ? 'review' : 'new';
+
             if (result.needsReview) {
-              console.log(`[CAPTURA] Contato salvo, mas enviado para REVISÃO: ${result.reviewReason}`);
               revCount++;
             } else {
-              console.log(`[CAPTURA] Contato NOVO cadastrado com sucesso.`);
               newCount++;
             }
           } catch (err: any) {
             if (err.message === 'DUPLICATE_CONTACT') {
-              console.log(`[CAPTURA] Contato DUPLICADO detectado.`);
               dupCount++;
+              currentDebug.isDuplicate = 'SIM';
             } else {
-              console.error("[CAPTURA] Erro ao salvar contato:", err);
               revCount++;
+              currentDebug.decisionStep = 'frontend-fallback';
+              currentDebug.decisionRule = 'catch error on save';
             }
           }
         } else {
-          console.log(`[CAPTURA] Telefone não identificado ou muito curto. Enviando para REVISÃO.`);
           try {
             await saveContact({ 
               data: { 
@@ -136,7 +145,11 @@ function ContactsPage() {
             });
           } catch (e) {}
           revCount++;
+          currentDebug.decisionStep = 'frontend';
+          currentDebug.decisionRule = 'phone.length < 8';
         }
+        
+        setDebugData(currentDebug);
       } catch (err) {
         console.error("[CAPTURA] Erro crítico ao processar imagem:", err);
         revCount++;
