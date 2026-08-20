@@ -20,10 +20,14 @@ import { useQuery } from "@tanstack/react-query"
 
 export function AppSidebar() {
   const navigate = useNavigate()
-  const { data: isAdmin } = useQuery({
+  const { data: isAdmin, isLoading: isAdminLoading } = useQuery({
     queryKey: ['is-admin'],
-    queryFn: () => checkIsAdmin(),
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    queryFn: async () => {
+      const result = await checkIsAdmin();
+      console.log("Admin check result for sidebar:", result);
+      return result;
+    },
+    staleTime: 0, // Force fresh check while debugging
   })
 
   const handleLogout = async () => {
