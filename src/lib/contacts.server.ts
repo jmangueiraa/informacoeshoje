@@ -74,7 +74,7 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
     
     try {
       console.log("[DEBUG] Iniciando fetch para Gemini API v1...");
-      const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+      const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
       
       const response = await fetch(apiUrl, {
         method: "POST",
@@ -95,7 +95,7 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
         console.warn(`[DEBUG] v1 falhou (${response.status}): ${errorText}. Tentando v1beta...`);
         
         // Fallback para v1beta
-        const betaUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        const betaUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`;
         const betaResponse = await fetch(betaUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
