@@ -8,14 +8,13 @@ export async function analyzeImageForContacts(imageBase64: string) {
     throw new Error("Configuração de IA ausente");
   }
 
-  // Removendo prefixo data:image/...;base64, se existir
   const base64Data = imageBase64.includes('base64,') 
     ? imageBase64.split('base64,')[1] 
     : imageBase64;
 
   try {
-    // Usando o endpoint correto do Lovable AI Gateway para projetos TanStack Start
-    const response = await fetch("https://api.lovable.dev/v1/ai/chat/completions", {
+    // Attempting the most standard AI Gateway endpoint for TanStack Start
+    const response = await fetch("https://api.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -60,9 +59,9 @@ export async function analyzeImageForContacts(imageBase64: string) {
       const errorText = await response.text();
       console.error(`AI Gateway error (${response.status}):`, errorText);
       
-      // Fallback para falha técnica: não travar a UI, mas marcar para revisão
+      // Fallback: If AI fails, return object marked for review to avoid UI crash
       return {
-        name: "Erro na extração",
+        name: "Revisão Necessária",
         phone: "",
         needsReview: true
       };
@@ -71,7 +70,6 @@ export async function analyzeImageForContacts(imageBase64: string) {
     const result = await response.json();
     const content = JSON.parse(result.choices[0].message.content);
     
-    // Pós-processamento de segurança
     const phone = (content.phone || "").replace(/\D/g, "");
     const needsReview = phone.length < 8;
 
@@ -83,7 +81,7 @@ export async function analyzeImageForContacts(imageBase64: string) {
   } catch (error) {
     console.error("Failed to analyze image:", error);
     return {
-      name: "Erro processamento",
+      name: "Erro no Processamento",
       phone: "",
       needsReview: true
     };
