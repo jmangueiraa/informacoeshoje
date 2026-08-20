@@ -19,6 +19,14 @@ export const getContacts = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { userId, supabase: authenticatedSupabase } = context;
 
+    // Verificar se é admin
+    const { data: isAdmin } = await authenticatedSupabase.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin'
+    });
+
+    if (!isAdmin) throw new Error("Acesso negado: apenas administradores podem ver contatos.");
+
     const { data, error } = await authenticatedSupabase
       .from("contacts")
       .select("*")
@@ -28,6 +36,7 @@ export const getContacts = createServerFn({ method: "GET" })
     if (error) throw error;
     return data || [];
   });
+
 
 export const saveContact = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
