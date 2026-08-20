@@ -64,22 +64,20 @@ export const saveContact = createServerFn({ method: "POST" })
 
       let nextNumber = 1;
       if (lastClients && lastClients.length > 0) {
-        const lastNames = lastClients.map((c: any) => c.name as string);
-        // Filtrar apenas os que seguem o padrão ClienteXXXXX
+        const lastNames = lastClients.map((c: any) => c.name);
         const sequentials = lastNames
-          .map((n: string) => {
-            if (!n) return null;
-            const match = n.match(/^Cliente(\d{5})$/);
+          .map((n: any) => {
+            const nameStr = String(n || "");
+            const match = nameStr.match(/^Cliente(\d{5})$/);
             return match ? parseInt(match[1], 10) : null;
           })
           .filter((n: number | null): n is number => n !== null);
-
-
         
         if (sequentials.length > 0) {
-          nextNumber = Math.max(...(sequentials as number[])) + 1;
+          nextNumber = Math.max(...sequentials) + 1;
         }
       }
+
       cleanName = `Cliente${String(nextNumber).padStart(5, '0')}`;
     } else {
       const firstName = rawName.split(' ')[0] || "Cliente";
