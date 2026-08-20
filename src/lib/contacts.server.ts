@@ -88,7 +88,8 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
       }
     ]);
 
-    let rawContent = result.response.text();
+    const response = await result.response;
+    let rawContent = response.text();
     console.log("[IMPORT] Resposta bruta do Gemini:", rawContent);
     
     // Sanitização rigorosa de JSON
