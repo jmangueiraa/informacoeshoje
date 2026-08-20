@@ -19,6 +19,14 @@ export const getContacts = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { userId, supabase: authenticatedSupabase } = context;
 
+    // Verificar se é admin
+    const { data: isAdmin } = await authenticatedSupabase.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin'
+    });
+
+    if (!isAdmin) throw new Error("Acesso negado: apenas administradores podem ver contatos.");
+
     const { data, error } = await authenticatedSupabase
       .from("contacts")
       .select("*")
@@ -29,12 +37,21 @@ export const getContacts = createServerFn({ method: "GET" })
     return data || [];
   });
 
+
 export const saveContact = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => ContactSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { userId, supabase: authenticatedSupabase } = context;
     const { name, phone } = data;
+
+    // Verificar se é admin
+    const { data: isAdmin } = await authenticatedSupabase.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin'
+    });
+
+    if (!isAdmin) throw new Error("Acesso negado: apenas administradores podem salvar contatos.");
 
     // Normalizar telefone
     const phoneNormalized = phone.replace(/\D/g, "");
@@ -61,11 +78,20 @@ export const saveContact = createServerFn({ method: "POST" })
     return saved;
   });
 
+
 export const deleteContact = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((id: unknown) => z.string().parse(id))
   .handler(async ({ data: id, context }) => {
     const { userId, supabase: authenticatedSupabase } = context;
+
+    // Verificar se é admin
+    const { data: isAdmin } = await authenticatedSupabase.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin'
+    });
+
+    if (!isAdmin) throw new Error("Acesso negado: apenas administradores podem excluir contatos.");
 
     const { error } = await authenticatedSupabase
       .from("contacts")
@@ -76,6 +102,7 @@ export const deleteContact = createServerFn({ method: "POST" })
     if (error) throw error;
     return { success: true };
   });
+
 
 export const updateContact = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -119,8 +146,17 @@ export const processImageOCR = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { userId, supabase: authenticatedSupabase } = context;
     
+    // Verificar se é admin
+    const { data: isAdmin } = await authenticatedSupabase.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin'
+    });
+
+    if (!isAdmin) throw new Error("Acesso negado: apenas administradores podem processar imagens.");
+
     // Import dynamically to keep the function thin
     const { analyzeImageForContacts } = await import("./contacts.server");
     
     return await analyzeImageForContacts(data.imageBase64);
   });
+

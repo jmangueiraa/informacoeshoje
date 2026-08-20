@@ -1,5 +1,5 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { createFileRoute, redirect } from '@tanstack/react-router'
+import { useState, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -10,10 +10,26 @@ import { getContacts, processImageOCR, saveContact } from '@/lib/contacts.functi
 import { formatPhone } from '@/lib/utils'
 import { Trash2, Phone, Upload, CheckCircle2, AlertCircle, X, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { supabase } from '@/integrations/supabase/client'
 
 export const Route = createFileRoute('/_authenticated/contacts')({
+  beforeLoad: async ({ context }) => {
+    // @ts-ignore
+    const userId = context.userId;
+    
+    // Verificação de admin rápida
+    const { data: isAdmin } = await supabase.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin'
+    });
+
+    if (!isAdmin) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
   component: ContactsPage,
 })
+
 
 function ContactsPage() {
   const [files, setFiles] = useState<File[]>([])
