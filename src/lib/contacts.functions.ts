@@ -37,7 +37,7 @@ export const saveContact = createServerFn({ method: "POST" })
     name: z.string(),
     phone: z.string(),
     needsReview: z.boolean().optional(),
-    reviewReason: z.string().optional(),
+    reviewReason: z.string().nullish(),
     rawData: z.any().optional()
   }).parse(data))
   .handler(async ({ data, context }) => {
