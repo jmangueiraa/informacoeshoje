@@ -48,15 +48,51 @@ export const saveContact = createServerFn({ method: "POST" })
     
     // Normalização agressiva: Captura apenas o primeiro nome em Title Case
     const rawName = data.name.trim().replace(/[_*]/g, " ").replace(/\s+/g, " ");
-    const firstName = rawName.split(' ')[0] || "Cliente";
-    const cleanName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+    const isErrorString = (s: string) => ["erro", "null", "undefined", "cliente", "desconhecido"].includes(s.toLowerCase());
+    const isNameInvalid = !rawName || rawName.length < 2 || isErrorString(rawName) || rawName.toLowerCase().includes("shopee");
+
+    let cleanName = "";
+    if (isNameInvalid) {
+      // Gerar nome sequencial: Cliente00001, etc.
+      const { data: lastClients, error: fetchError } = await supabase
+        .from('contacts')
+        .select('name')
+        .eq('user_id', userId)
+        .like('name', 'Cliente%')
+        .order('name', { ascending: false })
+        .limit(1);
+
+      let nextNumber = 1;
+      if (lastClients && lastClients.length > 0) {
+        const lastNames = lastClients.map((c: any) => c.name);
+        // Filtrar apenas os que seguem o padrão ClienteXXXXX
+        const sequentials = lastNames
+          .map((n: string) => {
+            const match = n.match(/^Cliente(\d{5})$/);
+            return match ? parseInt(match[1], 10) : null;
+          })
+          .filter((n: number | null) => n !== null);
+        
+        if (sequentials.length > 0) {
+          nextNumber = Math.max(...sequentials) + 1;
+        }
+      }
+      cleanName = `Cliente${String(nextNumber).padStart(5, '0')}`;
+    } else {
+      const firstName = rawName.split(' ')[0] || "Cliente";
+      cleanName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+    }
     
     const phoneDigits = data.phone.replace(/\D/g, '');
     
+    // Se o telefone for válido (10 ou 11 dígitos), aprovamos o registro mesmo com nome substituto
+    const isPhoneValid = phoneDigits.length >= 10 && phoneDigits.length <= 11;
+    const finalNeedsReview = data.needsReview === true && !isPhoneValid;
+
     console.log(`[CAPTURA] saveContact - Processando:`, { 
       name: cleanName, 
       phone: phoneDigits, 
-      needsReview: data.needsReview,
+      needsReview: finalNeedsReview,
       userId: userId
     });
 
@@ -81,11 +117,12 @@ export const saveContact = createServerFn({ method: "POST" })
     const payload = {
       name: cleanName,
       phone_normalized: phoneDigits,
-      needs_review: data.needsReview === true, 
-      review_reason: data.reviewReason || null,
+      needs_review: finalNeedsReview, 
+      review_reason: finalNeedsReview ? (data.reviewReason || "Revisão necessária") : null,
       raw_data: data.rawData || null,
-      user_id: userId // Agora garantido pelo middleware
+      user_id: userId
     };
+
 
     console.log(`[CAPTURA] saveContact - Payload Enviado ao Supabase:`, payload);
 

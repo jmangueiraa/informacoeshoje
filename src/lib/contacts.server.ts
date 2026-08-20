@@ -150,18 +150,18 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
       let finalNeedsReview = false;
       let reviewReason = "";
 
-      if (!isNameValid) {
+      // Alteração na regra: Se o telefone for válido, NÃO marca para revisão mesmo com nome inválido
+      if (isPhoneValid) {
+        finalNeedsReview = false;
+        reviewReason = "";
+      } else if (!isNameValid) {
         finalNeedsReview = true;
         reviewReason = "Nome não identificado claramente";
-      } else if (!isPhoneValid) {
+      } else {
         finalNeedsReview = true;
         reviewReason = phoneResult.reason || "Telefone inválido";
       }
 
-      if (isNameValid && isPhoneValid) {
-        finalNeedsReview = false;
-        reviewReason = "";
-      }
 
       return {
         name: cleanName || "Cliente",
