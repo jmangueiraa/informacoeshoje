@@ -63,20 +63,32 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
   try {
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.1,
+      }
+    });
 
-    const prompt = `Você é um especialista em OCR e extração de dados para logística da SHOPEE e outras transportadoras brasileiras.
-    Sua tarefa é extrair o NOME e o TELEFONE do DESTINATÁRIO da imagem de etiqueta ou comprovante de entrega.
+    const prompt = `Você é um extrator de dados de comprovantes de entrega e logística (Shopee/Transportadoras).
+    Analise a imagem e localize os dados da pessoa que recebeu ou vai receber o pedido.
+    Procure por rótulos como: "Informações do recebedor", "Recebedor", "Destinatário", "Comprador", "Cliente".
 
-    INSTRUÇÕES TÉCNICAS:
-    1. IDENTIFICAÇÃO DO DESTINATÁRIO: Procure por blocos rotulados como: "Informações do recebedor", "Recebedor", "Destinatário", "Consumidor", "Cliente", "Comprador" ou "Dados de Entrega".
-    2. NOME: Extraia o nome completo da pessoa. Capture o nome mesmo que contenha sufixos ou caracteres estranhos como underscores (_), hifens (-) ou pontos (.).
-    3. TELEFONE: Procure por sequências numéricas que representem o telefone. Muitas vezes aparece precedido por "Tel", "Contato" ou o prefixo "+55".
-    4. PRECISÃO: Ignore termos do sistema como "Tel", "Nome:", "Contato:". Extraia apenas o dado bruto.
-    5. Se houver múltiplos contatos na mesma imagem, retorne uma lista. Se não encontrar nada, retorne campos vazios "".
-
-    RETORNO OBRIGATÓRIO: Retorne ESTRITAMENTE um JSON estruturado (sem blocos de código markdown ou texto extra).
-    Formato: [ { "name": "Nome do Cliente", "phone": "apenas números" } ]`;
+    Regras:
+    1. Extraia o nome completo da pessoa. Remova pontuações soltas ou caracteres especiais das pontas (como _ ou -).
+    2. Extraia o número de telefone completo (incluindo DDD). Extraia apenas os dígitos.
+    
+    Retorne estritamente o JSON:
+    {
+      "name": "Nome da pessoa",
+      "phone": "Telefone com DDD (somente dígitos)"
+    }
+    Se absolutamente nenhum nome ou telefone for legível, retorne:
+    {
+      "name": "",
+      "phone": ""
+    }`;
 
     const result = await model.generateContent([
       prompt,
