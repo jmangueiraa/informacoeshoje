@@ -1,5 +1,5 @@
 import * as React from "react"
-import { LayoutDashboard, PlusCircle, Link2, BarChart3, Settings, LogOut, CreditCard, Video, ShieldAlert, Globe } from "lucide-react"
+import { LayoutDashboard, PlusCircle, Link2, BarChart3, Settings, LogOut, CreditCard, Video, ShieldAlert, Globe, Users } from "lucide-react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import { supabase } from "@/integrations/supabase/client"
 import {
@@ -88,6 +88,14 @@ export function AppSidebar() {
                   <Link to="/play-generator" className="flex items-center gap-3 py-2">
                     <Video className="h-5 w-5 text-purple-500" />
                     <span>Gerador de Play</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Captura de Contatos">
+                  <Link to="/contacts" className="flex items-center gap-3 py-2">
+                    <Users className="h-5 w-5 text-blue-500" />
+                    <span>Captura de Contatos</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
