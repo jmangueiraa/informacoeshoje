@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getContacts, saveContact, runControlledTest } from '@/lib/contacts.functions'
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
+import { getContacts, saveContact, runControlledTest, updateLastSend } from '@/lib/contacts.functions'
 import { extractContactFromGemini } from '@/lib/gemini'
-import { formatPhone } from '@/lib/utils'
+import { formatPhone, cn } from '@/lib/utils'
+import { differenceInDays, addDays, parseISO, format } from 'date-fns'
 
 import { Trash2, Phone, Upload, CheckCircle2, AlertCircle, X, Search, Beaker, Settings2, Key } from 'lucide-react'
 import { Input } from '@/components/ui/input'
@@ -276,6 +277,32 @@ function ContactsPage() {
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     c.phone_normalized.includes(searchTerm)
   )
+
+  const updateLastSendMutation = useMutation({
+    mutationFn: (contactId: string) => updateLastSend({ data: { contactId } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      toast.success('Status de envio atualizado!')
+    },
+    onError: (error) => {
+      toast.error('Erro ao atualizar status: ' + error.message)
+    }
+  })
+
+  const calculateDaysUntilNextSend = (contact: any) => {
+    const baseDate = contact.last_send ? parseISO(contact.last_send) : parseISO(contact.created_at)
+    const nextSendDate = addDays(baseDate, 7)
+    const today = new Date()
+    const diff = differenceInDays(nextSendDate, today)
+    return Math.max(0, diff)
+  }
+
+  const handleSendMessage = (contact: any) => {
+    // Primeiro abre o WhatsApp
+    window.open(`https://wa.me/55${contact.phone_normalized}`, '_blank')
+    // Depois atualiza a data no banco
+    updateLastSendMutation.mutate(contact.id)
+  }
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -561,65 +588,100 @@ function ContactsPage() {
                       </TableRow>
                     ) : (
                       filteredContacts?.map((contact: any) => (
-                        <TableRow key={contact.id} className="group hover:bg-muted/30 transition-colors">
-                          <TableCell className="font-medium">
-                            {contact.name}
-                            {contact.needs_review && (
-                              <p className="text-[10px] text-red-500 font-normal mt-0.5">
-                                Motivo: {contact.review_reason || 'Revisão manual necessária'}
-                              </p>
-                            )}
-                            <p className="text-[9px] text-muted-foreground mt-0.5">
-                              ID: {contact.id.substring(0, 8)} | User: {contact.user_id?.substring(0, 8)}
-                            </p>
-                          </TableCell>
-                          <TableCell>
-                            <span className="inline-flex items-center px-2 py-1 rounded bg-primary/10 text-primary text-xs font-mono">
-                              {formatPhone(contact.phone_normalized)}
+                    <TableRow 
+                      key={contact.id} 
+                      className={cn(
+                        "group hover:bg-muted/30 transition-colors",
+                        calculateDaysUntilNextSend(contact) === 0 && "bg-red-50/50 hover:bg-red-100/50"
+                      )}
+                    >
+                      <TableCell className="font-medium">
+                        {contact.name}
+                        {contact.needs_review && (
+                          <p className="text-[10px] text-red-500 font-normal mt-0.5">
+                            Motivo: {contact.review_reason || 'Revisão manual necessária'}
+                          </p>
+                        )}
+                        <p className="text-[9px] text-muted-foreground mt-0.5">
+                          ID: {contact.id.substring(0, 8)} | Criado em: {format(parseISO(contact.created_at), 'dd/MM/yy')}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center px-2 py-1 rounded bg-primary/10 text-primary text-xs font-mono">
+                          {formatPhone(contact.phone_normalized)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          {contact.needs_review ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-100 w-fit">
+                              <AlertCircle className="h-3 w-3" />
+                              Revisar
                             </span>
-                          </TableCell>
-                          <TableCell>
-                            {contact.needs_review ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-100">
-                                <AlertCircle className="h-3 w-3" />
-                                Revisar
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-100 w-fit">
+                              <CheckCircle2 className="h-3 w-3" />
+                              OK
+                            </span>
+                          )}
+                          
+                          {(() => {
+                            const daysLeft = calculateDaysUntilNextSend(contact)
+                            return daysLeft === 0 ? (
+                              <span className="text-[10px] font-bold text-red-600 animate-pulse">
+                                Envio Pendente
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-100">
-                                <CheckCircle2 className="h-3 w-3" />
-                                OK
+                              <span className="text-[10px] text-muted-foreground">
+                                Faltam {daysLeft} dias para o envio
                               </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right flex items-center justify-end gap-2">
+                            )
+                          })()}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {calculateDaysUntilNextSend(contact) === 0 ? (
+                            <Button 
+                              variant="default" 
+                              size="sm" 
+                              className="h-8 gap-2 bg-red-600 hover:bg-red-700 text-white transition-all shadow-sm"
+                              onClick={() => handleSendMessage(contact)}
+                            >
+                              <Phone className="h-3.5 w-3.5" />
+                              Enviar Mensagem
+                            </Button>
+                          ) : (
                             <Button 
                               variant="outline" 
                               size="sm" 
                               className="h-8 gap-2 hover:bg-green-500 hover:text-white transition-all"
-                              onClick={() => window.open(`https://wa.me/55${contact.phone_normalized}`, '_blank')}
+                              onClick={() => handleSendMessage(contact)}
                             >
                               <Phone className="h-3.5 w-3.5" />
                               WhatsApp
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                              onClick={async () => {
-                                if (confirm('Excluir este contato?')) {
-                                  const { error } = await supabase.from('contacts').delete().eq('id', contact.id);
-                                  if (error) toast.error('Erro ao excluir');
-                                  else {
-                                    toast.success('Contato excluído');
-                                    queryClient.invalidateQueries({ queryKey: ['contacts'] });
-                                  }
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                            onClick={async () => {
+                              if (confirm('Excluir este contato?')) {
+                                const { error } = await supabase.from('contacts').delete().eq('id', contact.id);
+                                if (error) toast.error('Erro ao excluir');
+                                else {
+                                  toast.success('Contato excluído');
+                                  queryClient.invalidateQueries({ queryKey: ['contacts'] });
                                 }
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                       ))
                     )}
                   </TableBody>

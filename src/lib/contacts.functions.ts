@@ -109,6 +109,29 @@ export const saveContact = createServerFn({ method: "POST" })
     return contact;
   });
 
+export const updateLastSend = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: any) => z.object({
+    contactId: z.string(),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context as any;
+    
+    const { data: contact, error } = await supabase
+      .from('contacts')
+      .update({ last_send: new Date().toISOString() })
+      .eq('id', data.contactId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[CAPTURA] Erro ao atualizar último envio:", error);
+      throw error;
+    }
+
+    return contact;
+  });
+
 export const runControlledTest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: any) => z.object({
