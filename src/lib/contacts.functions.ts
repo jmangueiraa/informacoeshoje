@@ -64,14 +64,15 @@ export const saveContact = createServerFn({ method: "POST" })
 
       let nextNumber = 1;
       if (lastClients && lastClients.length > 0) {
-        const lastNames = lastClients.map((c: any) => c.name);
+        const lastNames = lastClients.map((c: any) => c.name as string);
         // Filtrar apenas os que seguem o padrão ClienteXXXXX
         const sequentials = lastNames
           .map((n: string) => {
-            const match = n.match(/^Cliente(\d{5})$/);
+            const match = n?.match(/^Cliente(\d{5})$/);
             return match ? parseInt(match[1], 10) : null;
           })
-          .filter((n: number | null) => n !== null);
+          .filter((n): n is number => n !== null);
+
         
         if (sequentials.length > 0) {
           nextNumber = Math.max(...(sequentials as number[])) + 1;
