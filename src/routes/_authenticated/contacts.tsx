@@ -11,6 +11,7 @@ import { formatPhone } from '@/lib/utils'
 import { Trash2, Phone, Upload, CheckCircle2, AlertCircle, X, Search, Beaker } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/integrations/supabase/client'
+import { toast } from 'sonner'
 
 export const Route = createFileRoute('/_authenticated/contacts')({
   beforeLoad: async ({ context }) => {
@@ -189,8 +190,11 @@ function ContactsPage() {
         }
         
         setDebugData(currentDebug);
-      } catch (err) {
-        console.error("[CAPTURA] Erro crítico ao processar imagem:", err);
+      } catch (err: any) {
+        console.error("[IMPORT_ERROR]:", err);
+        const errorMessage = err.message || "Erro desconhecido ao processar imagem";
+        // Feedback visual detalhado
+        toast.error(`Falha ao processar ${file.name}: ${errorMessage}`);
         revCount++;
       }
 
