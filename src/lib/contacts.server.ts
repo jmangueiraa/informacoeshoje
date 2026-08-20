@@ -25,15 +25,15 @@ export async function analyzeImageForContacts(imageBase64: string) {
         messages: [
           {
             role: "system",
-            content: `Você é um extrator de dados para prints de logística da Shopee.
-            Extraia o NOME e o TELEFONE do destinatário que aparece no print. O telefone geralmente está abaixo do nome ou próximo ao endereço.
+            content: `Você é um extrator de dados para prints de logística da Shopee (especialmente prints de conversa ou detalhes do pedido).
+            Extraia o NOME e o TELEFONE do destinatário.
 
-            REGRAS:
-            1. Retorne JSON: {"name": string, "phone": string, "needsReview": boolean}.
-            2. "name": Extraia o NOME COMPLETO que encontrar.
-            3. "phone": Extraia o telefone. Procure por sequências como (XX) XXXXX-XXXX ou apenas números.
-            4. Se encontrar qualquer telefone (mesmo sem o nome), retorne needsReview: false.
-            5. "needsReview" deve ser false se houver um telefone detectado.`
+            REGRAS DE EXTRAÇÃO:
+            1. Retorne APENAS um JSON: {"name": string, "phone": string, "needsReview": boolean}.
+            2. Procure por padrões como "Destinatário:", "Nome:", "Recebedor:" ou um nome no topo.
+            3. Procure por telefones em formatos brasileiros: (XX) XXXXX-XXXX, XX XXXXX XXXX, ou apenas os números.
+            4. Mesmo que o telefone esteja incompleto ou mascarado (ex: ****), tente extrair os dígitos visíveis.
+            5. "needsReview" deve ser false se você encontrar qualquer sequência que pareça um número de telefone.`
           },
           {
             role: "user",
