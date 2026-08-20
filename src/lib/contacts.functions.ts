@@ -85,6 +85,14 @@ export const deleteContact = createServerFn({ method: "POST" })
   .handler(async ({ data: id, context }) => {
     const { userId, supabase: authenticatedSupabase } = context;
 
+    // Verificar se é admin
+    const { data: isAdmin } = await authenticatedSupabase.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin'
+    });
+
+    if (!isAdmin) throw new Error("Acesso negado: apenas administradores podem excluir contatos.");
+
     const { error } = await authenticatedSupabase
       .from("contacts")
       .delete()
@@ -94,6 +102,7 @@ export const deleteContact = createServerFn({ method: "POST" })
     if (error) throw error;
     return { success: true };
   });
+
 
 export const updateContact = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
