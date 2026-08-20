@@ -9,8 +9,6 @@ export function normalizeBrazilianPhone(phone: string): { normalized: string; is
   // Remove tudo que não é dígito
   let digits = phone.replace(/\D/g, "");
   
-  console.log(`[CAPTURA] Normalizando telefone bruto: "${phone}" -> dígitos: "${digits}"`);
-
   // Se o número for muito curto (menos de 8 dígitos), é inválido de cara
   if (digits.length < 8) {
     return { normalized: digits, isValid: false, reason: "Telefone muito curto" };
@@ -19,11 +17,10 @@ export function normalizeBrazilianPhone(phone: string): { normalized: string; is
   // Se tiver 12 ou 13 dígitos e começar com 55, remove o 55 (DDI Brasil)
   if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
     digits = digits.substring(2);
-    console.log(`[CAPTURA] Removido prefixo 55 -> "${digits}"`);
   }
 
-  // Se o número tiver 9 dígitos e não tiver DDD, ele é problemático para salvar, 
-  // mas vamos aceitar se tiver 10 ou 11 (DDD + Número)
+  // Se o número tiver 9 dígitos, pode ser sem DDD. 
+  // O usuário quer que 10 ou 11 dígitos sejam considerados válidos (DDD + Número)
   const isValid = digits.length >= 10 && digits.length <= 11;
   
   let reason;
