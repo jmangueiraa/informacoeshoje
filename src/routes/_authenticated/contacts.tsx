@@ -45,6 +45,8 @@ function ContactsPage() {
   
   // Controle de Rate Limit (429)
   const [isWaiting, setIsWaiting] = useState(false)
+  const [isCheckingApi, setIsCheckingApi] = useState(false)
+  const [isApiReleased, setIsApiReleased] = useState(false)
   const [waitTime, setWaitTime] = useState(0)
   const waitTimerRef = useRef<NodeJS.Timeout | null>(null)
   const processingRef = useRef(false)
@@ -110,6 +112,8 @@ function ContactsPage() {
     setProcessing(false)
     setIsPaused(false)
     setIsWaiting(false)
+    setIsCheckingApi(false)
+    setIsApiReleased(false)
     countsRef.current = { new: 0, dup: 0, rev: 0, processed: 0 }
   }
 
@@ -121,7 +125,8 @@ function ContactsPage() {
         setWaitTime(prev => {
           if (prev <= 1) {
             if (timer) clearInterval(timer);
-            setIsWaiting(false);
+            // Ao chegar a zero, não limpamos isWaiting imediatamente
+            // Mudamos para o estado de "verificando disponibilidade"
             return 0;
           }
           return prev - 1;
@@ -131,7 +136,7 @@ function ContactsPage() {
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [isWaiting, waitTime]);
+  }, [isWaiting, waitTime, isPaused]);
 
   const togglePause = () => {
     const newPaused = !isPaused;
@@ -194,12 +199,20 @@ function ContactsPage() {
       }
 
       // Se houver um período de espera global (429), aguarda antes do próximo lote
-      while (isWaiting && !cancelRef.current) {
+      while ((isWaiting || isCheckingApi) && !cancelRef.current) {
         // Se pausar durante a espera, fica aqui
         while (pausedRef.current && !cancelRef.current) {
           await new Promise(r => setTimeout(r, 1000));
         }
-        await new Promise(r => setTimeout(r, 1000));
+        
+        if (waitTime === 0 && isWaiting) {
+          setIsCheckingApi(true);
+          // Pequena pausa para simular a verificação visual
+          await new Promise(r => setTimeout(r, 800));
+          setIsWaiting(false);
+        }
+
+        await new Promise(r => setTimeout(r, 500));
       }
 
       if (cancelRef.current) break;
@@ -224,6 +237,15 @@ function ContactsPage() {
           const base64Data = base64.split(',')[1] || base64;
           
           try {
+            // Se estávamos verificando a API e conseguimos chegar aqui sem 429, está liberada
+            if (isCheckingApi) {
+              setIsCheckingApi(false);
+              setIsApiReleased(true);
+              // Feedback visual de API LIBERADA
+              await new Promise(r => setTimeout(r, 1500));
+              setIsApiReleased(false);
+            }
+            
             const extractedContacts = await extractContactFromGemini(base64Data, item.file.type || 'image/jpeg');
             
             if (!extractedContacts || extractedContacts.length === 0) {
@@ -274,6 +296,8 @@ function ContactsPage() {
               
               setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'waiting_limit', retryCount: (q.retryCount || 0) + 1 } : q));
               
+              setIsApiReleased(false);
+              setIsCheckingApi(false);
               setIsWaiting(true);
               // Definimos o maior tempo de espera se múltiplos 429 ocorrerem
               setWaitTime(prev => Math.max(prev, wait));
@@ -470,13 +494,42 @@ function ContactsPage() {
 
               
               {isWaiting && (
-                <Alert variant="destructive" className="bg-yellow-50 border-yellow-200 text-yellow-800 animate-pulse">
+                <Alert variant="destructive" className="bg-yellow-50 border-yellow-200 text-yellow-800 animate-in fade-in slide-in-from-top-2 duration-300 shadow-sm">
                   <Clock className="h-4 w-4 text-yellow-600" />
-                  <AlertTitle className="text-yellow-800 flex items-center gap-2">
-                    Limite da API atingido
+                  <AlertTitle className="text-yellow-800 flex items-center gap-2 font-bold uppercase text-xs tracking-wider">
+                    🟡 Limite da API atingido
                   </AlertTitle>
-                  <AlertDescription className="text-yellow-700 font-medium">
-                    Aguardando {waitTime} segundos para continuar automaticamente...
+                  <AlertDescription className="text-yellow-700 space-y-1">
+                    <p className="font-medium text-sm">
+                      Aguardando {waitTime} segundos para continuar automaticamente...
+                    </p>
+                    <p className="text-[10px] opacity-70">
+                      Próxima verificação em: {waitTime}s
+                    </p>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {isCheckingApi && !isWaiting && (
+                <Alert className="bg-blue-50 border-blue-200 text-blue-800 animate-pulse shadow-sm">
+                  <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
+                  <AlertTitle className="text-blue-800 flex items-center gap-2 font-bold uppercase text-xs tracking-wider">
+                    🔄 Verificando disponibilidade
+                  </AlertTitle>
+                  <AlertDescription className="text-blue-700 font-medium text-sm">
+                    Verificando disponibilidade da API...
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {isApiReleased && (
+                <Alert className="bg-green-50 border-green-200 text-green-800 animate-in zoom-in-95 duration-300 shadow-sm">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <AlertTitle className="text-green-800 flex items-center gap-2 font-bold uppercase text-xs tracking-wider">
+                    🟢 API LIBERADA
+                  </AlertTitle>
+                  <AlertDescription className="text-green-700 font-medium text-sm">
+                    Retomando processamento automaticamente...
                   </AlertDescription>
                 </Alert>
               )}
@@ -502,8 +555,18 @@ function ContactsPage() {
                         item.status === 'cancelled' && "border-gray-200 bg-gray-50/30"
                       )}>
                         <div className="flex items-center gap-2 truncate flex-1">
-                          {item.status === 'processing' && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
-                          {item.status === 'completed' && <span title="Concluída">🟢</span>}
+                          {item.status === 'processing' && (
+                            <div className="flex items-center gap-1.5">
+                              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                              <span className="text-[10px] font-bold text-primary uppercase">🔄 Processando</span>
+                            </div>
+                          )}
+                          {item.status === 'completed' && (
+                            <div className="flex items-center gap-1.5">
+                              <span title="Concluída">✅</span>
+                              <span className="text-[10px] font-bold text-green-600 uppercase">Concluída</span>
+                            </div>
+                          )}
                           {item.status === 'waiting_limit' && <span title="Aguardando limite da API">🟡</span>}
                           {item.status === 'pending' && <span title="Pendente">⚪</span>}
                           {item.status === 'final_error' && <span title="Erro definitivo">🔴</span>}
@@ -572,8 +635,16 @@ function ContactsPage() {
                   <Progress value={progress} className="h-2" />
                   <div className="flex justify-between items-center text-[9px] text-muted-foreground mt-2">
                     <span className="flex items-center gap-1">
-                      <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                      Lote em andamento...
+                      {isCheckingApi ? (
+                        <span className="text-blue-600 font-bold uppercase">Verificando API...</span>
+                      ) : isWaiting ? (
+                        <span className="text-yellow-600 font-bold uppercase">Aguardando Limite ({waitTime}s)</span>
+                      ) : (
+                        <>
+                          <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                          <span className="uppercase font-bold text-primary">🔄 Processando</span>
+                        </>
+                      )}
                     </span>
                     <span>Concluídas: {queue.filter(q => q.status === 'completed').length} / {queue.length}</span>
                   </div>
