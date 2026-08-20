@@ -491,14 +491,18 @@ function ContactsPage() {
                         item.status === 'processing' && "border-primary bg-primary/5",
                         item.status === 'completed' && "border-green-200 bg-green-50/30",
                         item.status === 'waiting_limit' && "border-yellow-200 bg-yellow-50/30",
-                        (item.status === 'error' || item.status === 'final_error') && "border-red-200 bg-red-50/30"
+                        item.status === 'final_error' && "border-red-200 bg-red-50/30",
+                        item.status === 'error' && "border-red-200 bg-red-50/30",
+                        item.status === 'cancelled' && "border-gray-200 bg-gray-50/30"
                       )}>
                         <div className="flex items-center gap-2 truncate flex-1">
                           {item.status === 'processing' && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
                           {item.status === 'completed' && <span title="Concluída">🟢</span>}
                           {item.status === 'waiting_limit' && <span title="Aguardando limite da API">🟡</span>}
                           {item.status === 'pending' && <span title="Pendente">⚪</span>}
-                          {(item.status === 'error' || item.status === 'final_error') && <span title="Erro definitivo">🔴</span>}
+                          {item.status === 'final_error' && <span title="Erro definitivo">🔴</span>}
+                          {item.status === 'error' && <span title="Erro">🔴</span>}
+                          {item.status === 'cancelled' && <span title="Cancelada">⚪</span>}
                           <span className="truncate ml-1">{item.file.name}</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
