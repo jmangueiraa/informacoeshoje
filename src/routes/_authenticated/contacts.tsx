@@ -18,20 +18,6 @@ import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 
 export const Route = createFileRoute('/_authenticated/contacts')({
-  beforeLoad: async ({ context }) => {
-    // @ts-ignore
-    const userId = context.userId;
-    
-    // Verificação de admin rápida
-    const { data: isAdmin } = await supabase.rpc('has_role', {
-      _user_id: userId,
-      _role: 'admin'
-    });
-
-    if (!isAdmin) {
-      throw redirect({ to: '/dashboard' });
-    }
-  },
   component: ContactsPage,
 })
 
