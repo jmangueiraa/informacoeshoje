@@ -35,13 +35,21 @@ export const saveContact = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context as any;
     
-    // Pegar o primeiro nome apenas se for salvar como contato direto,
-    // mas se for para revisão talvez queiramos o nome completo.
-    // O usuário pediu "Nome completo" no objetivo, mas em outra parte disse "primeiro nome".
-    // Vou manter o nome completo se for novo contato.
+    // Normalização básica para garantir que o telefone esteja limpo antes do banco
     const cleanName = data.name.trim();
     const phoneDigits = data.phone.replace(/\D/g, '');
     
+    // Verificar se já existe (Duplicado)
+    const { data: existing } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('phone_normalized', phoneDigits)
+      .maybeSingle();
+
+    if (existing) {
+      throw new Error('DUPLICATE_CONTACT');
+    }
+
     const { data: contact, error } = await supabase
       .from('contacts')
       .insert([{
@@ -55,11 +63,52 @@ export const saveContact = createServerFn({ method: "POST" })
       .single();
       
     if (error) {
-      // Se for erro de duplicidade (23505), retornar erro específico para o front tratar
-      if (error.code === '23505') {
-        throw new Error('DUPLICATE_CONTACT');
-      }
       throw error;
     }
     return contact;
+  });
+
+export const runControlledTest = createServerFn({ method: "POST" })
+  .inputValidator((data: any) => z.object({
+    name: z.string(),
+    phone: z.string()
+  }).parse(data))
+  .handler(async ({ data }) => {
+    const { analyzeImageForContacts } = await import("./contacts.server");
+    
+    // Mocking the result that would come from OCR/IA but controlled
+    // We bypass the actual IA call but use the SAME normalization and classification logic
+    const { normalizeBrazilianPhone } = await import("./contacts.server");
+    
+    const phoneResult = normalizeBrazilianPhone(data.phone);
+    const cleanName = data.name.replace(/[_*]/g, " ").replace(/\s+/g, " ").trim();
+    
+    const isNameValid = cleanName.length >= 3 && !cleanName.toLowerCase().includes("shopee");
+    const isPhoneValid = phoneResult.isValid;
+    
+    let needsReview = false;
+    let reviewReason = "";
+
+    if (!isNameValid) {
+      needsReview = true;
+      reviewReason = "Nome não identificado claramente";
+    } else if (!isPhoneValid) {
+      if (phoneResult.normalized.length >= 8 && phoneResult.normalized.length < 10) {
+        needsReview = true;
+        reviewReason = "Telefone capturado sem DDD";
+      } else {
+        needsReview = true;
+        reviewReason = phoneResult.reason || "Telefone inválido";
+      }
+    }
+
+    return {
+      name: cleanName,
+      phone: phoneResult.normalized,
+      needsReview,
+      reviewReason,
+      isNameValid,
+      isPhoneValid,
+      raw_data: { test: true, originalName: data.name, originalPhone: data.phone }
+    };
   });

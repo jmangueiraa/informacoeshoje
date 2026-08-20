@@ -6,9 +6,9 @@ import { Progress } from '@/components/ui/progress'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getContacts, processImageOCR, saveContact } from '@/lib/contacts.functions'
+import { getContacts, processImageOCR, saveContact, runControlledTest } from '@/lib/contacts.functions'
 import { formatPhone } from '@/lib/utils'
-import { Trash2, Phone, Upload, CheckCircle2, AlertCircle, X, Search } from 'lucide-react'
+import { Trash2, Phone, Upload, CheckCircle2, AlertCircle, X, Search, Beaker } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/integrations/supabase/client'
 
@@ -38,6 +38,8 @@ function ContactsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [summary, setSummary] = useState<{ processed: number; new: number; duplicates: number; review: number } | null>(null)
   const [debugData, setDebugData] = useState<any>(null)
+  const [testResults, setTestResults] = useState<any[] | null>(null)
+  const [isTesting, setIsTesting] = useState(false)
   
   const queryClient = useQueryClient()
   const { data: contacts, isLoading } = useQuery({
@@ -164,6 +166,70 @@ function ContactsPage() {
     queryClient.invalidateQueries({ queryKey: ['contacts'] })
   }
 
+  const handleControlledTest = async () => {
+    setIsTesting(true)
+    setTestResults([])
+    setSummary(null)
+    
+    const tests = [
+      { name: "João da Silva", phone: "16999999999", expected: "new" },
+      { name: "Maria de Souza", phone: "5516999999999", expected: "new" },
+      { name: "Pedro Oliveira", phone: "(16) 98888-7777", expected: "new" }
+    ]
+
+    let results = []
+    let newCount = 0
+    let dupCount = 0
+    let revCount = 0
+
+    for (const test of tests) {
+      try {
+        const result = await runControlledTest({ data: { name: test.name, phone: test.phone } })
+        
+        let statusSaved = 'error'
+        try {
+          const saved = await saveContact({ 
+            data: { 
+              name: result.name, 
+              phone: result.phone,
+              needsReview: result.needsReview,
+              reviewReason: result.reviewReason,
+              rawData: result.raw_data
+            } 
+          })
+          statusSaved = saved.needs_review ? 'review' : 'new'
+          if (saved.needs_review) revCount++
+          else newCount++
+        } catch (err: any) {
+          if (err.message === 'DUPLICATE_CONTACT') {
+            statusSaved = 'duplicate'
+            dupCount++
+          } else {
+            statusSaved = 'error'
+            revCount++
+          }
+        }
+
+        results.push({
+          ...test,
+          normalizedName: result.name,
+          normalizedPhone: result.phone,
+          isNameValid: result.isNameValid,
+          isPhoneValid: result.isPhoneValid,
+          statusCalculated: result.needsReview ? 'review' : 'new',
+          statusSaved: statusSaved
+        })
+      } catch (err) {
+        console.error("Erro no teste artificial:", err)
+      }
+    }
+
+    setTestResults(results)
+    setSummary({ processed: tests.length, new: newCount, duplicates: dupCount, review: revCount })
+    setIsTesting(false)
+    queryClient.invalidateQueries({ queryKey: ['contacts'] })
+  }
+
   const filteredContacts = contacts?.filter((c: any) => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     c.phone_normalized.includes(searchTerm)
@@ -176,6 +242,15 @@ function ContactsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Captura de Contatos</h1>
           <p className="text-muted-foreground">Extraia automaticamente nomes e telefones de imagens de logística (Shopee).</p>
         </div>
+        <Button 
+          variant="outline" 
+          onClick={handleControlledTest} 
+          disabled={isTesting || processing}
+          className="flex items-center gap-2 border-yellow-500/50 text-yellow-600 hover:bg-yellow-50"
+        >
+          <Beaker className="h-4 w-4" />
+          {isTesting ? 'Testando...' : '🧪 TESTAR CLASSIFICAÇÃO'}
+        </Button>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -268,6 +343,41 @@ function ContactsPage() {
                       <span className="text-red-600">Revisar</span>
                       <span className="text-lg font-bold text-red-700">{summary.review}</span>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {testResults && (
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl space-y-4 animate-in slide-in-from-top-2">
+                  <h3 className="text-sm font-bold text-yellow-800 flex items-center gap-2">
+                    <Beaker className="h-4 w-4" />
+                    ========== TESTE CONTROLADO ==========
+                  </h3>
+                  
+                  {testResults.map((res, idx) => (
+                    <div key={idx} className="text-[10px] font-mono space-y-1 bg-white/50 p-2 rounded border border-yellow-100">
+                      <div className="font-bold text-yellow-900 border-b border-yellow-200 pb-1 mb-1">Teste {idx + 1}: {res.name}</div>
+                      <div>Nome: {res.name}</div>
+                      <div>Telefone Original: {res.phone}</div>
+                      <div>Telefone Normalizado: {res.normalizedPhone}</div>
+                      <div>Nome válido: {String(res.isNameValid)}</div>
+                      <div>Telefone válido: {String(res.isPhoneValid)}</div>
+                      <div className="font-bold">Status calculado: {res.statusCalculated}</div>
+                      <div className="font-bold">Status banco: {res.statusSaved}</div>
+                      <div className="font-bold">Status frontend: {res.statusSaved === 'duplicate' ? 'duplicate' : (res.statusCalculated === 'new' ? 'new' : 'review')}</div>
+                    </div>
+                  ))}
+                  
+                  <div className="pt-2 border-t border-yellow-200 text-[10px] font-mono">
+                    <div>Contador Novos: {summary?.new}</div>
+                    <div>Contador Revisar: {summary?.review}</div>
+                    <div className="mt-2 font-bold text-sm text-yellow-900">
+                      TESTE ARTIFICIAL: {summary?.review === 0 && summary?.new === 3 ? '✅ PASSOU' : '❌ FALHOU'}
+                    </div>
+                  </div>
+                  
+                  <div className="text-[10px] text-yellow-700 italic">
+                    =======================================
                   </div>
                 </div>
               )}
