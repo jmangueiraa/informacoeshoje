@@ -109,7 +109,8 @@ export const runControlledTest = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { userId } = context as any;
     
-    // Bypass OCR call but use SAME normalization and classification logic
+    console.log(`[TESTE-SERVER] Iniciando teste para:`, { name: data.name, phone: data.phone, userId });
+
     const { normalizeBrazilianPhone } = await import("./contacts.server");
     
     const phoneResult = normalizeBrazilianPhone(data.phone);
@@ -135,7 +136,7 @@ export const runControlledTest = createServerFn({ method: "POST" })
       }
     }
 
-    return {
+    const testResult = {
       name: cleanName,
       phone: phoneResult.normalized,
       needsReview,
@@ -145,4 +146,7 @@ export const runControlledTest = createServerFn({ method: "POST" })
       user_id: userId,
       raw_data: { test: true, originalName: data.name, originalPhone: data.phone }
     };
+    
+    console.log(`[TESTE-SERVER] Resultado calculado:`, testResult);
+    return testResult;
   });
