@@ -70,6 +70,9 @@ function ContactsPage() {
     let newCount = 0
     let dupCount = 0
     let revCount = 0
+    
+    // Conjunto para rastrear duplicatas dentro do mesmo lote (batch)
+    const batchPhones = new Set<string>();
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
@@ -87,6 +90,8 @@ function ContactsPage() {
         
         const result = await processImageOCR({ data: { imageBase64: base64, filename: file.name } });
         
+        const phoneDigits = result.phone ? result.phone.replace(/\D/g, '') : '';
+
         const currentDebug: any = {
           filename: file.name,
           rawResult: result.raw_data,
@@ -95,13 +100,27 @@ function ContactsPage() {
           normalizedName: result.name,
           normalizedPhone: result.phone,
           isNameValid: result.name.length >= 2 && !result.name.toLowerCase().includes("erro"),
-          isPhoneValid: result.phone.length >= 10,
+          isPhoneValid: phoneDigits.length >= 10,
           confidence: result.raw_data?.confidence,
           serverStatus: result.needsReview ? 'review' : 'valid',
           reviewReason: result.reviewReason,
           decisionStep: 'servidor',
           decisionRule: `needsReview === ${result.needsReview}`
         };
+
+        // 1. Verificar duplicata no mesmo lote
+        if (phoneDigits && batchPhones.has(phoneDigits)) {
+          console.log(`[CAPTURA] Duplicata detectada no lote: ${phoneDigits}`);
+          dupCount++;
+          currentDebug.statusSentToDB = 'duplicate-batch';
+          setDebugData(currentDebug);
+          setProgress(((i + 1) / files.length) * 100);
+          continue;
+        }
+        
+        if (phoneDigits) {
+          batchPhones.add(phoneDigits);
+        }
 
         // Se a IA já marcou como revisão por erro de comunicação, respeitamos
         if (result.reviewReason === "Falha na comunicação com o provedor de IA" || result.reviewReason === "Erro interno no processamento da imagem") {
@@ -116,7 +135,7 @@ function ContactsPage() {
           });
           revCount++;
           currentDebug.statusSentToDB = 'review';
-        } else if (result.phone && result.phone.length >= 8) {
+        } else if (phoneDigits && phoneDigits.length >= 8) {
           try {
             const savedContact = await saveContact({ 
               data: { 
@@ -144,6 +163,7 @@ function ContactsPage() {
             if (err.message === 'DUPLICATE_CONTACT') {
               dupCount++;
               currentDebug.isDuplicate = 'SIM';
+              currentDebug.statusSavedInDB = 'duplicate';
             } else {
               revCount++;
               currentDebug.decisionStep = 'frontend-fallback';
