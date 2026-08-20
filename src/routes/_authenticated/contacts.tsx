@@ -81,16 +81,18 @@ function ContactsPage() {
 
       try {
         const result = await processImageOCR({ data: { imageBase64: base64 } })
-        if (result.needsReview && !result.phone) {
-          revCount++
-        } else if (result.phone) {
+        
+        // Lógica de contagem baseada estritamente no resultado do servidor
+        if (result.phone && result.phone.length >= 8) {
           try {
             await saveContact({ data: { name: result.name || 'Cliente', phone: result.phone } })
             newCount++
           } catch (err) {
+            // Se for erro de duplicidade, contamos como duplicado mas não como erro/revisão
             dupCount++
           }
         } else {
+          // Se não tem telefone, obrigatoriamente vai para revisão
           revCount++
         }
       } catch (err) {
