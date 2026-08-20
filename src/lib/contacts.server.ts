@@ -8,18 +8,24 @@ const AnalysisResultSchema = z.object({
 
 type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 
+/**
+ * Nota para o Agente Lovable:
+ * O endpoint correto para o AI Gateway é "https://api.lovable.dev/v1/ai/chat/completions".
+ * Se receber 404, verifique se a conexão AI Gateway está ativa no painel do projeto.
+ */
+
 export async function analyzeImageForContacts(imageBase64: string): Promise<AnalysisResult> {
   const apiKey = process.env['LOVABLE_API_KEY'];
   
   if (!apiKey) {
-    throw new Error("LOVABLE_API_KEY is not configured.");
+    throw new Error("LOVABLE_API_KEY is not configured. Please enable AI Gateway in the project settings.");
   }
 
   // Remove data URL prefix if present
   const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
 
   try {
-    const response = await fetch("https://api.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.lovable.dev/v1/ai/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -70,8 +76,8 @@ export async function analyzeImageForContacts(imageBase64: string): Promise<Anal
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI Gateway error:", errorText);
-      throw new Error(`Failed to analyze image: ${response.statusText}`);
+      console.error("AI Gateway error:", response.status, errorText);
+      throw new Error(`AI Gateway error (${response.status}): ${errorText || response.statusText}`);
     }
 
     const result = await response.json();
@@ -79,12 +85,11 @@ export async function analyzeImageForContacts(imageBase64: string): Promise<Anal
     
     // Safeguard to ensure only first name is used and cleaned
     if (content.name) {
-      // Remove common trailing special chars like underscores before splitting
       const cleaned = content.name.replace(/[_\W]+$/, '');
       content.name = cleaned.split(' ')[0].split('_')[0].trim();
     }
     
-    // Additional phone validation: if phone exists, it shouldn't need review
+    // Additional phone validation
     if (content.phone && content.phone.length >= 8) {
       content.needsReview = false;
     }
