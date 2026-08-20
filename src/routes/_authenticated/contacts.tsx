@@ -104,7 +104,6 @@ function ContactsPage() {
       if (!confirm("O processamento está em curso. Deseja cancelar tudo?")) return;
       cancelRef.current = true;
     }
-    setFiles([])
     setQueue([])
     setSummary(null)
     setProgress(0)
