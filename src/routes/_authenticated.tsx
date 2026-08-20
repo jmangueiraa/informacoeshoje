@@ -46,6 +46,7 @@ function AuthenticatedLayout() {
       <div className="flex min-h-screen w-full bg-background flex-col md:flex-row">
         <AppSidebar />
         <main className="flex-1 overflow-y-auto flex flex-col">
+          {/* Header Mobile - Visível apenas em mobile/tablet (< 768px) */}
           <header className="flex h-16 shrink-0 items-center gap-3 border-b px-4 bg-card/50 backdrop-blur-sm sticky top-0 z-20 md:hidden">
             <SidebarTrigger className="h-9 w-9 flex items-center justify-center text-foreground" />
             <div className="flex items-center gap-2 font-bold text-lg tracking-tight text-primary">
