@@ -278,6 +278,32 @@ function ContactsPage() {
     c.phone_normalized.includes(searchTerm)
   )
 
+  const updateLastSendMutation = useMutation({
+    mutationFn: (contactId: string) => updateLastSend({ data: { contactId } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      toast.success('Status de envio atualizado!')
+    },
+    onError: (error) => {
+      toast.error('Erro ao atualizar status: ' + error.message)
+    }
+  })
+
+  const calculateDaysUntilNextSend = (contact: any) => {
+    const baseDate = contact.last_send ? parseISO(contact.last_send) : parseISO(contact.created_at)
+    const nextSendDate = addDays(baseDate, 7)
+    const today = new Date()
+    const diff = differenceInDays(nextSendDate, today)
+    return Math.max(0, diff)
+  }
+
+  const handleSendMessage = (contact: any) => {
+    // Primeiro abre o WhatsApp
+    window.open(`https://wa.me/55${contact.phone_normalized}`, '_blank')
+    // Depois atualiza a data no banco
+    updateLastSendMutation.mutate(contact.id)
+  }
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
