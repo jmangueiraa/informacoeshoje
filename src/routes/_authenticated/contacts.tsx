@@ -45,7 +45,6 @@ function ContactsPage() {
   
   // Controle de Rate Limit (429)
   const [isWaiting, setIsWaiting] = useState(false)
-  const [isCheckingApi, setIsCheckingApi] = useState(false)
   const [isApiReleased, setIsApiReleased] = useState(false)
   const [waitTime, setWaitTime] = useState(0)
   const waitTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -112,7 +111,6 @@ function ContactsPage() {
     setProcessing(false)
     setIsPaused(false)
     setIsWaiting(false)
-    setIsCheckingApi(false)
     setIsApiReleased(false)
     countsRef.current = { new: 0, dup: 0, rev: 0, processed: 0 }
   }
@@ -164,7 +162,7 @@ function ContactsPage() {
 
 
   const processImages = async () => {
-    if (processing) return;
+    if (processingRef.current) return;
     
     setProcessing(true);
     processingRef.current = true;
@@ -176,56 +174,44 @@ function ContactsPage() {
     countsRef.current = { new: 0, dup: 0, rev: 0, processed: 0 };
     const batchPhones = new Set<string>();
     
-    // Filtra apenas itens que podem ser processados
-    // Pendente, Aguardando Limite, ou Erro (re-tentativa manual)
-    const getItemsToProcess = () => queue.filter(item => 
-      item.status === 'pending' || 
-      item.status === 'waiting_limit' || 
-      item.status === 'error' ||
-      item.status === 'cancelled'
-    );
+    const getItemsToProcess = () => {
+      // Prioritize items waiting for limit, then pending/cancelled
+      return queue.filter(item => 
+        item.status === 'pending' || 
+        item.status === 'waiting_limit' || 
+        item.status === 'error' ||
+        item.status === 'cancelled'
+      );
+    };
 
-    let itemsToProcess = getItemsToProcess();
-    const totalItemsInitial = queue.length; // Usamos o total da fila para o progresso real
+    const totalItemsInitial = queue.length;
     
-    while (itemsToProcess.length > 0 && !cancelRef.current) {
-      // Lotes de 5
-      const batchSize = 5;
-      const currentBatch = itemsToProcess.slice(0, batchSize);
-      
-      // Verifica pausa
-      while (pausedRef.current && !cancelRef.current) {
-        await new Promise(r => setTimeout(r, 1000));
-      }
+    try {
+      while (!cancelRef.current) {
+        const currentItems = getItemsToProcess();
+        if (currentItems.length === 0) break;
 
-      // Se houver um período de espera global (429), aguarda antes do próximo lote
-      while ((isWaiting || isCheckingApi) && !cancelRef.current) {
-        // Se pausar durante a espera, fica aqui
+        const item = currentItems[0];
+        if (!item) break; // Extra safety for TS
+
+        // Wait if paused
         while (pausedRef.current && !cancelRef.current) {
-          await new Promise(r => setTimeout(r, 1000));
+          await new Promise(r => setTimeout(r, 500));
         }
-        
-        if (waitTime === 0 && isWaiting) {
-          setIsCheckingApi(true);
-          // Pequena pausa para simular a verificação visual
-          await new Promise(r => setTimeout(r, 800));
-          setIsWaiting(false);
+        if (cancelRef.current) break;
+
+        // Wait for 429 backoff
+        while (isWaiting && waitTime > 0 && !cancelRef.current) {
+          while (pausedRef.current && !cancelRef.current) {
+            await new Promise(r => setTimeout(r, 500));
+          }
+          await new Promise(r => setTimeout(r, 500));
         }
+        if (cancelRef.current) break;
 
-        await new Promise(r => setTimeout(r, 500));
-      }
+        // Set status to processing for this specific item
+        setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'processing' } : q));
 
-      if (cancelRef.current) break;
-      
-      // Atualiza status para 'processing'
-      setQueue(prev => prev.map(item => 
-        currentBatch.find(b => b.id === item.id) 
-          ? { ...item, status: 'processing' } 
-          : item
-      ));
-
-      // Processa o lote em paralelo
-      const batchPromises = currentBatch.map(async (item) => {
         try {
           const base64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -236,27 +222,24 @@ function ContactsPage() {
           
           const base64Data = base64.split(',')[1] || base64;
           
-          try {
-            // Se estávamos verificando a API e conseguimos chegar aqui sem 429, está liberada
-            if (isCheckingApi) {
-              setIsCheckingApi(false);
-              setIsApiReleased(true);
-              // Feedback visual de API LIBERADA
-              await new Promise(r => setTimeout(r, 1500));
+          // Real extraction attempt
+          const extractedContacts = await extractContactFromGemini(base64Data, item.file.type || 'image/jpeg');
+          
+          // If successful and we were waiting, show success feedback
+          if (isWaiting) {
+            setIsWaiting(false);
+            setIsApiReleased(true);
+            setTimeout(() => {
               setIsApiReleased(false);
-            }
-            
-            const extractedContacts = await extractContactFromGemini(base64Data, item.file.type || 'image/jpeg');
-            
-            if (!extractedContacts || extractedContacts.length === 0) {
-              countsRef.current.rev++;
-              setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'final_error', error: 'Nenhum contato identificado' } : q));
-              return;
-            }
+            }, 3000);
+          }
 
+          if (!extractedContacts || extractedContacts.length === 0) {
+            countsRef.current.rev++;
+            setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'final_error', error: 'Nenhum contato identificado' } : q));
+          } else {
             for (const contactData of extractedContacts) {
               const phoneDigits = contactData.phone ? String(contactData.phone).replace(/\D/g, '') : '';
-
               if (phoneDigits && batchPhones.has(phoneDigits)) {
                 countsRef.current.dup++;
                 continue;
@@ -273,78 +256,60 @@ function ContactsPage() {
                     rawData: contactData || null
                   } 
                 });
-                
                 if (savedContact.needs_review) countsRef.current.rev++;
                 else countsRef.current.new++;
               } catch (err: any) {
-                if (err.message === 'DUPLICATE_CONTACT') {
-                  countsRef.current.dup++;
-                } else {
+                if (err.message === 'DUPLICATE_CONTACT') countsRef.current.dup++;
+                else {
                   countsRef.current.rev++;
                   throw err;
                 }
               }
             }
-            
             countsRef.current.processed++;
             setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'completed' } : q));
-            
-          } catch (err: any) {
-            if (err.status === 429) {
-              const wait = err.retryAfter || 60;
-              console.warn(`[429] Limite atingido para ${item.file.name}. Aguardando ${wait}s...`);
-              
-              setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'waiting_limit', retryCount: (q.retryCount || 0) + 1 } : q));
-              
-              setIsApiReleased(false);
-              setIsCheckingApi(false);
-              setIsWaiting(true);
-              // Definimos o maior tempo de espera se múltiplos 429 ocorrerem
-              setWaitTime(prev => Math.max(prev, wait));
-              return;
-            }
-
-            // Tratamento de Erro Definitivo
-            const retryCount = item.retryCount || 0;
-            if (retryCount < 5) {
-               // Erro genérico, tentamos novamente? O usuário pediu tratamento para 429.
-               // Outros erros vamos marcar como final_error ou error
-               setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'final_error', error: err.message } : q));
-            } else {
-               setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'final_error', error: 'Falha após 5 tentativas' } : q));
-            }
-            countsRef.current.rev++;
           }
         } catch (err: any) {
-          console.error(`Erro fatal no item ${item.id}:`, err);
+          if (err.status === 429) {
+            const wait = err.retryAfter || 60;
+            console.warn(`[429] Limite atingido. Aguardando ${wait}s...`);
+            
+            setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'waiting_limit' } : q));
+            setIsApiReleased(false);
+            setWaitTime(wait);
+            setIsWaiting(true);
+            
+            // Do not break the loop, it will wait in the next iteration
+            continue; 
+          }
+
+          console.error(`Erro no item ${item.id}:`, err);
           setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'final_error', error: err.message } : q));
+          countsRef.current.rev++;
         }
+
+        // Update progress
+        const completedCount = queue.filter(q => q.status === 'completed' || q.status === 'final_error').length;
+        setProgress((completedCount / totalItemsInitial) * 100);
+        
+        // Respect quota: ~5 per minute = 1 every 12s
+        if (!cancelRef.current) {
+          await new Promise(r => setTimeout(r, 12000));
+        }
+      }
+    } finally {
+      setSummary({ 
+        processed: countsRef.current.processed, 
+        new: countsRef.current.new, 
+        duplicates: countsRef.current.dup, 
+        review: countsRef.current.rev 
       });
-
-      await Promise.all(batchPromises);
       
-      // Atualiza progresso baseado em concluídos / total
-      const completedCount = queue.filter(q => q.status === 'completed' || q.status === 'final_error').length;
-      setProgress((completedCount / totalItemsInitial) * 100);
-      
-      // Recalcula itens para processar
-      itemsToProcess = getItemsToProcess();
-      
-      // Pequena pausa entre lotes
-      await new Promise(r => setTimeout(r, 1000));
+      setProcessing(false);
+      processingRef.current = false;
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      if (!cancelRef.current) toast.success("Processamento concluído");
     }
-
-    setSummary({ 
-      processed: countsRef.current.processed, 
-      new: countsRef.current.new, 
-      duplicates: countsRef.current.dup, 
-      review: countsRef.current.rev 
-    });
-    
-    setProcessing(false);
-    processingRef.current = false;
-    queryClient.invalidateQueries({ queryKey: ['contacts'] });
-    toast.success("Processamento concluído");
   }
 
 
@@ -496,28 +461,20 @@ function ContactsPage() {
               {isWaiting && (
                 <Alert variant="destructive" className="bg-yellow-50 border-yellow-200 text-yellow-800 animate-in fade-in slide-in-from-top-2 duration-300 shadow-sm">
                   <Clock className="h-4 w-4 text-yellow-600" />
-                  <AlertTitle className="text-yellow-800 flex items-center gap-2 font-bold uppercase text-xs tracking-wider">
-                    🟡 Limite da API atingido
-                  </AlertTitle>
                   <AlertDescription className="text-yellow-700 space-y-1">
+                    <p className="font-bold text-xs uppercase tracking-wider mb-1">
+                      {waitTime > 0 ? "🟡 Limite da API atingido" : "🔄 Tentando novamente..."}
+                    </p>
                     <p className="font-medium text-sm">
-                      Aguardando {waitTime} segundos para continuar automaticamente...
+                      {waitTime > 0 
+                        ? `Aguardando ${waitTime} segundos para continuar automaticamente...`
+                        : "Realizando nova tentativa de processamento..."}
                     </p>
-                    <p className="text-[10px] opacity-70">
-                      Próxima verificação em: {waitTime}s
-                    </p>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {isCheckingApi && !isWaiting && (
-                <Alert className="bg-blue-50 border-blue-200 text-blue-800 animate-pulse shadow-sm">
-                  <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
-                  <AlertTitle className="text-blue-800 flex items-center gap-2 font-bold uppercase text-xs tracking-wider">
-                    🔄 Verificando disponibilidade
-                  </AlertTitle>
-                  <AlertDescription className="text-blue-700 font-medium text-sm">
-                    Verificando disponibilidade da API...
+                    {waitTime > 0 && (
+                      <p className="text-[10px] opacity-70">
+                        Próxima tentativa em: {waitTime}s
+                      </p>
+                    )}
                   </AlertDescription>
                 </Alert>
               )}
@@ -635,9 +592,7 @@ function ContactsPage() {
                   <Progress value={progress} className="h-2" />
                   <div className="flex justify-between items-center text-[9px] text-muted-foreground mt-2">
                     <span className="flex items-center gap-1">
-                      {isCheckingApi ? (
-                        <span className="text-blue-600 font-bold uppercase">Verificando API...</span>
-                      ) : isWaiting ? (
+                      {isWaiting ? (
                         <span className="text-yellow-600 font-bold uppercase">Aguardando Limite ({waitTime}s)</span>
                       ) : (
                         <>
