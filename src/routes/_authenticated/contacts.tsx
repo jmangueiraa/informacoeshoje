@@ -25,13 +25,14 @@ export const Route = createFileRoute('/_authenticated/contacts')({
 })
 
 
-type QueueStatus = 'pending' | 'processing' | 'completed' | 'waiting' | 'error' | 'ignored';
+type QueueStatus = 'pending' | 'processing' | 'completed' | 'waiting' | 'error' | 'ignored' | 'waiting_limit' | 'final_error' | 'cancelled';
 
 interface QueueItem {
   id: string;
   file: File;
   status: QueueStatus;
   error?: string;
+  retryCount?: number;
 }
 
 function ContactsPage() {
