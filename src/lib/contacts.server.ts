@@ -124,9 +124,14 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
     }
 
     const result = await response.json();
-    const rawContent = result.choices[0].message.content;
-    console.log("2. RESULTADO BRUTO DO OCR/IA:", rawContent);
+    let rawContent = result.choices[0].message.content;
+    console.log("[IMPORT] Resposta bruta da IA:", rawContent);
     
+    // Sanitização de JSON caso venha com markdown blocks (```json ... ```)
+    if (rawContent.includes("```")) {
+      rawContent = rawContent.replace(/```json/g, "").replace(/```/g, "").trim();
+    }
+
     const content = JSON.parse(rawContent);
     const rawName = content.name || "";
     const rawPhone = content.phone || "";
