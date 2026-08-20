@@ -46,10 +46,26 @@ export const saveContact = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as any;
     
-    // Normalização agressiva: Captura apenas o primeiro nome em Title Case
-    const rawName = data.name.trim().replace(/[_*]/g, " ").replace(/\s+/g, " ");
-    const isErrorString = (s: string) => ["erro", "null", "undefined", "cliente", "desconhecido"].includes(s.toLowerCase());
-    const isNameInvalid = !rawName || rawName.length < 2 || isErrorString(rawName) || rawName.toLowerCase().includes("shopee");
+    // Lógica de validação do Nome (sincronizada com o servidor)
+    const rawName = data.name.trim();
+    const hasEllipsis = rawName.includes("...");
+    const hasSpecialChars = /[#@$%&|\\/]/.test(rawName);
+    const hasAsterisks = /[*_]{2,}/.test(rawName);
+    
+    const cleanedForLength = rawName
+      .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    const firstNameForLength = cleanedForLength.split(' ')[0] || "";
+    const isNameTooShort = firstNameForLength.length < 3;
+
+    const isNameInvalid = !rawName || 
+                         rawName === "ILEGÍVEL" || 
+                         hasEllipsis || 
+                         hasSpecialChars || 
+                         hasAsterisks || 
+                         isNameTooShort ||
+                         rawName.toLowerCase().includes("shopee");
 
     let cleanName = "";
     if (isNameInvalid) {

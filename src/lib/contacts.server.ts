@@ -132,7 +132,15 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
       
       const phoneResult = normalizeBrazilianPhone(rawPhone);
       
-      // Normalização agressiva: Captura apenas o primeiro nome em Title Case
+      // Regras de validação do Nome solicitadas:
+      // 1. Contém reticências (...) ou caracteres especiais soltos
+      // 2. Parcialmente cortado/ocultado por tarjas (geralmente indicado por asteriscos ou caracteres especiais)
+      // 3. Menos de 3 letras válidas completas no primeiro nome
+      
+      const hasEllipsis = rawName.includes("...");
+      const hasSpecialChars = /[#@$%&|\\/]/.test(rawName); // Caracteres que indicam ruído ou tarja
+      const hasAsterisks = /[*_]{2,}/.test(rawName); // Tarjas costumam vir com múltiplos asteriscos
+      
       const rawCleanedName = rawName
         .replace(/Tel|Nome|Contato|Recebedor|Destinatário/gi, "")
         .replace(/[_*]/g, " ")
@@ -140,26 +148,33 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
         .replace(/\s+/g, " ")
         .trim();
         
-      const firstName = rawCleanedName.split(' ')[0] || "Cliente";
-      const cleanName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+      const firstName = rawCleanedName.split(' ')[0] || "";
+      const isNameTooShort = firstName.length < 3;
       
-      const isErrorString = (s: string) => ["erro", "null", "undefined", "cliente", "desconhecido"].includes(s.toLowerCase());
-      const isNameValid = cleanName.length >= 2 && !isErrorString(cleanName) && !cleanName.toLowerCase().includes("shopee") && !cleanName.toLowerCase().includes("entrega");
-      const isPhoneValid = phoneResult.isValid || (phoneResult.normalized.length >= 8 && phoneResult.normalized.length <= 15);
+      const isNameIllegible = hasEllipsis || hasSpecialChars || hasAsterisks || isNameTooShort;
 
+      let cleanName = "";
       let finalNeedsReview = false;
       let reviewReason = "";
 
-      // Alteração na regra: Se o telefone for válido, NÃO marca para revisão mesmo com nome inválido
+      if (isNameIllegible) {
+        // Se ilegível, não tenta extrair pedaços: marca como placeholder
+        // O preenchimento sequencial Cliente00001 é feito no saveContact (functions)
+        cleanName = "ILEGÍVEL"; 
+      } else {
+        cleanName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+      }
+      
+      const phoneResult = normalizeBrazilianPhone(rawPhone);
+      const isPhoneValid = phoneResult.isValid || (phoneResult.normalized.length >= 8 && phoneResult.normalized.length <= 15);
+
+      // Regra: Se o telefone for válido, o status é OK (não precisa de revisão)
       if (isPhoneValid) {
         finalNeedsReview = false;
         reviewReason = "";
-      } else if (!isNameValid) {
-        finalNeedsReview = true;
-        reviewReason = "Nome não identificado claramente";
       } else {
         finalNeedsReview = true;
-        reviewReason = phoneResult.reason || "Telefone inválido";
+        reviewReason = isNameIllegible ? "Nome ilegível e telefone inválido" : (phoneResult.reason || "Telefone inválido");
       }
 
 
