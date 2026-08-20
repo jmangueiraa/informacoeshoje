@@ -83,13 +83,15 @@ function ContactsPage() {
         const result = await processImageOCR({ data: { imageBase64: base64 } })
         if (result.needsReview && !result.phone) {
           revCount++
-        } else {
+        } else if (result.phone) {
           try {
-            await saveContact({ data: { name: result.name || 'Sem nome', phone: result.phone } })
+            await saveContact({ data: { name: result.name || 'Cliente', phone: result.phone } })
             newCount++
           } catch (err) {
             dupCount++
           }
+        } else {
+          revCount++
         }
       } catch (err) {
         console.error("Erro ao processar imagem:", err)
