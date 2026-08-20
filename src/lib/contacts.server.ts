@@ -66,46 +66,49 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
   try {
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
+    // Chamada direta via fetch para diagnóstico detalhado
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    
+    const payload = {
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType: mimeType || "image/jpeg",
+                data: base64Data
+              }
+            }
+          ]
+        }
+      ],
       generationConfig: {
         responseMimeType: "application/json",
-        temperature: 0.1,
+        temperature: 0.1
       }
+    };
+
+    console.log("[DEBUG] Iniciando fetch para Gemini API...");
+    const fetchResponse = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
     });
 
-    const prompt = `Você é um extrator de dados de comprovantes de entrega e logística (Shopee/Transportadoras).
-    Analise a imagem e localize os dados da pessoa que recebeu ou vai receber o pedido.
-    Procure por rótulos como: "Informações do recebedor", "Recebedor", "Destinatário", "Comprador", "Cliente".
-
-    Regras:
-    1. Extraia o nome completo da pessoa. Remova pontuações soltas ou caracteres especiais das pontas (como _ ou -).
-    2. Extraia o número de telefone completo (incluindo DDD). Extraia apenas os dígitos.
-    
-    Retorne estritamente o JSON:
-    {
-      "name": "Nome da pessoa",
-      "phone": "Telefone com DDD (somente dígitos)"
+    if (!fetchResponse.ok) {
+      const errorText = await fetchResponse.text();
+      console.error("[DEBUG GEMINI ERROR RAW]:", fetchResponse.status, errorText);
+      throw new Error(`Gemini API falhou (${fetchResponse.status}): ${errorText}`);
     }
-    Se absolutamente nenhum nome ou telefone for legível, retorne:
-    {
-      "name": "",
-      "phone": ""
-    }`;
 
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          data: base64Data || "",
-          mimeType: "image/jpeg"
-        }
-      }
-    ]);
-
-    const response = await result.response;
-    const rawContent = response.text();
-    console.log("[GEMINI_RESPONSE_RAW]:", rawContent);
+    const responseJson = await fetchResponse.json();
+    const rawContent = responseJson.candidates?.[0]?.content?.parts?.[0]?.text;
+    console.log("[DEBUG GEMINI SUCCESS TEXT]:", rawContent);
+    
+    if (!rawContent) {
+      throw new Error("Resposta do Gemini vazia ou sem conteúdo textual");
+    }
     
     let contactsData: any[] = [];
     try {
