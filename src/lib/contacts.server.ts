@@ -77,9 +77,16 @@ export async function analyzeImageForContacts(imageBase64: string): Promise<Anal
     const result = await response.json();
     const content = JSON.parse(result.choices[0].message.content);
     
-    // Safeguard to ensure only first name is used
+    // Safeguard to ensure only first name is used and cleaned
     if (content.name) {
-      content.name = content.name.split(' ')[0].split('_')[0].trim();
+      // Remove common trailing special chars like underscores before splitting
+      const cleaned = content.name.replace(/[_\W]+$/, '');
+      content.name = cleaned.split(' ')[0].split('_')[0].trim();
+    }
+    
+    // Additional phone validation: if phone exists, it shouldn't need review
+    if (content.phone && content.phone.length >= 8) {
+      content.needsReview = false;
     }
     
     return AnalysisResultSchema.parse(content);
