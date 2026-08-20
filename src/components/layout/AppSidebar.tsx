@@ -110,16 +110,14 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              {(isAdmin || isAdminLoading) && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Captura de Contatos">
-                    <Link to="/contacts" className="flex items-center gap-3 py-2">
-                      <Users className="h-5 w-5 text-blue-500" />
-                      <span>Captura de Contatos</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Captura de Contatos">
+                  <Link to="/contacts" className="flex items-center gap-3 py-2">
+                    <Users className="h-5 w-5 text-blue-500" />
+                    <span>Captura de Contatos</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
 
               {isAdmin && (
                 <SidebarGroup>
