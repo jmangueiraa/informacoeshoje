@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 import { supabase } from '@/integrations/supabase/client'
-import { SidebarProvider } from '@/components/ui/sidebar'
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { Toaster } from '@/components/ui/sonner'
 
@@ -43,9 +43,15 @@ export const Route = createFileRoute('/_authenticated')({
 function AuthenticatedLayout() {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-background">
+      <div className="flex min-h-screen w-full bg-background relative">
         <AppSidebar />
         <main className="flex-1 overflow-y-auto flex flex-col">
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 md:hidden">
+            <div className="flex items-center gap-2">
+              <SidebarTrigger />
+              <span className="font-bold text-lg tracking-tight text-primary">LinkAfiliado</span>
+            </div>
+          </header>
           <div className="flex-1">
             <Outlet />
           </div>
