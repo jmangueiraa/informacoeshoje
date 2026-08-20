@@ -65,6 +65,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          last_send: string | null
           name: string
           needs_review: boolean | null
           phone_normalized: string
@@ -75,6 +76,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          last_send?: string | null
           name: string
           needs_review?: boolean | null
           phone_normalized: string
@@ -85,6 +87,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          last_send?: string | null
           name?: string
           needs_review?: boolean | null
           phone_normalized?: string
