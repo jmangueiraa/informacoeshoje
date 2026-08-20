@@ -80,10 +80,18 @@ function ContactsPage() {
       })
 
       try {
-        console.log(`[CAPTURA] Processando arquivo: ${file.name}`);
-        const result = await processImageOCR({ data: { imageBase64: base64 } });
+        console.log(`\n========== CAPTURA DEBUG ==========\n1. ARQUIVO:\n   nome: ${file.name}\n   tipo: ${file.type}\n   tamanho: ${Math.round(file.size / 1024)} KB`);
         
-        console.log(`[CAPTURA] Resultado da IA para ${file.name}:`, result);
+        const result = await processImageOCR({ data: { imageBase64: base64, filename: file.name } });
+        
+        console.log("2. RESULTADO BRUTO DO OCR/IA:", result.raw_data);
+        console.log(`3. DADOS EXTRAÍDOS:\n   nome = ${result.name}\n   telefone = ${result.phone}`);
+        console.log(`4. DADOS NORMALIZADOS:\n   nome = ${result.name}\n   telefone = ${result.phone}`);
+        console.log(`5. VALIDAÇÃO:\n   nome válido = ${!result.needsReview || result.reviewReason !== "Nome não identificado ou inválido"}\n   telefone válido = ${!result.needsReview || (result.reviewReason !== "Telefone muito curto" && !result.reviewReason?.includes("DDD"))}`);
+        console.log(`6. CONFIANÇA: (Ver resultado bruto)`);
+        console.log(`8. STATUS CALCULADO: ${result.needsReview ? 'review' : 'valid'}`);
+        console.log(`9. MOTIVO: ${result.reviewReason || 'Dados Claros'}`);
+        console.log("10. LOCAL DA DECISÃO: contacts.server.ts (analyzeImageForContacts)\n====================================\n");
 
         if (result.phone && result.phone.length >= 8) {
           try {
