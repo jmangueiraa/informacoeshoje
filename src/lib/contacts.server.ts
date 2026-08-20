@@ -43,15 +43,17 @@ export function normalizeBrazilianPhone(phone: string | null | undefined): { nor
   };
 }
 
+/**
+ * Função principal para analisar a imagem e extrair contatos
+ */
 export async function analyzeImageForContacts(imageBase64: string, filename: string = "arquivo_upload.jpg", mimeType: string = "image/jpeg") {
-  console.log(`\n========== CAPTURA GEMINI SDK DEBUG ==========`);
+  console.log(`\n========== CAPTURA GEMINI DEBUG ==========`);
   console.log(`[DEBUG] Arquivo: ${filename}`);
   console.log(`[DEBUG] MimeType: ${mimeType}`);
   console.log(`[DEBUG] Tamanho Base64 recebido: ${imageBase64?.length}`);
   
   const apiKey = process.env['GEMINI_API_KEY'];
-  console.log("[DEBUG] API Key presente?:", !!apiKey);
-
+  
   if (!apiKey) {
     console.error("10. LOCAL DA DECISÃO: analyzeImageForContacts - Erro: GEMINI_API_KEY ausente");
     return {
@@ -65,132 +67,73 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
     // Garante que o base64 está limpo (sem prefixo data:image/...)
     const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
 
-    // Chamada direta via fetch para o endpoint v1 (mais estável)
-    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // Tentativa com v1 (mais estável em alguns ambientes edge)
+    const promptText = "Você é um extrator de contatos de comprovantes de entrega da Shopee. Encontre o bloco 'Informações do recebedor' ou destinatário. Extraia o nome da pessoa e o telefone com DDD. Retorne estritamente um JSON: {\"name\": \"...\", \"phone\": \"...\"}";
     
-    const payload = {
-      contents: [
-        {
-          parts: [
-            {
-              text: "Você é um extrator de contatos de comprovantes de entrega da Shopee. Encontre o bloco 'Informações do recebedor' ou destinatário. Extraia o nome da pessoa e o telefone com DDD. Retorne estritamente um JSON: {\"name\": \"...\", \"phone\": \"...\"}"
-            },
-            {
-              inline_data: {
-                mime_type: mimeType || "image/jpeg",
-                data: cleanBase64
-              }
-            }
-          ]
-        }
-      ],
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.1
-      }
-    };
-
-    console.log("[DEBUG] Iniciando fetch direto para Gemini API v1...");
-    const fetchResponse = await fetch(apiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    if (!fetchResponse.ok) {
-      const errorText = await fetchResponse.text();
-      console.error("[DEBUG GEMINI ERROR RAW]:", fetchResponse.status, errorText);
+    let contactsData: any[] = [];
+    
+    try {
+      console.log("[DEBUG] Iniciando fetch para Gemini API v1...");
+      const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
       
-      // Tenta fallback para v1beta se v1 falhar
-      if (fetchResponse.status === 404) {
-        console.log("[DEBUG] Fallback para v1beta...");
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: promptText },
+              { inline_data: { mime_type: mimeType || "image/jpeg", data: cleanBase64 } }
+            ]
+          }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`[DEBUG] v1 falhou (${response.status}): ${errorText}. Tentando v1beta...`);
+        
+        // Fallback para v1beta
         const betaUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
         const betaResponse = await fetch(betaUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: promptText },
+                { inline_data: { mime_type: mimeType || "image/jpeg", data: cleanBase64 } }
+              ]
+            }],
+            generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
+          })
         });
-        
+
         if (!betaResponse.ok) {
-          const betaError = await betaResponse.text();
-          throw new Error(`Gemini API falhou em v1 e v1beta (v1beta status: ${betaResponse.status}): ${betaError}`);
+          throw new Error(`Gemini API falhou em v1 e v1beta.`);
         }
         
-        const responseJson = await betaResponse.json();
-        return parseGeminiResponse(responseJson);
+        const betaJson = await betaResponse.json();
+        contactsData = parseGeminiJson(betaJson);
+      } else {
+        const v1Json = await response.json();
+        contactsData = parseGeminiJson(v1Json);
       }
-      
-      throw new Error(`Gemini API falhou (${fetchResponse.status}): ${errorText}`);
+    } catch (apiErr) {
+      console.error("[DEBUG] Erro em ambas as versões da API:", apiErr);
+      throw apiErr;
     }
 
-    const responseJson = await fetchResponse.json();
-    return parseGeminiResponse(responseJson);
-
-  } catch (error) {
-    console.error("10. LOCAL DA DECISÃO: analyzeImageForContacts - Exceção:", error);
-    return {
-      contacts: [],
-      needsReview: true,
-      reviewReason: "Erro no processamento Gemini: " + (error instanceof Error ? error.message : String(error))
-    };
-  }
-}
-
-/**
- * Função auxiliar para parsear a resposta do Gemini e manter a compatibilidade
- */
-function parseGeminiResponse(responseJson: any) {
-  const rawContent = responseJson.candidates?.[0]?.content?.parts?.[0]?.text;
-  console.log("[GEMINI_SUCCESS_TEXT]:", rawContent);
-  
-  if (!rawContent) {
-    throw new Error("Resposta do Gemini vazia ou sem conteúdo textual");
-  }
-  
-  let contactsData: any[] = [];
-  try {
-    const cleanJson = rawContent.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(cleanJson);
-    const items = Array.isArray(parsed) ? parsed : [parsed];
-    contactsData = items.map((item: any) => ({
-      name: item.name || "",
-      phone: item.phone || "",
-      ...item
-    }));
-  } catch (e) {
-    console.error("[IMPORT] Erro ao parsear JSON do Gemini:", e);
-    const jsonMatch = rawContent.match(/\[.*\]|\{.*\}/s);
-    if (jsonMatch) {
-      try {
-        const parsedMatch = JSON.parse(jsonMatch[0]);
-        const items = Array.isArray(parsedMatch) ? parsedMatch : [parsedMatch];
-        contactsData = items.map((item: any) => ({
-          name: item.name || "",
-          phone: item.phone || ""
-        }));
-      } catch (innerError) {
-        console.error("[IMPORT] Falha no fallback de parse:", innerError);
-      }
-    }
-  }
-  
-  // Reutiliza a lógica de processamento já existente no analyzeImageForContacts (que foi mantida abaixo no arquivo)
-  // Mas aqui precisamos retornar os contatos brutos para o mapeamento final
-  return contactsData;
-}
-
-// Nota: A lógica de mapeamento e validação final foi movida para dentro do analyzeImageForContacts original
-// Vou refatorar analyzeImageForContacts para usar esse novo fluxo.
-
-
+    // Processamento e normalização dos contatos extraídos
     const processedContacts = contactsData.map(content => {
       const rawName = content.name || "";
       const rawPhone = content.phone || "";
       
       const phoneResult = normalizeBrazilianPhone(rawPhone);
       const cleanName = rawName
-        .replace(/Tel|Nome|Contato|Recebedor/gi, "") // Remove palavras de sistema
-        .replace(/^[^a-zA-ZáéíóúÁÉÍÓÚñÑ]+|[^a-zA-ZáéíóúÁÉÍÓÚñÑ]+$/g, "") // Remove caracteres não alfabéticos das bordas
+        .replace(/Tel|Nome|Contato|Recebedor|Destinatário/gi, "")
+        .replace(/^[^a-zA-ZáéíóúÁÉÍÓÚñÑ]+|[^a-zA-ZáéíóúÁÉÍÓÚñÑ]+$/g, "")
         .replace(/\s+/g, " ")
         .trim();
       
@@ -205,13 +148,8 @@ function parseGeminiResponse(responseJson: any) {
         finalNeedsReview = true;
         reviewReason = "Nome não identificado claramente";
       } else if (!isPhoneValid) {
-        if (phoneResult.normalized.length >= 8 && phoneResult.normalized.length < 10) {
-          finalNeedsReview = true;
-          reviewReason = "Telefone capturado sem DDD";
-        } else {
-          finalNeedsReview = true;
-          reviewReason = phoneResult.reason || "Telefone inválido";
-        }
+        finalNeedsReview = true;
+        reviewReason = phoneResult.reason || "Telefone inválido";
       }
 
       if (isNameValid && isPhoneValid) {
@@ -235,11 +173,38 @@ function parseGeminiResponse(responseJson: any) {
     };
 
   } catch (error) {
-    console.error("10. LOCAL DA DECISÃO: analyzeImageForContacts - Exceção Gemini SDK:", error);
+    console.error("10. LOCAL DA DECISÃO: analyzeImageForContacts - Exceção:", error);
     return {
       contacts: [],
       needsReview: true,
-      reviewReason: "Erro no processamento Gemini SDK: " + (error instanceof Error ? error.message : String(error))
+      reviewReason: "Erro no processamento Gemini: " + (error instanceof Error ? error.message : String(error))
     };
+  }
+}
+
+/**
+ * Helper para extrair JSON da resposta da API
+ */
+function parseGeminiJson(responseJson: any): any[] {
+  const rawContent = responseJson.candidates?.[0]?.content?.parts?.[0]?.text;
+  console.log("[GEMINI_RAW_RESPONSE]:", rawContent);
+  
+  if (!rawContent) return [];
+  
+  try {
+    const cleanJson = rawContent.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(cleanJson);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch (e) {
+    const jsonMatch = rawContent.match(/\[.*\]|\{.*\}/s);
+    if (jsonMatch) {
+      try {
+        const parsedMatch = JSON.parse(jsonMatch[0]);
+        return Array.isArray(parsedMatch) ? parsedMatch : [parsedMatch];
+      } catch (inner) {
+        return [];
+      }
+    }
+    return [];
   }
 }
