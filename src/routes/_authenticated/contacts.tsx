@@ -348,50 +348,6 @@ function ContactsPage() {
               )}
 
 
-              {debugData && (
-                <div className="p-4 bg-slate-900 text-slate-100 rounded-xl border border-slate-700 space-y-3 font-mono text-[10px] overflow-x-auto">
-                  <div className="flex items-center gap-2 text-xs font-bold border-b border-slate-700 pb-2 mb-2 text-blue-400">
-                    <Search className="h-4 w-4" />
-                    🔎 Diagnóstico da Última Captura
-                  </div>
-                  
-                  <div className="grid gap-2">
-                    <div><span className="text-slate-400">Arquivo:</span> {debugData.filename}</div>
-                    <div>
-                      <span className="text-slate-400">Resultado bruto da IA/OCR:</span>
-                      <pre className="mt-1 p-2 bg-black/50 rounded max-h-32 overflow-y-auto whitespace-pre-wrap">
-                        {JSON.stringify(debugData.rawResult, null, 2)}
-                      </pre>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><span className="text-slate-400">Nome extraído:</span> {debugData.extractedName}</div>
-                      <div><span className="text-slate-400">Telefone extraído:</span> {debugData.extractedPhone}</div>
-                      <div><span className="text-slate-400">Nome normalizado:</span> {debugData.normalizedName}</div>
-                      <div><span className="text-slate-400">Telefone normalizado:</span> {debugData.normalizedPhone}</div>
-                      <div><span className="text-slate-400">Nome válido:</span> {debugData.isNameValid ? 'SIM' : 'NÃO'}</div>
-                      <div><span className="text-slate-400">Telefone válido:</span> {debugData.isPhoneValid ? 'SIM' : 'NÃO'}</div>
-                      <div><span className="text-slate-400">Confiança IA:</span> {debugData.confidence || 'N/A'}</div>
-                      <div><span className="text-slate-400">Duplicado:</span> {debugData.isDuplicate || 'NÃO'}</div>
-                    </div>
-
-                    <div className="border-t border-slate-700 pt-2 mt-2 space-y-1">
-                      <div><span className="text-slate-400">Status calculado pelo servidor:</span> <span className={debugData.serverStatus === 'review' ? 'text-red-400' : 'text-green-400'}>{debugData.serverStatus}</span></div>
-                      <div><span className="text-slate-400">Status enviado para o banco:</span> {debugData.statusSentToDB}</div>
-                      <div><span className="text-slate-400">Status efetivamente salvo:</span> {debugData.statusSavedInDB}</div>
-                      <div><span className="text-slate-400">Status retornado para o frontend:</span> {debugData.statusReturnedToFront}</div>
-                      <div><span className="text-slate-400">Motivo da revisão:</span> {debugData.reviewReason || 'Nenhum'}</div>
-                    </div>
-
-                    <div className="border-t border-slate-700 pt-2 mt-2 space-y-1">
-                      <div className="text-blue-400 font-bold">Etapa que classificou o contato:</div>
-                      <div>{debugData.decisionStep}</div>
-                      <div className="text-blue-400 font-bold">Regra que causou a classificação:</div>
-                      <div className="text-yellow-400">{debugData.decisionRule}</div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>
