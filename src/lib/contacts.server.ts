@@ -70,14 +70,23 @@ export async function analyzeImageForContacts(imageBase64: string) {
     const result = await response.json();
     const content = JSON.parse(result.choices[0].message.content);
     
-    const name = (content.name || "Cliente").split(/[_\s]/)[0].replace(/[^a-zA-ZáàâãéèêíïóôõöúçÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇ]/g, "");
+    const name = (content.name || "Cliente")
+      .split(/[_\s]/)[0]
+      .replace(/[^a-zA-ZáàâãéèêíïóôõöúçÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇ]/g, "")
+      .trim();
+    
     const phone = (content.phone || "").replace(/\D/g, "");
-    const needsReview = phone.length < 8;
+    
+    // Forçar needsReview=false se tivermos o que parece ser um telefone
+    const hasPhone = phone.length >= 8;
+    const finalNeedsReview = content.needsReview !== undefined ? content.needsReview : !hasPhone;
+
+    console.log("Extraction results:", { name, phone, finalNeedsReview });
 
     return {
       name: name || "Cliente",
       phone: phone,
-      needsReview: needsReview
+      needsReview: finalNeedsReview && !hasPhone
     };
   } catch (error) {
     console.error("Failed to analyze image:", error);
