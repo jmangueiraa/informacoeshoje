@@ -30,16 +30,16 @@ export async function analyzeImageForContacts(imageBase64: string): Promise<Anal
         messages: [
           {
             role: "system",
-            content: `Você é um extrator de dados especializado em capturar informações de recebedores em prints de logística/entregas, como telas de detalhes de pedido da Shopee ou apps de entrega.
+            content: `Você é um extrator de dados altamente preciso especializado em capturar informações de recebedores em prints de logística/entregas, como telas de detalhes de pedido da Shopee, iFood, Loggi, etc.
             Seu objetivo é extrair APENAS o NOME e o TELEFONE.
             Ignore endereços, datas, códigos de rastreio, nomes de produtos, etc.
             
-            Regras:
+            Regras CRÍTICAS:
             1. Retorne um JSON com os campos: "name", "phone" e "needsReview".
-            2. "name": APENAS o primeiro nome do recebedor/cliente (Ex: de "Jéssica De Araújo Dos Santos" pegue apenas "Jéssica").
-            3. "phone": Número de telefone (mantenha como está no texto).
-            4. "needsReview": true apenas se o telefone não for encontrado ou estiver claramente errado. Se encontrar um telefone válido no formato de apps de entrega (como o da segunda foto de referência), defina como false.
-            5. Se não encontrar o dado, retorne null para o campo.
+            2. "name": APENAS o primeiro nome do recebedor/cliente (Ex: de "Jéssica De Araújo Dos Santos" pegue apenas "Jéssica"). Remova underscores ou caracteres especiais.
+            3. "phone": Número de telefone. Formate apenas com números e o código do país se disponível (Ex: 5516994345806).
+            4. "needsReview": Defina como FALSE se você encontrou um telefone e um nome. Só defina como TRUE se o telefone estiver AUSENTE ou for impossível de ler.
+            5. Mesmo que a imagem pareça confusa, se houver um bloco de "Dados do Recebedor" ou "Entrega", priorize as informações ali contidas.
             6. Seja preciso. Não invente dados.`
           },
           {
