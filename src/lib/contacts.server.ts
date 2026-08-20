@@ -9,27 +9,31 @@ export function normalizeBrazilianPhone(phone: string): { normalized: string; is
   // Remove tudo que não é dígito
   let digits = phone.replace(/\D/g, "");
   
-  // Se o número for muito curto (menos de 8 dígitos), é inválido de cara
-  if (digits.length < 8) {
-    return { normalized: digits, isValid: false, reason: "Telefone muito curto" };
-  }
-
+  // LOGICA AGRESSIVA DE EXTRAÇÃO DE DDD/NÚMERO
   // Se tiver 12 ou 13 dígitos e começar com 55, remove o 55 (DDI Brasil)
   if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
     digits = digits.substring(2);
   }
 
-  // O usuário quer que 10 ou 11 dígitos sejam considerados válidos (DDD + Número)
+  // Se o número começar com 0 e tiver 11 ou 12 dígitos, remove o 0 inicial
+  if (digits.startsWith("0") && (digits.length === 11 || digits.length === 12)) {
+    digits = digits.substring(1);
+  }
+
+  // Validação: No Brasil, números válidos com DDD tem 10 ou 11 dígitos.
+  // Casos comuns em etiquetas: DDD colado ou espaços estranhos.
   const isValid = digits.length >= 10 && digits.length <= 11;
   
   let reason;
-  if (!isValid) {
+  if (digits.length < 8) {
+    reason = "Telefone muito curto";
+  } else if (!isValid) {
     reason = `Formato suspeito (${digits.length} dígitos). Verifique o DDD.`;
   }
 
   return { 
     normalized: digits, 
-    isValid,
+    isValid: isValid,
     reason
   };
 }
@@ -64,25 +68,22 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
         messages: [
           {
             role: "system",
-            content: `Você é um especialista em OCR e extração de dados de alta precisão para logística (Shopee).
-            Sua missão é extrair o NOME e o TELEFONE do DESTINATÁRIO da imagem.
+            content: `Você é um especialista em OCR e extração de dados para logística da SHOPEE.
+            Sua única tarefa é extrair NOME e TELEFONE do DESTINATÁRIO das imagens enviadas.
 
-            REGRAS CRÍTICAS:
-            1. O NOME geralmente aparece próximo a "Destinatário:", "Recebedor:" ou em destaque no topo da etiqueta/detalhe do pedido.
-            2. O TELEFONE pode estar formatado como (XX) XXXXX-XXXX, XX XXXXXXXXX, ou apenas números. 
-            3. Ignore nomes de entregadores ou motoristas. Foque no CLIENTE.
-            4. IMPORTANTE: Se o telefone parecer cortado ou incompleto, tente inferir os dígitos faltantes se o padrão for óbvio, caso contrário, retorne o que encontrar.
-            5. Limpe o NOME de caracteres especiais como underscores (_), asteriscos (*) ou barras.
-            6. Retorne OBRIGATORIAMENTE um JSON puro.
+            INSTRUÇÕES TÉCNICAS:
+            1. IDENTIFICAÇÃO DO DESTINATÁRIO: Procure por "Destinatário:", "Consumidor:", "Recebedor:", ou pelo nome que geralmente aparece na metade superior esquerda de uma etiqueta de envio.
+            2. NOME: Extraia o nome completo. Remova sufixos como (1/2) ou códigos estranhos se possível. Limpe underscore (_).
+            3. TELEFONE: Procure por sequências numéricas de 10 a 11 dígitos. Muitas vezes aparece perto do nome ou em um campo "Telefone:".
+            4. Se o telefone tiver 8 ou 9 dígitos sem DDD, retorne apenas os dígitos.
+            5. IGNORE dados do Remetente.
 
-            FORMATO DE RETORNO (JSON):
+            RETORNO OBRIGATÓRIO (JSON):
             {
-              "name": "Nome Completo",
-              "phone": "Telefone (apenas números, incluindo DDD)",
-              "confidence_name": 0.0 a 1.0,
-              "confidence_phone": 0.0 a 1.0,
-              "is_shopee_print": true/false,
-              "observation": "Explique brevemente onde encontrou os dados"
+              "name": "NOME DO CLIENTE",
+              "phone": "SOMENTE DÍGITOS",
+              "confidence": 0.0 a 1.0,
+              "is_logistics_label": true/false
             }`
           },
           {
@@ -124,36 +125,39 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
     const rawName = content.name || "";
     const rawPhone = content.phone || "";
     
-    console.log(`3. DADOS EXTRAÍDOS:\n   nome = ${rawName}\n   telefone = ${rawPhone}`);
+    console.log(`3. DADOS EXTRAÍDOS PELA IA:\n   nome = ${rawName}\n   telefone = ${rawPhone}`);
 
-    // Normalização e Validação
+    // Normalização agressiva
     const phoneResult = normalizeBrazilianPhone(rawPhone);
-    const cleanName = rawName.replace(/_/g, " ").trim();
-    const isNameValid = cleanName.length >= 2;
+    const cleanName = rawName.replace(/[_*]/g, " ").replace(/\s+/g, " ").trim();
+    
+    const isNameValid = cleanName.length >= 3 && !cleanName.toLowerCase().includes("shopee");
     const isPhoneValid = phoneResult.isValid;
     
-    console.log(`4. DADOS NORMALIZADOS:\n   nome = ${cleanName}\n   telefone = ${phoneResult.normalized}`);
-    console.log(`5. VALIDAÇÃO:\n   nome válido = ${isNameValid}\n   telefone válido = ${isPhoneValid}`);
-    console.log(`6. CONFIANÇA:\n   confidence nome = ${content.confidence_name}\n   confidence telefone = ${content.confidence_phone}`);
+    console.log(`4. PÓS-PROCESSAMENTO:\n   nome limpo = ${cleanName}\n   telefone normalizado = ${phoneResult.normalized}`);
+    console.log(`5. VALIDAÇÃO:\n   nome ok = ${isNameValid}\n   telefone ok = ${isPhoneValid}`);
 
-    // Lógica de Classificação Final (REGRA DE NEGÓCIO SOLICITADA)
-    // SE nome válido E telefone válido (DDD incluso) -> NÃO mandar para revisar.
+    // LOGICA DE REVISÃO
     let finalNeedsReview = false;
     let reviewReason = "";
 
-    if (isNameValid && isPhoneValid) {
-      // Será decidido se é NOVO ou DUPLICADO na função saveContact (backend)
+    if (!isNameValid) {
+      finalNeedsReview = true;
+      reviewReason = "Nome não identificado claramente";
+    } else if (!isPhoneValid) {
+      finalNeedsReview = true;
+      reviewReason = phoneResult.reason || "Telefone inválido (faltando DDD?)";
+    } else {
+      // Nome e Telefone parecem OK
       finalNeedsReview = false;
       reviewReason = "";
-    } else {
-      finalNeedsReview = true;
-      if (!isNameValid) reviewReason = "Nome não identificado ou inválido";
-      else if (!isPhoneValid) reviewReason = phoneResult.reason || "Telefone inválido ou sem DDD";
     }
 
-    console.log(`8. STATUS CALCULADO: ${finalNeedsReview ? 'review' : 'valid'}`);
-    console.log(`9. MOTIVO: ${reviewReason || 'Dados Claros (Nome + Telefone válidos)'}`);
-    console.log("10. LOCAL DA DECISÃO: analyzeImageForContacts (backend)\n====================================\n");
+    // Se o telefone for capturado MAS for curto, ainda salvamos mas pedimos revisão
+    if (!isPhoneValid && phoneResult.normalized.length >= 8) {
+       finalNeedsReview = true;
+       reviewReason = "Telefone capturado sem DDD";
+    }
 
     return {
       name: cleanName || "Cliente",
