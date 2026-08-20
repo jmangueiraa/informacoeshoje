@@ -17,10 +17,11 @@ export const getContacts = createServerFn({ method: "GET" })
 
 export const processImageOCR = createServerFn({ method: "POST" })
   .inputValidator((data: any) => z.object({
-    imageBase64: z.string()
+    imageBase64: z.string(),
+    filename: z.string().optional()
   }).parse(data))
   .handler(async ({ data }) => {
-    return analyzeImageForContacts(data.imageBase64);
+    return analyzeImageForContacts(data.imageBase64, data.filename);
   });
 
 export const saveContact = createServerFn({ method: "POST" })
