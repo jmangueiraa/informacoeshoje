@@ -111,7 +111,6 @@ function ContactsPage() {
     setProcessing(false)
     setIsPaused(false)
     setIsWaiting(false)
-    setIsCheckingApi(false)
     setIsApiReleased(false)
     countsRef.current = { new: 0, dup: 0, rev: 0, processed: 0 }
   }
