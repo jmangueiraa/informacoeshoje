@@ -20,15 +20,27 @@ import { useQuery } from "@tanstack/react-query"
 
 export function AppSidebar() {
   const navigate = useNavigate()
-  const { data: isAdmin, isLoading: isAdminLoading } = useQuery({
+  const { data: isAdmin, isLoading: isAdminLoading, refetch } = useQuery({
     queryKey: ['is-admin'],
     queryFn: async () => {
+      console.log("Checking admin status for sidebar...");
       const result = await checkIsAdmin();
-      console.log("Admin check result for sidebar:", result);
+      console.log("Admin check result:", result);
       return result;
     },
-    staleTime: 0, // Force fresh check while debugging
+    staleTime: 0,
   })
+
+  // Add effect to monitor auth state and refetch admin status
+  React.useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        refetch();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [refetch]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut()
