@@ -5,7 +5,11 @@ import { z } from "zod";
  * Aceita formatos como: (16) 99999-9999, +55 16 99999-9999, 5516999999999, etc.
  * Retorna apenas os dígitos relevantes sem o prefixo DDI 55 (se presente).
  */
-export function normalizeBrazilianPhone(phone: string): { normalized: string; isValid: boolean; reason: string | undefined } {
+export function normalizeBrazilianPhone(phone: string | null | undefined): { normalized: string; isValid: boolean; reason: string | undefined } {
+  if (!phone) {
+    return { normalized: "", isValid: false, reason: "Telefone vazio ou não identificado" };
+  }
+
   // Remove tudo que não é dígito
   let digits = phone.replace(/\D/g, "");
   
@@ -21,11 +25,12 @@ export function normalizeBrazilianPhone(phone: string): { normalized: string; is
   }
 
   // Validação: No Brasil, números válidos com DDD tem 10 ou 11 dígitos.
-  // Casos comuns em etiquetas: DDD colado ou espaços estranhos.
   const isValid = digits.length >= 10 && digits.length <= 11;
   
   let reason;
-  if (digits.length < 8) {
+  if (digits.length === 0) {
+    reason = "Telefone não identificado";
+  } else if (digits.length < 8) {
     reason = "Telefone muito curto";
   } else if (!isValid) {
     reason = `Formato suspeito (${digits.length} dígitos). Verifique o DDD.`;
@@ -110,10 +115,11 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
       const errorText = await response.text();
       console.error(`10. LOCAL DA DECISÃO: analyzeImageForContacts - Erro API IA (${response.status})`);
       return {
-        name: "Erro na IA",
+        name: "",
         phone: "",
         needsReview: true,
-        reviewReason: "Falha na comunicação com o provedor de IA"
+        reviewReason: "Falha na comunicação com o provedor de IA",
+        raw_data: { error: true, status: response.status }
       };
     }
 
@@ -131,7 +137,9 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
     const phoneResult = normalizeBrazilianPhone(rawPhone);
     const cleanName = rawName.replace(/[_*]/g, " ").replace(/\s+/g, " ").trim();
     
-    const isNameValid = cleanName.length >= 3 && !cleanName.toLowerCase().includes("shopee");
+    // Validação de nome: Mínimo 2 caracteres, ignora strings de erro
+    const isErrorString = (s: string) => ["erro na ia", "null", "undefined", "cliente"].includes(s.toLowerCase());
+    const isNameValid = cleanName.length >= 2 && !isErrorString(cleanName) && !cleanName.toLowerCase().includes("shopee");
     const isPhoneValid = phoneResult.isValid;
     
     console.log(`4. PÓS-PROCESSAMENTO:\n   nome limpo = ${cleanName}\n   telefone normalizado = ${phoneResult.normalized}`);
@@ -174,10 +182,11 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
   } catch (error) {
     console.error("10. LOCAL DA DECISÃO: analyzeImageForContacts - Exceção crítica");
     return {
-      name: "Erro no Sistema",
+      name: "",
       phone: "",
       needsReview: true,
-      reviewReason: "Erro interno no processamento da imagem"
+      reviewReason: "Erro interno no processamento da imagem",
+      raw_data: { exception: true, message: error instanceof Error ? error.message : String(error) }
     };
   }
 }
