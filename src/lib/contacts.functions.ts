@@ -68,10 +68,12 @@ export const saveContact = createServerFn({ method: "POST" })
         // Filtrar apenas os que seguem o padrão ClienteXXXXX
         const sequentials = lastNames
           .map((n: string) => {
-            const match = n?.match(/^Cliente(\d{5})$/);
+            if (!n) return null;
+            const match = n.match(/^Cliente(\d{5})$/);
             return match ? parseInt(match[1], 10) : null;
           })
-          .filter((n): n is number => n !== null);
+          .filter((n: number | null): n is number => n !== null);
+
 
         
         if (sequentials.length > 0) {
