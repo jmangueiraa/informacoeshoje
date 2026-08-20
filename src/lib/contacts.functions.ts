@@ -83,12 +83,6 @@ export const runControlledTest = createServerFn({ method: "POST" })
     const phoneResult = normalizeBrazilianPhone(data.phone);
     const cleanName = data.name.replace(/[_*]/g, " ").replace(/\s+/g, " ").trim();
     
-    const isNameValid = cleanName.length >= 3 && !cleanName.toLowerCase().includes("shopee");
-    const isPhoneValid = phoneResult.isValid;
-    
-    let needsReview = false;
-    let reviewReason = "";
-
     const isErrorString = (s: string) => ["erro na ia", "null", "undefined", "cliente"].includes(s.toLowerCase());
     const isNameValid = cleanName.length >= 2 && !isErrorString(cleanName) && !cleanName.toLowerCase().includes("shopee");
     const isPhoneValid = phoneResult.isValid;
