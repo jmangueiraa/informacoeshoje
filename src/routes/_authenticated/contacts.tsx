@@ -555,8 +555,18 @@ function ContactsPage() {
                         item.status === 'cancelled' && "border-gray-200 bg-gray-50/30"
                       )}>
                         <div className="flex items-center gap-2 truncate flex-1">
-                          {item.status === 'processing' && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
-                          {item.status === 'completed' && <span title="Concluída">🟢</span>}
+                          {item.status === 'processing' && (
+                            <div className="flex items-center gap-1.5">
+                              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                              <span className="text-[10px] font-bold text-primary uppercase">🔄 Processando</span>
+                            </div>
+                          )}
+                          {item.status === 'completed' && (
+                            <div className="flex items-center gap-1.5">
+                              <span title="Concluída">✅</span>
+                              <span className="text-[10px] font-bold text-green-600 uppercase">Concluída</span>
+                            </div>
+                          )}
                           {item.status === 'waiting_limit' && <span title="Aguardando limite da API">🟡</span>}
                           {item.status === 'pending' && <span title="Pendente">⚪</span>}
                           {item.status === 'final_error' && <span title="Erro definitivo">🔴</span>}
