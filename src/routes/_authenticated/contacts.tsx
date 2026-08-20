@@ -115,28 +115,10 @@ function ContactsPage() {
         for (const contactData of extractedContacts) {
           const phoneDigits = contactData.phone ? String(contactData.phone).replace(/\D/g, '') : '';
 
-          const currentDebug: any = {
-            filename: file.name,
-            rawResult: contactData.raw_data,
-            extractedName: contactData.name,
-            extractedPhone: contactData.phone,
-            normalizedName: contactData.name,
-            normalizedPhone: contactData.phone,
-            isNameValid: contactData.name && contactData.name.length >= 2 && !contactData.name.toLowerCase().includes("erro"),
-            isPhoneValid: phoneDigits.length >= 8,
-            serverStatus: contactData.needsReview ? 'review' : 'valid',
-            reviewReason: contactData.reviewReason || 'Extração direta',
-            decisionStep: 'frontend-gemini',
-            decisionRule: 'Chamada Direta Gemini API'
-
-          };
-
           // 1. Verificar duplicata no mesmo lote
           if (phoneDigits && batchPhones.has(phoneDigits)) {
             console.log(`[IMPORT] Duplicata no lote detectada: ${phoneDigits}`);
             dupCount++;
-            currentDebug.statusSentToDB = 'duplicate-batch';
-            setDebugData(currentDebug);
             continue;
           }
           
