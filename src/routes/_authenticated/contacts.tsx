@@ -25,13 +25,14 @@ export const Route = createFileRoute('/_authenticated/contacts')({
 })
 
 
-type QueueStatus = 'pending' | 'processing' | 'completed' | 'waiting' | 'error' | 'ignored';
+type QueueStatus = 'pending' | 'processing' | 'completed' | 'waiting' | 'error' | 'ignored' | 'waiting_limit' | 'final_error' | 'cancelled';
 
 interface QueueItem {
   id: string;
   file: File;
   status: QueueStatus;
   error?: string;
+  retryCount?: number;
 }
 
 function ContactsPage() {
@@ -115,7 +116,7 @@ function ContactsPage() {
   // Timer para o contador regressivo de espera (429)
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
-    if (isWaiting && waitTime > 0) {
+    if (isWaiting && waitTime > 0 && !isPaused) {
       timer = setInterval(() => {
         setWaitTime(prev => {
           if (prev <= 1) {
@@ -147,6 +148,11 @@ function ContactsPage() {
     if (confirm("Deseja realmente cancelar o processamento restante?")) {
       cancelRef.current = true;
       setProcessing(false);
+      setQueue(prev => prev.map(q => 
+        (q.status === 'pending' || q.status === 'processing' || q.status === 'waiting_limit') 
+          ? { ...q, status: 'cancelled' } 
+          : q
+      ));
       toast.error("Processamento cancelado");
     }
   }
@@ -165,22 +171,38 @@ function ContactsPage() {
     countsRef.current = { new: 0, dup: 0, rev: 0, processed: 0 };
     const batchPhones = new Set<string>();
     
-    // Filtra apenas itens pendentes ou com erro para processar/re-processar
-    const itemsToProcess = queue.filter(item => item.status === 'pending' || item.status === 'error');
+    // Filtra apenas itens que podem ser processados
+    // Pendente, Aguardando Limite, ou Erro (re-tentativa manual)
+    const getItemsToProcess = () => queue.filter(item => 
+      item.status === 'pending' || 
+      item.status === 'waiting_limit' || 
+      item.status === 'error' ||
+      item.status === 'cancelled'
+    );
+
+    let itemsToProcess = getItemsToProcess();
+    const totalItemsInitial = queue.length; // Usamos o total da fila para o progresso real
     
-    // Lotes de 5
-    const batchSize = 5;
-    const totalItems = itemsToProcess.length;
-    
-    for (let i = 0; i < totalItems; i += batchSize) {
-      if (cancelRef.current) break;
+    while (itemsToProcess.length > 0 && !cancelRef.current) {
+      // Lotes de 5
+      const batchSize = 5;
+      const currentBatch = itemsToProcess.slice(0, batchSize);
       
-      // Verifica pausa antes de cada lote
+      // Verifica pausa
       while (pausedRef.current && !cancelRef.current) {
         await new Promise(r => setTimeout(r, 1000));
       }
-      
-      const currentBatch = itemsToProcess.slice(i, i + batchSize);
+
+      // Se houver um período de espera global (429), aguarda antes do próximo lote
+      while (isWaiting && !cancelRef.current) {
+        // Se pausar durante a espera, fica aqui
+        while (pausedRef.current && !cancelRef.current) {
+          await new Promise(r => setTimeout(r, 1000));
+        }
+        await new Promise(r => setTimeout(r, 1000));
+      }
+
+      if (cancelRef.current) break;
       
       // Atualiza status para 'processing'
       setQueue(prev => prev.map(item => 
@@ -189,7 +211,7 @@ function ContactsPage() {
           : item
       ));
 
-      // Processa o lote em paralelo (máximo 5)
+      // Processa o lote em paralelo
       const batchPromises = currentBatch.map(async (item) => {
         try {
           const base64 = await new Promise<string>((resolve, reject) => {
@@ -201,84 +223,90 @@ function ContactsPage() {
           
           const base64Data = base64.split(',')[1] || base64;
           
-          // Função de chamada com retry automático para 429
-          const callGeminiWithRetry = async (retryCount = 0): Promise<any> => {
-            try {
-              return await extractContactFromGemini(base64Data, item.file.type || 'image/jpeg');
-            } catch (err: any) {
-              if (err.status === 429 && retryCount < 3) {
-                const wait = err.retryAfter || (60 * (retryCount + 1));
-                console.warn(`[429] Limite atingido. Aguardando ${wait}s...`);
-                
-                setIsWaiting(true);
-                setWaitTime(wait);
-                
-                // Aguarda o tempo informado
-                await new Promise(r => setTimeout(r, wait * 1000));
-                
-                return callGeminiWithRetry(retryCount + 1);
-              }
-              throw err;
+          try {
+            const extractedContacts = await extractContactFromGemini(base64Data, item.file.type || 'image/jpeg');
+            
+            if (!extractedContacts || extractedContacts.length === 0) {
+              countsRef.current.rev++;
+              setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'final_error', error: 'Nenhum contato identificado' } : q));
+              return;
             }
-          };
 
-          const extractedContacts = await callGeminiWithRetry();
-          
-          if (!extractedContacts || extractedContacts.length === 0) {
-            countsRef.current.rev++;
-            setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'error', error: 'Nenhum contato identificado' } : q));
-            return;
-          }
+            for (const contactData of extractedContacts) {
+              const phoneDigits = contactData.phone ? String(contactData.phone).replace(/\D/g, '') : '';
 
-          for (const contactData of extractedContacts) {
-            const phoneDigits = contactData.phone ? String(contactData.phone).replace(/\D/g, '') : '';
-
-            if (phoneDigits && batchPhones.has(phoneDigits)) {
-              countsRef.current.dup++;
-              continue;
-            }
-            if (phoneDigits) batchPhones.add(phoneDigits);
-
-            try {
-              const savedContact = await saveContact({ 
-                data: { 
-                  name: contactData.name || 'Cliente', 
-                  phone: contactData.phone,
-                  needsReview: !contactData.name || !contactData.phone,
-                  reviewReason: (!contactData.name || !contactData.phone) ? 'Dados incompletos' : null,
-                  rawData: contactData || null
-                } 
-              });
-              
-              if (savedContact.needs_review) countsRef.current.rev++;
-              else countsRef.current.new++;
-            } catch (err: any) {
-              if (err.message === 'DUPLICATE_CONTACT') {
+              if (phoneDigits && batchPhones.has(phoneDigits)) {
                 countsRef.current.dup++;
-              } else {
-                countsRef.current.rev++;
-                throw err;
+                continue;
+              }
+              if (phoneDigits) batchPhones.add(phoneDigits);
+
+              try {
+                const savedContact = await saveContact({ 
+                  data: { 
+                    name: contactData.name || 'Cliente', 
+                    phone: contactData.phone,
+                    needsReview: !contactData.name || !contactData.phone,
+                    reviewReason: (!contactData.name || !contactData.phone) ? 'Dados incompletos' : null,
+                    rawData: contactData || null
+                  } 
+                });
+                
+                if (savedContact.needs_review) countsRef.current.rev++;
+                else countsRef.current.new++;
+              } catch (err: any) {
+                if (err.message === 'DUPLICATE_CONTACT') {
+                  countsRef.current.dup++;
+                } else {
+                  countsRef.current.rev++;
+                  throw err;
+                }
               }
             }
+            
+            countsRef.current.processed++;
+            setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'completed' } : q));
+            
+          } catch (err: any) {
+            if (err.status === 429) {
+              const wait = err.retryAfter || 60;
+              console.warn(`[429] Limite atingido para ${item.file.name}. Aguardando ${wait}s...`);
+              
+              setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'waiting_limit', retryCount: (q.retryCount || 0) + 1 } : q));
+              
+              setIsWaiting(true);
+              // Definimos o maior tempo de espera se múltiplos 429 ocorrerem
+              setWaitTime(prev => Math.max(prev, wait));
+              return;
+            }
+
+            // Tratamento de Erro Definitivo
+            const retryCount = item.retryCount || 0;
+            if (retryCount < 5) {
+               // Erro genérico, tentamos novamente? O usuário pediu tratamento para 429.
+               // Outros erros vamos marcar como final_error ou error
+               setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'final_error', error: err.message } : q));
+            } else {
+               setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'final_error', error: 'Falha após 5 tentativas' } : q));
+            }
+            countsRef.current.rev++;
           }
-          
-          countsRef.current.processed++;
-          setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'completed' } : q));
-          
         } catch (err: any) {
-          console.error(`Erro ao processar ${item.file.name}:`, err);
-          countsRef.current.rev++;
-          setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'error', error: err.message } : q));
+          console.error(`Erro fatal no item ${item.id}:`, err);
+          setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'final_error', error: err.message } : q));
         }
       });
 
       await Promise.all(batchPromises);
       
-      // Atualiza progresso global
-      const processedSoFar = Math.min(i + batchSize, totalItems);
-      setProgress((processedSoFar / totalItems) * 100);
+      // Atualiza progresso baseado em concluídos / total
+      const completedCount = queue.filter(q => q.status === 'completed' || q.status === 'final_error').length;
+      setProgress((completedCount / totalItemsInitial) * 100);
       
-      // Pequena pausa entre lotes para não sobrecarregar
+      // Recalcula itens para processar
+      itemsToProcess = getItemsToProcess();
+      
+      // Pequena pausa entre lotes
       await new Promise(r => setTimeout(r, 1000));
     }
 
@@ -292,7 +320,7 @@ function ContactsPage() {
     setProcessing(false);
     processingRef.current = false;
     queryClient.invalidateQueries({ queryKey: ['contacts'] });
-    toast.success("Processamento de fila concluído");
+    toast.success("Processamento concluído");
   }
 
 
@@ -468,17 +496,28 @@ function ContactsPage() {
                         "flex items-center justify-between text-[11px] p-2 rounded border transition-colors bg-background",
                         item.status === 'processing' && "border-primary bg-primary/5",
                         item.status === 'completed' && "border-green-200 bg-green-50/30",
-                        item.status === 'error' && "border-red-200 bg-red-50/30"
+                        item.status === 'waiting_limit' && "border-yellow-200 bg-yellow-50/30",
+                        item.status === 'final_error' && "border-red-200 bg-red-50/30",
+                        item.status === 'error' && "border-red-200 bg-red-50/30",
+                        item.status === 'cancelled' && "border-gray-200 bg-gray-50/30"
                       )}>
                         <div className="flex items-center gap-2 truncate flex-1">
                           {item.status === 'processing' && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
-                          {item.status === 'completed' && <CheckCircle2 className="h-3 w-3 text-green-500" />}
-                          {item.status === 'error' && <AlertTriangle className="h-3 w-3 text-red-500" />}
-                          {item.status === 'pending' && <Clock className="h-3 w-3 text-muted-foreground" />}
-                          <span className="truncate">{item.file.name}</span>
+                          {item.status === 'completed' && <span title="Concluída">🟢</span>}
+                          {item.status === 'waiting_limit' && <span title="Aguardando limite da API">🟡</span>}
+                          {item.status === 'pending' && <span title="Pendente">⚪</span>}
+                          {item.status === 'final_error' && <span title="Erro definitivo">🔴</span>}
+                          {item.status === 'error' && <span title="Erro">🔴</span>}
+                          {item.status === 'cancelled' && <span title="Cancelada">⚪</span>}
+                          <span className="truncate ml-1">{item.file.name}</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          {item.status === 'error' && (
+                          {item.status === 'waiting_limit' && (
+                            <span className="text-[9px] text-yellow-600 font-bold uppercase animate-pulse">
+                              Aguardando Limite
+                            </span>
+                          )}
+                          {(item.status === 'error' || item.status === 'final_error') && (
                             <span className="text-[9px] text-red-500 font-medium italic truncate max-w-[80px]">
                               {item.error}
                             </span>
@@ -516,9 +555,9 @@ function ContactsPage() {
                     <Button 
                       className="w-full font-bold shadow-sm" 
                       onClick={processImages} 
-                      disabled={queue.length === 0 || queue.every(q => q.status === 'completed')}
+                      disabled={queue.length === 0 || queue.every(q => q.status === 'completed' || q.status === 'final_error' || q.status === 'cancelled')}
                     >
-                      {queue.some(q => q.status === 'error') ? 'Tentar Erros Novamente' : 'Iniciar Processamento'}
+                      {queue.some(q => q.status === 'final_error' || q.status === 'error' || q.status === 'cancelled') ? 'Retomar / Tentar Novamente' : 'Iniciar Processamento'}
                     </Button>
                   )}
                 </div>
@@ -536,7 +575,7 @@ function ContactsPage() {
                       <Loader2 className="h-2.5 w-2.5 animate-spin" />
                       Lote em andamento...
                     </span>
-                    <span>{queue.filter(q => q.status === 'completed').length} / {queue.length} concluídos</span>
+                    <span>Concluídas: {queue.filter(q => q.status === 'completed').length} / {queue.length}</span>
                   </div>
                 </div>
               )}
