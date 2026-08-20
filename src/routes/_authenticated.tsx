@@ -43,11 +43,11 @@ export const Route = createFileRoute('/_authenticated')({
 function AuthenticatedLayout() {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-background relative flex-col md:flex-row">
+      <div className="flex min-h-screen w-full bg-background flex-col md:flex-row">
         <AppSidebar />
         <main className="flex-1 overflow-y-auto flex flex-col">
-          <header className="flex h-16 shrink-0 items-center gap-3 border-b px-4 bg-card/50 backdrop-blur-sm sticky top-0 z-20 block md:hidden">
-            <SidebarTrigger className="h-9 w-9 flex! items-center justify-center text-foreground" />
+          <header className="flex h-16 shrink-0 items-center gap-3 border-b px-4 bg-card/50 backdrop-blur-sm sticky top-0 z-20 md:hidden">
+            <SidebarTrigger className="h-9 w-9 flex items-center justify-center text-foreground" />
             <div className="flex items-center gap-2 font-bold text-lg tracking-tight text-primary">
               <div className="w-7 h-7 bg-primary rounded flex items-center justify-center text-primary-foreground text-xs">
                 LA
