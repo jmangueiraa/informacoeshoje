@@ -66,14 +66,14 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `Você é um especialista em OCR e extração de dados para logística da SHOPEE e outras transportadoras brasileiras.
-    Sua tarefa é extrair o NOME e o TELEFONE do DESTINATÁRIO da imagem.
+    Sua tarefa é extrair o NOME e o TELEFONE do DESTINATÁRIO da imagem de etiqueta ou comprovante de entrega.
 
     INSTRUÇÕES TÉCNICAS:
-    1. IDENTIFICAÇÃO DO DESTINATÁRIO: Procure por "Destinatário:", "Consumidor:", "Recebedor:", "Informações do recebedor" ou blocos de texto que contenham um nome de pessoa e um número de telefone próximos.
-    2. NOME: Extraia o nome completo. Remova sufixos como (1/2), códigos de rastreio ou termos como "Tel".
-    3. TELEFONE: Extraia apenas os números do telefone com DDD. O formato esperado é o brasileiro (ex: 11988887777). Ignore o prefixo +55 se presente.
-    4. PRECISÃO: Se a imagem tiver "Informações do recebedor" seguido de um nome e "Tel +55...", esse é o contato correto.
-    5. Se houver múltiplos contatos distintos, retorne uma lista. Se não encontrar nada, retorne campos vazios "".
+    1. IDENTIFICAÇÃO DO DESTINATÁRIO: Procure por blocos rotulados como: "Informações do recebedor", "Recebedor", "Destinatário", "Consumidor", "Cliente", "Comprador" ou "Dados de Entrega".
+    2. NOME: Extraia o nome completo da pessoa. Capture o nome mesmo que contenha sufixos ou caracteres estranhos como underscores (_), hifens (-) ou pontos (.).
+    3. TELEFONE: Procure por sequências numéricas que representem o telefone. Muitas vezes aparece precedido por "Tel", "Contato" ou o prefixo "+55".
+    4. PRECISÃO: Ignore termos do sistema como "Tel", "Nome:", "Contato:". Extraia apenas o dado bruto.
+    5. Se houver múltiplos contatos na mesma imagem, retorne uma lista. Se não encontrar nada, retorne campos vazios "".
 
     RETORNO OBRIGATÓRIO: Retorne ESTRITAMENTE um JSON estruturado (sem blocos de código markdown ou texto extra).
     Formato: [ { "name": "Nome do Cliente", "phone": "apenas números" } ]`;
@@ -118,7 +118,11 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
       const rawPhone = content.phone || "";
       
       const phoneResult = normalizeBrazilianPhone(rawPhone);
-      const cleanName = rawName.replace(/[_*]/g, " ").replace(/\s+/g, " ").trim();
+      const cleanName = rawName
+        .replace(/Tel|Nome|Contato|Recebedor/gi, "") // Remove palavras de sistema
+        .replace(/^[^a-zA-ZáéíóúÁÉÍÓÚñÑ]+|[^a-zA-ZáéíóúÁÉÍÓÚñÑ]+$/g, "") // Remove caracteres não alfabéticos das bordas
+        .replace(/\s+/g, " ")
+        .trim();
       
       const isErrorString = (s: string) => ["erro", "null", "undefined", "cliente", "desconhecido"].includes(s.toLowerCase());
       const isNameValid = cleanName.length >= 2 && !isErrorString(cleanName) && !cleanName.toLowerCase().includes("shopee") && !cleanName.toLowerCase().includes("entrega");
