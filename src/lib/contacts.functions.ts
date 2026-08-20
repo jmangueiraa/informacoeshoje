@@ -58,6 +58,7 @@ export const saveContact = createServerFn({ method: "POST" })
     const { data: existing, error: checkError } = await supabase
       .from('contacts')
       .select('id')
+      .eq('user_id', userId)
       .eq('phone_normalized', phoneDigits)
       .maybeSingle();
 
@@ -90,8 +91,11 @@ export const saveContact = createServerFn({ method: "POST" })
       .single();
       
     if (insertError) {
+      if (insertError.code === '23505') {
+        console.log(`[CAPTURA] saveContact - Conflito de UNIQUE detectado para ${phoneDigits}`);
+        throw new Error('DUPLICATE_CONTACT');
+      }
       console.error(`[CAPTURA] Supabase insert response ERROR:`, insertError);
-      // Retornamos um objeto que o frontend consiga interpretar como erro de banco, mas sem quebrar a execução
       throw new Error(`DB_INSERT_ERROR: ${insertError.code} - ${insertError.message} - ${insertError.details}`);
     }
 
