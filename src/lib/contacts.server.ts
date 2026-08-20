@@ -70,6 +70,7 @@ export async function analyzeImageForContacts(imageBase64: string) {
     const result = await response.json();
     const content = JSON.parse(result.choices[0].message.content);
     
+    const name = (content.name || "Cliente").split(/[_\s]/)[0].replace(/[^a-zA-ZáàâãéèêíïóôõöúçÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇ]/g, "");
     const phone = (content.phone || "").replace(/\D/g, "");
     const needsReview = phone.length < 8;
 
