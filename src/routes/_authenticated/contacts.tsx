@@ -166,22 +166,37 @@ function ContactsPage() {
     countsRef.current = { new: 0, dup: 0, rev: 0, processed: 0 };
     const batchPhones = new Set<string>();
     
-    // Filtra apenas itens pendentes ou com erro para processar/re-processar
-    const itemsToProcess = queue.filter(item => item.status === 'pending' || item.status === 'error');
+    // Filtra apenas itens que podem ser processados
+    // Pendente, Aguardando Limite, ou Erro (re-tentativa manual)
+    const getItemsToProcess = () => queue.filter(item => 
+      item.status === 'pending' || 
+      item.status === 'waiting_limit' || 
+      item.status === 'error'
+    );
+
+    let itemsToProcess = getItemsToProcess();
+    const totalItemsInitial = queue.length; // Usamos o total da fila para o progresso real
     
-    // Lotes de 5
-    const batchSize = 5;
-    const totalItems = itemsToProcess.length;
-    
-    for (let i = 0; i < totalItems; i += batchSize) {
-      if (cancelRef.current) break;
+    while (itemsToProcess.length > 0 && !cancelRef.current) {
+      // Lotes de 5
+      const batchSize = 5;
+      const currentBatch = itemsToProcess.slice(0, batchSize);
       
-      // Verifica pausa antes de cada lote
+      // Verifica pausa
       while (pausedRef.current && !cancelRef.current) {
         await new Promise(r => setTimeout(r, 1000));
       }
-      
-      const currentBatch = itemsToProcess.slice(i, i + batchSize);
+
+      // Se houver um período de espera global (429), aguarda antes do próximo lote
+      while (isWaiting && !cancelRef.current) {
+        // Se pausar durante a espera, fica aqui
+        while (pausedRef.current && !cancelRef.current) {
+          await new Promise(r => setTimeout(r, 1000));
+        }
+        await new Promise(r => setTimeout(r, 1000));
+      }
+
+      if (cancelRef.current) break;
       
       // Atualiza status para 'processing'
       setQueue(prev => prev.map(item => 
@@ -190,7 +205,7 @@ function ContactsPage() {
           : item
       ));
 
-      // Processa o lote em paralelo (máximo 5)
+      // Processa o lote em paralelo
       const batchPromises = currentBatch.map(async (item) => {
         try {
           const base64 = await new Promise<string>((resolve, reject) => {
@@ -202,84 +217,90 @@ function ContactsPage() {
           
           const base64Data = base64.split(',')[1] || base64;
           
-          // Função de chamada com retry automático para 429
-          const callGeminiWithRetry = async (retryCount = 0): Promise<any> => {
-            try {
-              return await extractContactFromGemini(base64Data, item.file.type || 'image/jpeg');
-            } catch (err: any) {
-              if (err.status === 429 && retryCount < 3) {
-                const wait = err.retryAfter || (60 * (retryCount + 1));
-                console.warn(`[429] Limite atingido. Aguardando ${wait}s...`);
-                
-                setIsWaiting(true);
-                setWaitTime(wait);
-                
-                // Aguarda o tempo informado
-                await new Promise(r => setTimeout(r, wait * 1000));
-                
-                return callGeminiWithRetry(retryCount + 1);
-              }
-              throw err;
+          try {
+            const extractedContacts = await extractContactFromGemini(base64Data, item.file.type || 'image/jpeg');
+            
+            if (!extractedContacts || extractedContacts.length === 0) {
+              countsRef.current.rev++;
+              setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'final_error', error: 'Nenhum contato identificado' } : q));
+              return;
             }
-          };
 
-          const extractedContacts = await callGeminiWithRetry();
-          
-          if (!extractedContacts || extractedContacts.length === 0) {
-            countsRef.current.rev++;
-            setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'error', error: 'Nenhum contato identificado' } : q));
-            return;
-          }
+            for (const contactData of extractedContacts) {
+              const phoneDigits = contactData.phone ? String(contactData.phone).replace(/\D/g, '') : '';
 
-          for (const contactData of extractedContacts) {
-            const phoneDigits = contactData.phone ? String(contactData.phone).replace(/\D/g, '') : '';
-
-            if (phoneDigits && batchPhones.has(phoneDigits)) {
-              countsRef.current.dup++;
-              continue;
-            }
-            if (phoneDigits) batchPhones.add(phoneDigits);
-
-            try {
-              const savedContact = await saveContact({ 
-                data: { 
-                  name: contactData.name || 'Cliente', 
-                  phone: contactData.phone,
-                  needsReview: !contactData.name || !contactData.phone,
-                  reviewReason: (!contactData.name || !contactData.phone) ? 'Dados incompletos' : null,
-                  rawData: contactData || null
-                } 
-              });
-              
-              if (savedContact.needs_review) countsRef.current.rev++;
-              else countsRef.current.new++;
-            } catch (err: any) {
-              if (err.message === 'DUPLICATE_CONTACT') {
+              if (phoneDigits && batchPhones.has(phoneDigits)) {
                 countsRef.current.dup++;
-              } else {
-                countsRef.current.rev++;
-                throw err;
+                continue;
+              }
+              if (phoneDigits) batchPhones.add(phoneDigits);
+
+              try {
+                const savedContact = await saveContact({ 
+                  data: { 
+                    name: contactData.name || 'Cliente', 
+                    phone: contactData.phone,
+                    needsReview: !contactData.name || !contactData.phone,
+                    reviewReason: (!contactData.name || !contactData.phone) ? 'Dados incompletos' : null,
+                    rawData: contactData || null
+                  } 
+                });
+                
+                if (savedContact.needs_review) countsRef.current.rev++;
+                else countsRef.current.new++;
+              } catch (err: any) {
+                if (err.message === 'DUPLICATE_CONTACT') {
+                  countsRef.current.dup++;
+                } else {
+                  countsRef.current.rev++;
+                  throw err;
+                }
               }
             }
+            
+            countsRef.current.processed++;
+            setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'completed' } : q));
+            
+          } catch (err: any) {
+            if (err.status === 429) {
+              const wait = err.retryAfter || 60;
+              console.warn(`[429] Limite atingido para ${item.file.name}. Aguardando ${wait}s...`);
+              
+              setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'waiting_limit', retryCount: (q.retryCount || 0) + 1 } : q));
+              
+              setIsWaiting(true);
+              // Definimos o maior tempo de espera se múltiplos 429 ocorrerem
+              setWaitTime(prev => Math.max(prev, wait));
+              return;
+            }
+
+            // Tratamento de Erro Definitivo
+            const retryCount = item.retryCount || 0;
+            if (retryCount < 5) {
+               // Erro genérico, tentamos novamente? O usuário pediu tratamento para 429.
+               // Outros erros vamos marcar como final_error ou error
+               setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'final_error', error: err.message } : q));
+            } else {
+               setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'final_error', error: 'Falha após 5 tentativas' } : q));
+            }
+            countsRef.current.rev++;
           }
-          
-          countsRef.current.processed++;
-          setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'completed' } : q));
-          
         } catch (err: any) {
-          console.error(`Erro ao processar ${item.file.name}:`, err);
-          countsRef.current.rev++;
-          setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'error', error: err.message } : q));
+          console.error(`Erro fatal no item ${item.id}:`, err);
+          setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'final_error', error: err.message } : q));
         }
       });
 
       await Promise.all(batchPromises);
       
-      // Atualiza progresso global
-      const processedSoFar = Math.min(i + batchSize, totalItems);
-      setProgress((processedSoFar / totalItems) * 100);
+      // Atualiza progresso baseado em concluídos / total
+      const completedCount = queue.filter(q => q.status === 'completed' || q.status === 'final_error').length;
+      setProgress((completedCount / totalItemsInitial) * 100);
       
-      // Pequena pausa entre lotes para não sobrecarregar
+      // Recalcula itens para processar
+      itemsToProcess = getItemsToProcess();
+      
+      // Pequena pausa entre lotes
       await new Promise(r => setTimeout(r, 1000));
     }
 
@@ -293,7 +314,7 @@ function ContactsPage() {
     setProcessing(false);
     processingRef.current = false;
     queryClient.invalidateQueries({ queryKey: ['contacts'] });
-    toast.success("Processamento de fila concluído");
+    toast.success("Processamento concluído");
   }
 
 
