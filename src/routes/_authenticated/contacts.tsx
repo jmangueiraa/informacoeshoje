@@ -548,11 +548,18 @@ function ContactsPage() {
                             className="h-8 w-8 text-destructive hover:bg-destructive/10"
                             onClick={async () => {
                               if (confirm('Excluir este contato?')) {
-                                const { error } = await supabase.from('contacts').delete().eq('id', contact.id);
-                                if (error) toast.error('Erro ao excluir');
-                                else {
-                                  toast.success('Contato excluído');
-                                  queryClient.invalidateQueries({ queryKey: ['contacts'] });
+                                try {
+                                  const { error } = await supabase.from('contacts').delete().eq('id', contact.id);
+                                  if (error) {
+                                    console.error('[DELETE_ERROR] Falha ao excluir contato:', error);
+                                    toast.error(`Erro ao excluir: ${error.message}`);
+                                  } else {
+                                    toast.success('Contato excluído');
+                                    queryClient.invalidateQueries({ queryKey: ['contacts'] });
+                                  }
+                                } catch (err: any) {
+                                  console.error('[DELETE_CRASH] Erro inesperado ao excluir:', err);
+                                  toast.error('Erro inesperado ao excluir contato');
                                 }
                               }
                             }}
