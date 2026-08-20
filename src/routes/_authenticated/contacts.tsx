@@ -554,9 +554,9 @@ function ContactsPage() {
                     <Button 
                       className="w-full font-bold shadow-sm" 
                       onClick={processImages} 
-                      disabled={queue.length === 0 || queue.every(q => q.status === 'completed' || q.status === 'final_error')}
+                      disabled={queue.length === 0 || queue.every(q => q.status === 'completed' || q.status === 'final_error' || q.status === 'cancelled')}
                     >
-                      {queue.some(q => q.status === 'final_error' || q.status === 'error') ? 'Tentar Erros Novamente' : 'Iniciar Processamento'}
+                      {queue.some(q => q.status === 'final_error' || q.status === 'error' || q.status === 'cancelled') ? 'Retomar / Tentar Novamente' : 'Iniciar Processamento'}
                     </Button>
                   )}
                 </div>
