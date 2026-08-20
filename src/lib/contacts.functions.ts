@@ -38,20 +38,20 @@ export const saveContact = createServerFn({ method: "POST" })
     rawData: z.any().optional()
   }).parse(data))
   .handler(async ({ data, context }) => {
-    const { supabase } = context as any;
+    const { supabase, userId } = context as any;
     
     // Normalização básica para garantir que o telefone esteja limpo antes do banco
     const cleanName = data.name.trim();
     const phoneDigits = data.phone.replace(/\D/g, '');
     
-    console.log(`[CAPTURA] saveContact - Input:`, { 
+    console.log(`[CAPTURA] saveContact - Processando:`, { 
       name: cleanName, 
       phone: phoneDigits, 
-      needsReview: data.needsReview, 
-      reviewReason: data.reviewReason 
+      needsReview: data.needsReview,
+      userId: userId
     });
 
-    // Verificar se já existe (Duplicado)
+    // 1. Verificar se já existe (Duplicado)
     const { data: existing, error: checkError } = await supabase
       .from('contacts')
       .select('id')
@@ -59,37 +59,40 @@ export const saveContact = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (checkError) {
-      console.error(`[CAPTURA] Erro ao verificar duplicidade:`, checkError);
+      console.error(`[CAPTURA] Erro na verificação de duplicidade:`, checkError);
     }
 
     if (existing) {
-      console.log(`[CAPTURA] saveContact - DUPLICATE detected for ${phoneDigits}`);
+      console.log(`[CAPTURA] saveContact - DUPLICADO detectado para ${phoneDigits}`);
       throw new Error('DUPLICATE_CONTACT');
     }
 
-    const { data: contact, error } = await supabase
+    // 2. Montagem do Payload Exato
+    const payload = {
+      name: cleanName,
+      phone_normalized: phoneDigits,
+      needs_review: data.needsReview === true, 
+      review_reason: data.reviewReason || null,
+      raw_data: data.rawData || null,
+      user_id: userId // OBRIGATÓRIO PARA RLS
+    };
+
+    console.log(`[CAPTURA] saveContact - Payload Enviado ao Supabase:`, payload);
+
+    // 3. Inserção
+    const { data: contact, error: insertError } = await supabase
       .from('contacts')
-      .insert([{
-        name: cleanName,
-        phone_normalized: phoneDigits,
-        needs_review: data.needsReview === true, 
-        review_reason: data.reviewReason || null,
-        raw_data: data.rawData || null
-      }])
+      .insert([payload])
       .select()
       .single();
       
-    if (error) {
-      console.error(`[CAPTURA] saveContact - Erro no insert:`, error);
-      throw error;
+    if (insertError) {
+      console.error(`[CAPTURA] Supabase insert response ERROR:`, insertError);
+      // Retornamos um objeto que o frontend consiga interpretar como erro de banco, mas sem quebrar a execução
+      throw new Error(`DB_INSERT_ERROR: ${insertError.message}`);
     }
 
-    console.log(`[CAPTURA] saveContact - Success:`, {
-      id: contact.id,
-      name: contact.name,
-      needs_review: contact.needs_review,
-      status: contact.needs_review ? 'review' : 'new'
-    });
+    console.log(`[CAPTURA] Supabase insert response SUCCESS:`, contact);
 
     return contact;
   });

@@ -218,12 +218,15 @@ function ContactsPage() {
           if (saved.needs_review) revCount++
           else newCount++
         } catch (err: any) {
-          console.error(`[TESTE] Erro ao salvar contato controlado:`, err);
+          console.error(`[TESTE] Erro ao salvar contato controlado:`, err.message);
           if (err.message === 'DUPLICATE_CONTACT') {
             statusSaved = 'duplicate'
             dupCount++
+          } else if (err.message.includes('DB_INSERT_ERROR')) {
+            statusSaved = 'DB_ERROR'
+            revCount++
           } else {
-            statusSaved = 'error'
+            statusSaved = 'ERROR'
             revCount++
           }
         }
