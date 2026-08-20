@@ -4,10 +4,11 @@
  * Isso permite depuração imediata e evita intermediários no servidor para a extração OCR.
  */
 export async function extractContactFromGemini(imageBase64: string, mimeType: string = "image/jpeg") {
-  const apiKey = import.meta.env['VITE_GEMINI_API_KEY'];
+  // No Lovable Cloud, tentamos ler do import.meta.env injetado ou process.env se disponível
+  const apiKey = import.meta.env['VITE_GEMINI_API_KEY'] || (globalThis as any).process?.env?.['GEMINI_API_KEY'];
   
   if (!apiKey) {
-    throw new Error("VITE_GEMINI_API_KEY não configurada no ambiente do frontend.");
+    throw new Error("API Key do Gemini não encontrada. Verifique as configurações de variáveis de ambiente (VITE_GEMINI_API_KEY ou GEMINI_API_KEY).");
   }
 
   // Garante que o base64 está limpo (sem prefixo data:image/...)
