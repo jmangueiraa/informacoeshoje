@@ -390,6 +390,7 @@ function ContactsPage() {
                       <div>Telefone válido: {String(res.isPhoneValid)}</div>
                       <div className="font-bold">Status calculado: {res.statusCalculated}</div>
                       <div className="font-bold">Status banco: {res.statusSaved}</div>
+                      {res.dbDetails && <div className="text-red-600 bg-red-50 p-1 mt-1 rounded border border-red-100 break-all">Erro DB: {res.dbDetails}</div>}
                       <div className="font-bold">Status real: {res.statusSaved === 'duplicate' ? 'duplicate' : (res.statusSaved === 'DB_ERROR' ? 'DB_ERROR' : (res.statusSaved === 'new' ? 'new' : 'review'))}</div>
                     </div>
                   ))}
