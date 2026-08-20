@@ -20,11 +20,30 @@ import { useQuery } from "@tanstack/react-query"
 
 export function AppSidebar() {
   const navigate = useNavigate()
-  const { data: isAdmin } = useQuery({
+  const { data: isAdmin, isLoading: isAdminLoading, refetch } = useQuery({
     queryKey: ['is-admin'],
-    queryFn: () => checkIsAdmin(),
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    queryFn: async () => {
+      console.log("Checking admin status for sidebar...");
+      const result = await checkIsAdmin();
+      console.log("Admin check result:", result);
+      return result;
+    },
+    staleTime: 0,
   })
+
+  // Log status do admin para debug
+  React.useEffect(() => {
+    console.log("AppSidebar Status:", { isAdmin, isAdminLoading, email: 'ajpentretedimento@hotmail.com' });
+  }, [isAdmin, isAdminLoading]);
+  React.useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        refetch();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [refetch]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut()
@@ -91,7 +110,7 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              {isAdmin && (
+              {(isAdmin || isAdminLoading) && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild tooltip="Captura de Contatos">
                     <Link to="/contacts" className="flex items-center gap-3 py-2">
