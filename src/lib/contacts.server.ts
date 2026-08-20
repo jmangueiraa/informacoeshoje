@@ -82,7 +82,7 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
       prompt,
       {
         inlineData: {
-          data: base64Data,
+          data: base64Data || "",
           mimeType: "image/jpeg"
         }
       }
