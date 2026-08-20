@@ -42,28 +42,32 @@ function ContactsPage() {
     let revCount = 0
 
     for (let i = 0; i < files.length; i++) {
-      const file = files[i]
-      const reader = new FileReader()
+      const file = files[i];
+      if (!file) continue;
+
       const base64 = await new Promise<string>((resolve) => {
-        reader.onload = () => resolve(reader.result as string)
-        reader.readAsDataURL(file)
-      })
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
 
       try {
-        const result = await processImageOCR({ imageBase64: base64 })
+        const result = await processImageOCR({ data: { imageBase64: base64 } });
         if (result.needsReview || !result.phone) {
-          revCount++
+          revCount++;
         } else {
           try {
-            await saveContact({ name: result.name || 'Sem nome', phone: result.phone })
-            newCount++
+            await saveContact({ data: { name: result.name || 'Sem nome', phone: result.phone } });
+            newCount++;
           } catch (err) {
-            dupCount++
+            dupCount++;
           }
         }
       } catch (err) {
-        revCount++
+        console.error("Erro ao processar imagem:", err);
+        revCount++;
       }
+
 
       setProgress(((i + 1) / files.length) * 100)
     }
