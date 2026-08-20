@@ -118,7 +118,7 @@ function ContactsPage() {
             normalizedName: contactData.name,
             normalizedPhone: contactData.phone,
             isNameValid: contactData.name.length >= 2 && !contactData.name.toLowerCase().includes("erro"),
-            isPhoneValid: phoneDigits.length >= 10,
+            isPhoneValid: phoneDigits.length >= 8,
             serverStatus: contactData.needsReview ? 'review' : 'valid',
             reviewReason: contactData.reviewReason,
             decisionStep: 'servidor',
