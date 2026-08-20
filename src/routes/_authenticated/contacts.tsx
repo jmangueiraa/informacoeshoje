@@ -126,41 +126,35 @@ function ContactsPage() {
             batchPhones.add(phoneDigits);
           }
 
-          // 2. Persistência com tratamento de status
-          try {
-            const savedContact = await saveContact({ 
-              data: { 
-                name: contactData.name || 'Cliente', 
-                phone: contactData.phone,
-                needsReview: !contactData.name || !contactData.phone,
-                reviewReason: (!contactData.name || !contactData.phone) ? 'Dados incompletos na extração' : null,
-                rawData: contactData || null,
-
-                status: 'new'
-              } 
-            });
-            
-            // Sucesso na gravação
-            if (savedContact.needs_review) {
-              revCount++;
-            } else {
-              newCount++;
+            // 2. Persistência com tratamento de status
+            try {
+              const savedContact = await saveContact({ 
+                data: { 
+                  name: contactData.name || 'Cliente', 
+                  phone: contactData.phone,
+                  needsReview: !contactData.name || !contactData.phone,
+                  reviewReason: (!contactData.name || !contactData.phone) ? 'Dados incompletos na extração' : null,
+                  rawData: contactData || null,
+                  status: 'new'
+                } 
+              });
+              
+              // Sucesso na gravação
+              if (savedContact.needs_review) {
+                revCount++;
+              } else {
+                newCount++;
+              }
+            } catch (err: any) {
+              if (err.message === 'DUPLICATE_CONTACT') {
+                console.log(`[IMPORT] Duplicata no banco detectada para: ${phoneDigits}`);
+                dupCount++;
+              } else {
+                console.error(`[IMPORT_ERROR] Falha na gravação do contato:`, err);
+                revCount++;
+                toast.error(`Erro ao salvar contato ${contactData.name}: ${err.message}`);
+              }
             }
-            currentDebug.statusSavedInDB = savedContact.needs_review ? 'review' : 'new';
-          } catch (err: any) {
-            if (err.message === 'DUPLICATE_CONTACT') {
-              console.log(`[IMPORT] Duplicata no banco detectada para: ${phoneDigits}`);
-              dupCount++;
-              currentDebug.statusSavedInDB = 'duplicate';
-            } else {
-              console.error(`[IMPORT_ERROR] Falha na gravação do contato:`, err);
-              revCount++;
-              currentDebug.statusSavedInDB = 'error';
-              toast.error(`Erro ao salvar contato ${contactData.name}: ${err.message}`);
-            }
-          }
-          
-          setDebugData(currentDebug);
         }
       } catch (err: any) {
         console.error("[IMPORT_ERROR]:", err);
