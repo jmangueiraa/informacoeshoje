@@ -490,17 +490,24 @@ function ContactsPage() {
                         "flex items-center justify-between text-[11px] p-2 rounded border transition-colors bg-background",
                         item.status === 'processing' && "border-primary bg-primary/5",
                         item.status === 'completed' && "border-green-200 bg-green-50/30",
-                        item.status === 'error' && "border-red-200 bg-red-50/30"
+                        item.status === 'waiting_limit' && "border-yellow-200 bg-yellow-50/30",
+                        (item.status === 'error' || item.status === 'final_error') && "border-red-200 bg-red-50/30"
                       )}>
                         <div className="flex items-center gap-2 truncate flex-1">
                           {item.status === 'processing' && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
-                          {item.status === 'completed' && <CheckCircle2 className="h-3 w-3 text-green-500" />}
-                          {item.status === 'error' && <AlertTriangle className="h-3 w-3 text-red-500" />}
-                          {item.status === 'pending' && <Clock className="h-3 w-3 text-muted-foreground" />}
-                          <span className="truncate">{item.file.name}</span>
+                          {item.status === 'completed' && <span title="Concluída">🟢</span>}
+                          {item.status === 'waiting_limit' && <span title="Aguardando limite da API">🟡</span>}
+                          {item.status === 'pending' && <span title="Pendente">⚪</span>}
+                          {(item.status === 'error' || item.status === 'final_error') && <span title="Erro definitivo">🔴</span>}
+                          <span className="truncate ml-1">{item.file.name}</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          {item.status === 'error' && (
+                          {item.status === 'waiting_limit' && (
+                            <span className="text-[9px] text-yellow-600 font-bold uppercase animate-pulse">
+                              Aguardando Limite
+                            </span>
+                          )}
+                          {(item.status === 'error' || item.status === 'final_error') && (
                             <span className="text-[9px] text-red-500 font-medium italic truncate max-w-[80px]">
                               {item.error}
                             </span>
