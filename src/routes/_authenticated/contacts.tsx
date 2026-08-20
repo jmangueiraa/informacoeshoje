@@ -218,12 +218,15 @@ function ContactsPage() {
           if (saved.needs_review) revCount++
           else newCount++
         } catch (err: any) {
-          console.error(`[TESTE] Erro ao salvar contato controlado:`, err);
+          console.error(`[TESTE] Erro ao salvar contato controlado:`, err.message);
           if (err.message === 'DUPLICATE_CONTACT') {
             statusSaved = 'duplicate'
             dupCount++
+          } else if (err.message.includes('DB_INSERT_ERROR')) {
+            statusSaved = 'DB_ERROR'
+            revCount++
           } else {
-            statusSaved = 'error'
+            statusSaved = 'ERROR'
             revCount++
           }
         }
@@ -382,7 +385,7 @@ function ContactsPage() {
                       <div>Telefone válido: {String(res.isPhoneValid)}</div>
                       <div className="font-bold">Status calculado: {res.statusCalculated}</div>
                       <div className="font-bold">Status banco: {res.statusSaved}</div>
-                      <div className="font-bold">Status frontend: {res.statusSaved === 'duplicate' ? 'duplicate' : (res.statusCalculated === 'new' ? 'new' : 'review')}</div>
+                      <div className="font-bold">Status real: {res.statusSaved === 'duplicate' ? 'duplicate' : (res.statusSaved === 'DB_ERROR' ? 'DB_ERROR' : (res.statusSaved === 'new' ? 'new' : 'review'))}</div>
                     </div>
                   ))}
                   
