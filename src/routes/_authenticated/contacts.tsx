@@ -106,7 +106,7 @@ function ContactsPage() {
         }
 
         for (const contactData of extractedContacts) {
-          const phoneDigits = contactData.phone ? contactData.phone.replace(/\D/g, '') : '';
+          const phoneDigits = contactData.phone ? String(contactData.phone).replace(/\D/g, '') : '';
 
           const currentDebug: any = {
             filename: file.name,
@@ -115,7 +115,7 @@ function ContactsPage() {
             extractedPhone: contactData.phone,
             normalizedName: contactData.name,
             normalizedPhone: contactData.phone,
-            isNameValid: contactData.name.length >= 2 && !contactData.name.toLowerCase().includes("erro"),
+            isNameValid: contactData.name && contactData.name.length >= 2 && !contactData.name.toLowerCase().includes("erro"),
             isPhoneValid: phoneDigits.length >= 8,
             serverStatus: contactData.needsReview ? 'review' : 'valid',
             reviewReason: contactData.reviewReason || 'Extração direta',
