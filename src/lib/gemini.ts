@@ -15,76 +15,79 @@ export async function extractContactFromGemini(imageBase64: string, mimeType: st
   // Garante que o base64 está limpo (sem prefixo data:image/...)
   const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
 
-  // Lista de modelos para tentativa de fallback
-  // Modelo recomendado: gemini-3.6-flash
-  const models = ["gemini-3.6-flash"];
-  let lastError = "";
 
-  for (const model of models) {
-    try {
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const model = "gemini-3.6-flash";
+  try {
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: "Você é um leitor de etiquetas e telas de pedidos/entrega da Shopee. Encontre o nome do destinatário/recebedor em 'Informações do recebedor' e o número de telefone com DDD. Retorne ESTRITAMENTE um JSON no formato: {\"name\": \"Nome\", \"phone\": \"Telefone com DDD\"}. Se houver múltiplos, retorne um array de objetos JSON."
-                },
-                {
-                  inlineData: {
-                    mimeType: mimeType,
-                    data: cleanBase64
-                  }
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: "Você é um leitor de etiquetas e telas de pedidos/entrega da Shopee. Encontre o nome do destinatário/recebedor em 'Informações do recebedor' e o número de telefone com DDD. Retorne ESTRITAMENTE um JSON no formato: {\"name\": \"Nome\", \"phone\": \"Telefone com DDD\"}. Se houver múltiplos, retorne um array de objetos JSON."
+              },
+              {
+                inlineData: {
+                  mimeType: mimeType,
+                  data: cleanBase64
                 }
-              ]
-            }
-          ],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.1
+              }
+            ]
           }
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        // Se for 404 (modelo não encontrado) ou 400 (parâmetro inválido para o modelo), tenta o próximo
-        if (response.status === 404 || response.status === 400) {
-          console.warn(`Modelo ${model} não disponível ou não suportado. Tentando fallback...`);
-          lastError = `Erro Gemini (${response.status} no modelo ${model}): ${errorText}`;
-          continue;
+        ],
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: 0.1
         }
-        throw new Error(`Erro Gemini (${response.status}): ${errorText}`);
-      }
+      })
+    });
 
-      const result = await response.json();
-      const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
       
-      if (!rawText) {
-        throw new Error("A IA não retornou nenhum texto processável.");
+      if (response.status === 429) {
+        // Tenta extrair retryDelay: "44s"
+        let retrySeconds = 60;
+        const details = errorData.error?.details || [];
+        const quotaFailure = details.find((d: any) => d.retryDelay);
+        
+        if (quotaFailure && quotaFailure.retryDelay) {
+          const match = quotaFailure.retryDelay.match(/(\d+)s/);
+          if (match) retrySeconds = parseInt(match[1], 10);
+        }
+
+        const error: any = new Error("RESOURCE_EXHAUSTED");
+        error.status = 429;
+        error.retryAfter = retrySeconds;
+        throw error;
       }
 
-      try {
-        const parsed = JSON.parse(rawText);
-        return Array.isArray(parsed) ? parsed : [parsed];
-      } catch (e) {
-        console.error("Falha ao parsear JSON da IA:", rawText);
-        throw new Error("A IA retornou um formato inválido: " + rawText.substring(0, 100));
-      }
-    } catch (err: any) {
-      if (err.message.includes("IA não retornou") || err.message.includes("formato inválido")) {
-        throw err;
-      }
-      lastError = err.message;
-      console.error(`Erro na tentativa com ${model}:`, err);
+      throw new Error(`Erro Gemini (${response.status}): ${errorData.error?.message || JSON.stringify(errorData)}`);
     }
-  }
 
-  throw new Error(`Falha em todos os modelos do Gemini. Último erro: ${lastError}`);
+    const result = await response.json();
+    const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!rawText) {
+      throw new Error("A IA não retornou nenhum texto processável.");
+    }
+
+    try {
+      const parsed = JSON.parse(rawText);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch (e) {
+      console.error("Falha ao parsear JSON da IA:", rawText);
+      throw new Error("A IA retornou um formato inválido: " + rawText.substring(0, 100));
+    }
+  } catch (err: any) {
+    console.error(`Erro na chamada Gemini:`, err);
+    throw err;
+  }
 }
+

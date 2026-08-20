@@ -95,7 +95,12 @@ export const saveContact = createServerFn({ method: "POST" })
     let cleanName = sanitizedName;
     if (sanitizedName !== nextSequentialName) {
       const firstName = sanitizedName.split(' ')[0] || "Cliente";
-      cleanName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+      const cleaned = firstName.replace(/[^a-zA-ZÀ-ÿ]/g, '');
+      if (cleaned.length < 3) {
+        cleanName = nextSequentialName;
+      } else {
+        cleanName = cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
+      }
     }
     
     const phoneDigits = data.phone.replace(/\D/g, '');

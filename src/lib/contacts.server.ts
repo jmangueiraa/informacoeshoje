@@ -155,7 +155,12 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
         cleanName = "ILEGÍVEL"; 
       } else {
         const firstName = sanitized.split(' ')[0] || "";
-        cleanName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+        const cleaned = firstName.replace(/[^a-zA-ZÀ-ÿ]/g, '');
+        if (cleaned.length < 3) {
+          cleanName = "ILEGÍVEL";
+        } else {
+          cleanName = cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
+        }
       }
       
       const isNameIllegible = cleanName === "ILEGÍVEL";
