@@ -237,15 +237,14 @@ export const runControlledTest = createServerFn({ method: "POST" })
     let needsReview = false;
     let reviewReason = "";
 
-    if (!isNameValid) {
-      needsReview = true;
-      reviewReason = "Nome não identificado claramente";
+    if (isNameIllegible) {
+      needsReview = !isPhoneValid;
+      reviewReason = isPhoneValid ? "" : "Nome ilegível e telefone inválido";
     } else if (!isPhoneValid) {
+      needsReview = true;
       if (phoneResult.normalized.length >= 8 && phoneResult.normalized.length < 10) {
-        needsReview = true;
         reviewReason = "Telefone capturado sem DDD";
       } else {
-        needsReview = true;
         reviewReason = phoneResult.reason || "Telefone inválido";
       }
     }
@@ -255,7 +254,7 @@ export const runControlledTest = createServerFn({ method: "POST" })
       phone: phoneResult.normalized,
       needsReview,
       reviewReason,
-      isNameValid,
+      isNameValid: !isNameIllegible,
       isPhoneValid,
       user_id: userId,
       raw_data: { test: true, originalName: data.name, originalPhone: data.phone }
