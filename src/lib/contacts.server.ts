@@ -161,11 +161,7 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
       reviewReason = "";
     }
 
-    // Se o telefone for capturado MAS for curto, ainda salvamos mas pedimos revisão
-    if (!isPhoneValid && phoneResult.normalized.length >= 8) {
-       finalNeedsReview = true;
-       reviewReason = "Telefone capturado sem DDD";
-    }
+    // O bloco redundante foi removido e integrado na lógica acima.
 
     return {
       name: cleanName || "Cliente",
