@@ -11,7 +11,12 @@ export const getContacts = createServerFn({ method: "GET" })
       .select('*')
       .order('created_at', { ascending: false });
       
-    if (error) throw error;
+    if (error) {
+      console.error("[CAPTURA] Erro ao buscar contatos:", error);
+      throw error;
+    }
+    
+    console.log(`[CAPTURA] getContacts - Total retornados: ${data?.length || 0}`);
     return data;
   });
 
