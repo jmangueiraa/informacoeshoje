@@ -105,24 +105,39 @@ export const getDashboardStats = createServerFn({ method: "GET" })
       .select("id, clicks_count, status")
       .eq("user_id", userId);
 
-    const totalClicks = links?.reduce((acc, curr) => acc + (Number(curr.clicks_count) || 0), 0) || 0;
-    const activeLinks = links?.filter(l => l.status === 'active').length || 0;
-
-    // Cliques nas últimas 24h
-    const today = new Date();
-    today.setHours(today.getHours() - 24); // Mudança para "últimas 24h" reais em vez de "hoje 00:00"
-
-    const linkIds = links?.map(l => l.id) || [];
+    // Total de cliques únicos acumulados nos links do usuário
+    // O valor correto de "Cliques Totais" deve ser a soma de cliques brutos ou únicos? 
+    // O usuário estranhou que o total (10) era menor que os das últimas 24h (16).
+    // Isso acontece porque estamos usando o contador de cliques ÚNICOS no total, mas Cliques Hoje conta tudo.
+    // Vamos padronizar: Cliques Totais = Soma de todos os registros na tabela clicks para os links do usuário.
     
+    const linkIds = links?.map(l => l.id) || [];
+    let totalClicks = 0;
     let clicksToday = 0;
+
     if (linkIds.length > 0) {
-      const { count } = await authenticatedSupabase
+      // Total de cliques brutos (registros na tabela clicks)
+      const { count: totalRaw } = await authenticatedSupabase
+        .from("clicks")
+        .select("*", { count: 'exact', head: true })
+        .in("link_id", linkIds);
+      
+      totalClicks = totalRaw || 0;
+
+      // Cliques nas últimas 24h (brutos)
+      const today = new Date();
+      today.setHours(today.getHours() - 24);
+
+      const { count: rawToday } = await authenticatedSupabase
         .from("clicks")
         .select("*", { count: 'exact', head: true })
         .in("link_id", linkIds)
         .gte("clicked_at", today.toISOString());
-      clicksToday = count || 0;
+      
+      clicksToday = rawToday || 0;
     }
+
+    const activeLinks = links?.filter(l => l.status === 'active').length || 0;
 
     return {
       totalLinks: totalLinks || 0,
