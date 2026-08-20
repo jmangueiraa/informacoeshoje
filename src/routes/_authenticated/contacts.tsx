@@ -6,8 +6,10 @@ import { Progress } from '@/components/ui/progress'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getContacts, processImageOCR, saveContact, runControlledTest } from '@/lib/contacts.functions'
+import { getContacts, saveContact, runControlledTest } from '@/lib/contacts.functions'
+import { extractContactFromGemini } from '@/lib/gemini'
 import { formatPhone } from '@/lib/utils'
+
 import { Trash2, Phone, Upload, CheckCircle2, AlertCircle, X, Search, Beaker } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/integrations/supabase/client'
@@ -90,16 +92,12 @@ function ContactsPage() {
         console.log(`[IMPORT] Iniciando extração do arquivo: ${file.name} (tipo: ${file.type}, tamanho: ${file.size})`);
         
         const base64Data = base64.split(',')[1] || base64;
-        const response = await processImageOCR({ 
-          data: { 
-            imageBase64: base64Data, 
-            filename: file.name,
-            mimeType: file.type || 'image/jpeg'
-          } 
-        });
-        console.log(`[IMPORT] Resposta da extração para ${file.name}:`, response);
         
-        const extractedContacts = response.contacts || [];
+        // Chamada direta ao Gemini no frontend
+        const extractedContacts = await extractContactFromGemini(base64Data, file.type || 'image/jpeg');
+        
+        console.log(`[IMPORT] Contatos extraídos via Gemini Frontend para ${file.name}:`, extractedContacts);
+
 
         if (extractedContacts.length === 0) {
           revCount++;
@@ -108,7 +106,7 @@ function ContactsPage() {
         }
 
         for (const contactData of extractedContacts) {
-          const phoneDigits = contactData.phone ? contactData.phone.replace(/\D/g, '') : '';
+          const phoneDigits = contactData.phone ? String(contactData.phone).replace(/\D/g, '') : '';
 
           const currentDebug: any = {
             filename: file.name,
@@ -117,12 +115,13 @@ function ContactsPage() {
             extractedPhone: contactData.phone,
             normalizedName: contactData.name,
             normalizedPhone: contactData.phone,
-            isNameValid: contactData.name.length >= 2 && !contactData.name.toLowerCase().includes("erro"),
+            isNameValid: contactData.name && contactData.name.length >= 2 && !contactData.name.toLowerCase().includes("erro"),
             isPhoneValid: phoneDigits.length >= 8,
             serverStatus: contactData.needsReview ? 'review' : 'valid',
-            reviewReason: contactData.reviewReason,
-            decisionStep: 'servidor',
-            decisionRule: `needsReview === ${contactData.needsReview}`
+            reviewReason: contactData.reviewReason || 'Extração direta',
+            decisionStep: 'frontend-gemini',
+            decisionRule: 'Chamada Direta Gemini API'
+
           };
 
           // 1. Verificar duplicata no mesmo lote
@@ -144,9 +143,10 @@ function ContactsPage() {
               data: { 
                 name: contactData.name || 'Cliente', 
                 phone: contactData.phone,
-                needsReview: !!contactData.needsReview,
-                reviewReason: contactData.reviewReason || null,
-                rawData: contactData.raw_data || null,
+                needsReview: !contactData.name || !contactData.phone,
+                reviewReason: (!contactData.name || !contactData.phone) ? 'Dados incompletos na extração' : null,
+                rawData: contactData || null,
+
                 status: 'new'
               } 
             });
