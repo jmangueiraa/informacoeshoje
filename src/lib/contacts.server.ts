@@ -44,16 +44,15 @@ export function normalizeBrazilianPhone(phone: string | null | undefined): { nor
 }
 
 export async function analyzeImageForContacts(imageBase64: string, filename: string = "arquivo_upload.jpg") {
-  console.log(`\n========== CAPTURA DEBUG ==========\n1. ARQUIVO:\n   nome: ${filename}\n   tamanho: ~${Math.round(imageBase64.length * 0.75 / 1024)} KB`);
+  console.log(`\n========== CAPTURA GEMINI DEBUG ==========\n1. ARQUIVO:\n   nome: ${filename}\n   tamanho: ~${Math.round(imageBase64.length * 0.75 / 1024)} KB`);
   
-  const apiKey = process.env['LOVABLE_API_KEY'];
+  const apiKey = process.env['GEMINI_API_KEY'];
   if (!apiKey) {
-    console.error("10. LOCAL DA DECISÃO: analyzeImageForContacts - Erro: API Key ausente");
+    console.error("10. LOCAL DA DECISÃO: analyzeImageForContacts - Erro: GEMINI_API_KEY ausente");
     return {
-      name: "Erro de Configuração",
-      phone: "",
+      contacts: [],
       needsReview: true,
-      reviewReason: "Configuração de IA ausente"
+      reviewReason: "Configuração de IA (Gemini) ausente"
     };
   }
 
@@ -62,136 +61,105 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
     : imageBase64;
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `Você é um especialista em OCR e extração de dados para logística da SHOPEE.
-            Sua única tarefa é extrair NOME e TELEFONE do DESTINATÁRIO das imagens enviadas.
+    const { GoogleGenerativeAI } = await import("@google/generative-ai");
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-            INSTRUÇÕES TÉCNICAS:
-            1. IDENTIFICAÇÃO DO DESTINATÁRIO: Procure por "Destinatário:", "Consumidor:", "Recebedor:", ou pelo nome que geralmente aparece na metade superior esquerda de uma etiqueta de envio.
-            2. NOME: Extraia o nome completo. Remova sufixos como (1/2) ou códigos estranhos se possível. Limpe underscore (_).
-            3. TELEFONE: Procure por sequências numéricas de 10 a 11 dígitos. Muitas vezes aparece perto do nome ou em um campo "Telefone:".
-            4. Se o telefone tiver 8 ou 9 dígitos sem DDD, retorne apenas os dígitos.
-            5. IGNORE dados do Remetente.
+    const prompt = `Você é um especialista em OCR e extração de dados para logística da SHOPEE.
+    Sua única tarefa é extrair NOME e TELEFONE do DESTINATÁRIO das imagens enviadas.
 
-            RETORNO OBRIGATÓRIO (JSON):
-            {
-              "name": "NOME DO CLIENTE",
-              "phone": "SOMENTE DÍGITOS",
-              "confidence": 0.0 a 1.0,
-              "is_logistics_label": true/false
-            }`
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Extraia o nome e telefone do destinatário desta imagem de logística:"
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:image/jpeg;base64,${base64Data}`
-                }
-              }
-            ]
-          }
-        ],
-        response_format: { type: "json_object" }
-      }),
-    });
+    INSTRUÇÕES TÉCNICAS:
+    1. IDENTIFICAÇÃO DO DESTINATÁRIO: Procure por "Destinatário:", "Consumidor:", "Recebedor:", ou pelo nome que geralmente aparece na metade superior esquerda de uma etiqueta de envio.
+    2. NOME: Extraia o nome completo. Remova sufixos como (1/2) ou códigos estranhos.
+    3. TELEFONE: Procure por sequências numéricas de 10 a 11 dígitos. Muitas vezes aparece perto do nome.
+    4. Se a imagem não contiver dados legíveis, retorne campos vazios "".
+    5. Se houver múltiplos contatos, retorne uma lista.
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`10. LOCAL DA DECISÃO: analyzeImageForContacts - Erro API IA (${response.status})`);
-      return {
-        name: "",
-        phone: "",
-        needsReview: true,
-        reviewReason: "Falha na comunicação com o provedor de IA",
-        raw_data: { error: true, status: response.status }
-      };
-    }
+    RETORNO OBRIGATÓRIO: Retorne ESTRITAMENTE um JSON estruturado (sem blocos de código markdown ou texto extra).
+    Formato: [ { "name": "Nome do Cliente", "phone": "apenas números" } ]`;
 
-    const result = await response.json();
-    let rawContent = result.choices[0].message.content;
-    console.log("[IMPORT] Resposta bruta da IA:", rawContent);
+    const result = await model.generateContent([
+      prompt,
+      {
+        inlineData: {
+          data: base64Data,
+          mimeType: "image/jpeg"
+        }
+      }
+    ]);
+
+    let rawContent = result.response.text();
+    console.log("[IMPORT] Resposta bruta do Gemini:", rawContent);
     
-    // Sanitização de JSON caso venha com markdown blocks (```json ... ```)
+    // Sanitização rigorosa de JSON
     if (rawContent.includes("```")) {
       rawContent = rawContent.replace(/```json/g, "").replace(/```/g, "").trim();
     }
-
-    const content = JSON.parse(rawContent);
-    const rawName = content.name || "";
-    const rawPhone = content.phone || "";
     
-    console.log(`3. DADOS EXTRAÍDOS PELA IA:\n   nome = ${rawName}\n   telefone = ${rawPhone}`);
-
-    // Normalização agressiva
-    const phoneResult = normalizeBrazilianPhone(rawPhone);
-    const cleanName = rawName.replace(/[_*]/g, " ").replace(/\s+/g, " ").trim();
-    
-    // Validação de nome: Mínimo 2 caracteres, ignora strings de erro
-    const isErrorString = (s: string) => ["erro na ia", "null", "undefined", "cliente"].includes(s.toLowerCase());
-    const isNameValid = cleanName.length >= 2 && !isErrorString(cleanName) && !cleanName.toLowerCase().includes("shopee");
-    const isPhoneValid = phoneResult.isValid;
-    
-    console.log(`4. PÓS-PROCESSAMENTO:\n   nome limpo = ${cleanName}\n   telefone normalizado = ${phoneResult.normalized}`);
-    console.log(`5. VALIDAÇÃO:\n   nome ok = ${isNameValid}\n   telefone ok = ${isPhoneValid}`);
-
-    // LOGICA DE REVISÃO
-    // LOGICA DE REVISÃO (MUITO IMPORTANTE)
-    let finalNeedsReview = false;
-    let reviewReason = "";
-
-    if (!isNameValid) {
-      finalNeedsReview = true;
-      reviewReason = "Nome não identificado claramente";
-    } else if (!isPhoneValid) {
-      // Se tiver pelo menos 8 dígitos, aceitamos salvar mas pedimos revisão para colocar DDD
-      if (phoneResult.normalized.length >= 8 && phoneResult.normalized.length < 10) {
-        finalNeedsReview = true;
-        reviewReason = "Telefone capturado sem DDD";
-      } else {
-        finalNeedsReview = true;
-        reviewReason = phoneResult.reason || "Telefone inválido";
+    // Às vezes o Gemini retorna apenas um objeto em vez de um array se houver apenas um contato.
+    // Vamos garantir que seja um array.
+    let contactsData: any[] = [];
+    try {
+      const parsed = JSON.parse(rawContent);
+      contactsData = Array.isArray(parsed) ? parsed : [parsed];
+    } catch (e) {
+      console.error("[IMPORT] Erro ao parsear JSON do Gemini:", e);
+      // Fallback: tentar encontrar JSON no texto se houver lixo em volta
+      const jsonMatch = rawContent.match(/\[.*\]|\{.*\}/s);
+      if (jsonMatch) {
+        const parsedMatch = JSON.parse(jsonMatch[0]);
+        contactsData = Array.isArray(parsedMatch) ? parsedMatch : [parsedMatch];
       }
-    } else {
-      // Nome válido (>= 3 chars) E Telefone válido (10-11 dígitos)
-      // REGRA DE OURO: Não vai para revisão se ambos forem válidos.
-      finalNeedsReview = false;
-      reviewReason = "";
     }
 
-    // O bloco redundante foi removido e integrado na lógica acima.
+    const processedContacts = contactsData.map(content => {
+      const rawName = content.name || "";
+      const rawPhone = content.phone || "";
+      
+      const phoneResult = normalizeBrazilianPhone(rawPhone);
+      const cleanName = rawName.replace(/[_*]/g, " ").replace(/\s+/g, " ").trim();
+      
+      const isErrorString = (s: string) => ["erro", "null", "undefined", "cliente", "desconhecido"].includes(s.toLowerCase());
+      const isNameValid = cleanName.length >= 2 && !isErrorString(cleanName) && !cleanName.toLowerCase().includes("shopee");
+      const isPhoneValid = phoneResult.isValid;
+
+      let finalNeedsReview = false;
+      let reviewReason = "";
+
+      if (!isNameValid) {
+        finalNeedsReview = true;
+        reviewReason = "Nome não identificado claramente";
+      } else if (!isPhoneValid) {
+        if (phoneResult.normalized.length >= 8 && phoneResult.normalized.length < 10) {
+          finalNeedsReview = true;
+          reviewReason = "Telefone capturado sem DDD";
+        } else {
+          finalNeedsReview = true;
+          reviewReason = phoneResult.reason || "Telefone inválido";
+        }
+      }
+
+      return {
+        name: cleanName || "Cliente",
+        phone: phoneResult.normalized,
+        needsReview: finalNeedsReview,
+        reviewReason: reviewReason,
+        raw_data: content
+      };
+    });
 
     return {
-      name: cleanName || "Cliente",
-      phone: phoneResult.normalized,
-      needsReview: finalNeedsReview,
-      reviewReason: reviewReason,
-      raw_data: content
+      contacts: processedContacts,
+      needsReview: processedContacts.length === 0,
+      reviewReason: processedContacts.length === 0 ? "Nenhum contato legível encontrado" : ""
     };
 
   } catch (error) {
-    console.error("10. LOCAL DA DECISÃO: analyzeImageForContacts - Exceção crítica");
+    console.error("10. LOCAL DA DECISÃO: analyzeImageForContacts - Exceção Gemini:", error);
     return {
-      name: "",
-      phone: "",
+      contacts: [],
       needsReview: true,
-      reviewReason: "Erro interno no processamento da imagem",
-      raw_data: { exception: true, message: error instanceof Error ? error.message : String(error) }
+      reviewReason: "Erro no processamento Gemini: " + (error instanceof Error ? error.message : String(error))
     };
   }
 }
