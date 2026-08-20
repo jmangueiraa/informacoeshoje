@@ -14,7 +14,7 @@ export async function analyzeImageForContacts(imageBase64: string) {
 
   try {
     // Attempting the most standard AI Gateway endpoint for TanStack Start
-    const response = await fetch("https://api.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
