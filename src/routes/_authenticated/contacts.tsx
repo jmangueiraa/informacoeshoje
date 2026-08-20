@@ -496,11 +496,12 @@ function ContactsPage() {
                           <TableCell><div className="h-4 w-32 bg-muted animate-pulse rounded" /></TableCell>
                           <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded" /></TableCell>
                           <TableCell><div className="h-8 w-full bg-muted animate-pulse rounded" /></TableCell>
+                          <TableCell><div className="h-8 w-full bg-muted animate-pulse rounded" /></TableCell>
                         </TableRow>
                       ))
                     ) : filteredContacts?.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} className="h-32 text-center text-muted-foreground">
+                        <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
                           {searchTerm ? 'Nenhum contato encontrado para esta busca.' : 'Nenhum contato capturado ainda.'}
                         </TableCell>
                       </TableRow>
@@ -536,7 +537,7 @@ function ContactsPage() {
                               </span>
                             )}
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right flex items-center justify-end gap-2">
                             <Button 
                               variant="outline" 
                               size="sm" 
@@ -545,6 +546,23 @@ function ContactsPage() {
                             >
                               <Phone className="h-3.5 w-3.5" />
                               WhatsApp
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                              onClick={async () => {
+                                if (confirm('Excluir este contato?')) {
+                                  const { error } = await supabase.from('contacts').delete().eq('id', contact.id);
+                                  if (error) toast.error('Erro ao excluir');
+                                  else {
+                                    toast.success('Contato excluído');
+                                    queryClient.invalidateQueries({ queryKey: ['contacts'] });
+                                  }
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </TableCell>
                         </TableRow>
