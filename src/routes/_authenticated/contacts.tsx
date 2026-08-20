@@ -229,7 +229,9 @@ function ContactsPage() {
           if (isWaiting) {
             setIsWaiting(false);
             setIsApiReleased(true);
-            setTimeout(() => setIsApiReleased(false), 3000);
+            setTimeout(() => {
+              setIsApiReleased(false);
+            }, 3000);
           }
 
           if (!extractedContacts || extractedContacts.length === 0) {
