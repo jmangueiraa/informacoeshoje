@@ -105,7 +105,7 @@ function ContactsPage() {
     queryClient.invalidateQueries({ queryKey: ['contacts'] })
   }
 
-  const filteredContacts = contacts?.filter(c => 
+  const filteredContacts = contacts?.filter((c: any) => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     c.phone_normalized.includes(searchTerm)
   )
@@ -261,7 +261,7 @@ function ContactsPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredContacts?.map((contact) => (
+                      filteredContacts?.map((contact: any) => (
                         <TableRow key={contact.id} className="group hover:bg-muted/30 transition-colors">
                           <TableCell className="font-medium">{contact.name}</TableCell>
                           <TableCell>

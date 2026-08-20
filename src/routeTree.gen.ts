@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SlugRouteImport } from './routes/$slug'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
-import { Route as TestAiRouteRouteImport } from './routes/test-ai-route'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedContactsRouteImport } from './routes/_authenticated/contacts'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -34,11 +33,6 @@ const SlugRoute = SlugRouteImport.update({
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TestAiRouteRoute = TestAiRouteRouteImport.update({
-  id: '/test-ai-route',
-  path: '/test-ai-route',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
@@ -87,7 +81,6 @@ const AuthenticatedAdminDomainsRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
-  '/test-ai-route': typeof TestAiRouteRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/contacts': typeof AuthenticatedContactsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -100,7 +93,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
-  '/test-ai-route': typeof TestAiRouteRoute
   '/contacts': typeof AuthenticatedContactsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/links': typeof AuthenticatedLinksRoute
@@ -114,7 +106,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
-  '/test-ai-route': typeof TestAiRouteRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/contacts': typeof AuthenticatedContactsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -129,7 +120,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/$slug'
-    | '/test-ai-route'
     | '/admin'
     | '/contacts'
     | '/dashboard'
@@ -142,7 +132,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/$slug'
-    | '/test-ai-route'
     | '/contacts'
     | '/dashboard'
     | '/links'
@@ -155,7 +144,6 @@ export interface FileRouteTypes {
     | '/'
     | '/$slug'
     | '/_authenticated'
-    | '/test-ai-route'
     | '/_authenticated/admin'
     | '/_authenticated/contacts'
     | '/_authenticated/dashboard'
@@ -170,7 +158,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SlugRoute: typeof SlugRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
-  TestAiRouteRoute: typeof TestAiRouteRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -194,13 +181,6 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/test-ai-route': {
-      id: '/test-ai-route'
-      path: '/test-ai-route'
-      fullPath: '/test-ai-route'
-      preLoaderRoute: typeof TestAiRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin': {
@@ -301,7 +281,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SlugRoute: SlugRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
-  TestAiRouteRoute: TestAiRouteRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
