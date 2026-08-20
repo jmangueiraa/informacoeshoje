@@ -106,11 +106,10 @@ export const runControlledTest = createServerFn({ method: "POST" })
     name: z.string(),
     phone: z.string()
   }).parse(data))
-  .handler(async ({ data }) => {
-    const { analyzeImageForContacts } = await import("./contacts.server");
+  .handler(async ({ data, context }) => {
+    const { userId } = context as any;
     
-    // Mocking the result that would come from OCR/IA but controlled
-    // We bypass the actual IA call but use the SAME normalization and classification logic
+    // Bypass OCR call but use SAME normalization and classification logic
     const { normalizeBrazilianPhone } = await import("./contacts.server");
     
     const phoneResult = normalizeBrazilianPhone(data.phone);
@@ -143,6 +142,7 @@ export const runControlledTest = createServerFn({ method: "POST" })
       reviewReason,
       isNameValid,
       isPhoneValid,
+      user_id: userId,
       raw_data: { test: true, originalName: data.name, originalPhone: data.phone }
     };
   });
