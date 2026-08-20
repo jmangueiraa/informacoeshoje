@@ -459,28 +459,20 @@ function ContactsPage() {
               {isWaiting && (
                 <Alert variant="destructive" className="bg-yellow-50 border-yellow-200 text-yellow-800 animate-in fade-in slide-in-from-top-2 duration-300 shadow-sm">
                   <Clock className="h-4 w-4 text-yellow-600" />
-                  <AlertTitle className="text-yellow-800 flex items-center gap-2 font-bold uppercase text-xs tracking-wider">
-                    🟡 Limite da API atingido
-                  </AlertTitle>
                   <AlertDescription className="text-yellow-700 space-y-1">
+                    <p className="font-bold text-xs uppercase tracking-wider mb-1">
+                      {waitTime > 0 ? "🟡 Limite da API atingido" : "🔄 Tentando novamente..."}
+                    </p>
                     <p className="font-medium text-sm">
-                      Aguardando {waitTime} segundos para continuar automaticamente...
+                      {waitTime > 0 
+                        ? `Aguardando ${waitTime} segundos para continuar automaticamente...`
+                        : "Realizando nova tentativa de processamento..."}
                     </p>
-                    <p className="text-[10px] opacity-70">
-                      Próxima verificação em: {waitTime}s
-                    </p>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {isCheckingApi && !isWaiting && (
-                <Alert className="bg-blue-50 border-blue-200 text-blue-800 animate-pulse shadow-sm">
-                  <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
-                  <AlertTitle className="text-blue-800 flex items-center gap-2 font-bold uppercase text-xs tracking-wider">
-                    🔄 Verificando disponibilidade
-                  </AlertTitle>
-                  <AlertDescription className="text-blue-700 font-medium text-sm">
-                    Verificando disponibilidade da API...
+                    {waitTime > 0 && (
+                      <p className="text-[10px] opacity-70">
+                        Próxima tentativa em: {waitTime}s
+                      </p>
+                    )}
                   </AlertDescription>
                 </Alert>
               )}
