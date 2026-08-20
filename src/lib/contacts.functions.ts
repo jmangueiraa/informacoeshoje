@@ -146,8 +146,17 @@ export const processImageOCR = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { userId, supabase: authenticatedSupabase } = context;
     
+    // Verificar se é admin
+    const { data: isAdmin } = await authenticatedSupabase.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin'
+    });
+
+    if (!isAdmin) throw new Error("Acesso negado: apenas administradores podem processar imagens.");
+
     // Import dynamically to keep the function thin
     const { analyzeImageForContacts } = await import("./contacts.server");
     
     return await analyzeImageForContacts(data.imageBase64);
   });
+
