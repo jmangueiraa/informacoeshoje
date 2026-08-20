@@ -11,6 +11,7 @@ import { formatPhone } from '@/lib/utils'
 import { Trash2, Phone, Upload, CheckCircle2, AlertCircle, X, Search, Beaker } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/integrations/supabase/client'
+import { toast } from 'sonner'
 
 export const Route = createFileRoute('/_authenticated/contacts')({
   beforeLoad: async ({ context }) => {
@@ -86,9 +87,10 @@ function ContactsPage() {
       })
 
       try {
-        console.log(`\n========== CAPTURA DEBUG (FRONTEND) ==========\n1. ARQUIVO:\n   nome: ${file.name}\n   tipo: ${file.type}\n   tamanho: ${Math.round(file.size / 1024)} KB`);
+        console.log(`[IMPORT] Iniciando extração do arquivo: ${file.name}`);
         
         const result = await processImageOCR({ data: { imageBase64: base64, filename: file.name } });
+        console.log(`[IMPORT] Resposta da extração para ${file.name}:`, result);
         
         const phoneDigits = result.phone ? result.phone.replace(/\D/g, '') : '';
 
@@ -110,7 +112,7 @@ function ContactsPage() {
 
         // 1. Verificar duplicata no mesmo lote
         if (phoneDigits && batchPhones.has(phoneDigits)) {
-          console.log(`[CAPTURA] Duplicata detectada no lote: ${phoneDigits}`);
+          console.log(`[IMPORT] Duplicata no lote detectada: ${phoneDigits}`);
           dupCount++;
           currentDebug.statusSentToDB = 'duplicate-batch';
           setDebugData(currentDebug);
@@ -122,74 +124,44 @@ function ContactsPage() {
           batchPhones.add(phoneDigits);
         }
 
-        // Se a IA já marcou como revisão por erro de comunicação, respeitamos
-        if (result.reviewReason === "Falha na comunicação com o provedor de IA" || result.reviewReason === "Erro interno no processamento da imagem") {
-          await saveContact({ 
+        // 2. Persistência com tratamento de status
+        try {
+          const savedContact = await saveContact({ 
             data: { 
-              name: result.name || 'Erro IA', 
-              phone: result.phone || '0000000000',
-              needsReview: true,
-              reviewReason: result.reviewReason,
-              rawData: result.raw_data
+              name: result.name || 'Cliente', 
+              phone: result.phone,
+              needsReview: !!result.needsReview,
+              reviewReason: result.reviewReason || null,
+              rawData: result.raw_data || null
             } 
           });
-          revCount++;
-          currentDebug.statusSentToDB = 'review';
-        } else if (phoneDigits && phoneDigits.length >= 8) {
-          try {
-            const savedContact = await saveContact({ 
-              data: { 
-                name: result.name || 'Cliente', 
-                phone: result.phone,
-                needsReview: !!result.needsReview,
-                reviewReason: result.reviewReason || null,
-                rawData: result.raw_data || null
-              } 
-            });
-            
-            // Sincronizar com o banco: false -> 'new', true -> 'review'
-            const finalStatus = savedContact.needs_review ? 'review' : 'new';
-            currentDebug.statusSentToDB = result.needsReview ? 'review' : 'new';
-            currentDebug.statusSavedInDB = finalStatus;
-            currentDebug.statusReturnedToFront = finalStatus;
-
-            if (savedContact.needs_review) {
-              revCount++;
-            } else {
-              newCount++;
-            }
-          } catch (err: any) {
-            console.error(`[CAPTURA] Erro ao salvar contato:`, err);
-            if (err.message === 'DUPLICATE_CONTACT') {
-              dupCount++;
-              currentDebug.isDuplicate = 'SIM';
-              currentDebug.statusSavedInDB = 'duplicate';
-            } else {
-              revCount++;
-              currentDebug.decisionStep = 'frontend-fallback';
-              currentDebug.decisionRule = `catch error on save: ${err.message}`;
-            }
+          
+          // Sucesso na gravação
+          if (savedContact.needs_review) {
+            revCount++;
+          } else {
+            newCount++;
           }
-        } else {
-          try {
-            await saveContact({ 
-              data: { 
-                name: result.name || 'Cliente', 
-                phone: result.phone || '00000000',
-                needsReview: true,
-                reviewReason: result.reviewReason || "Telefone não identificado",
-                rawData: result.raw_data
-              } 
-            });
-          } catch (e) {}
-          revCount++;
-          currentDebug.decisionStep = 'frontend';
-          currentDebug.decisionRule = 'phone.length < 8';
+          currentDebug.statusSavedInDB = savedContact.needs_review ? 'review' : 'new';
+        } catch (err: any) {
+          if (err.message === 'DUPLICATE_CONTACT') {
+            console.log(`[IMPORT] Duplicata no banco detectada para: ${phoneDigits}`);
+            dupCount++;
+            currentDebug.statusSavedInDB = 'duplicate';
+          } else {
+            console.error(`[IMPORT_ERROR] Falha na gravação do contato:`, err);
+            revCount++;
+            currentDebug.statusSavedInDB = 'error';
+            toast.error(`Erro ao salvar contato ${result.name}: ${err.message}`);
+          }
         }
         
         setDebugData(currentDebug);
-      } catch (err) {
-        console.error("[CAPTURA] Erro crítico ao processar imagem:", err);
+      } catch (err: any) {
+        console.error("[IMPORT_ERROR]:", err);
+        const errorMessage = err.message || "Erro desconhecido ao processar imagem";
+        // Feedback visual detalhado
+        toast.error(`Falha ao processar ${file.name}: ${errorMessage}`);
         revCount++;
       }
 

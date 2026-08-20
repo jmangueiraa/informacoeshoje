@@ -38,7 +38,8 @@ export const saveContact = createServerFn({ method: "POST" })
     phone: z.string(),
     needsReview: z.boolean().optional(),
     reviewReason: z.string().nullish(),
-    rawData: z.any().optional()
+    rawData: z.any().optional(),
+    status: z.string().optional() // Campo status opcional para facilitar controle do frontend
   }).parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as any;
@@ -92,15 +93,14 @@ export const saveContact = createServerFn({ method: "POST" })
       
     if (insertError) {
       if (insertError.code === '23505') {
-        console.log(`[CAPTURA] saveContact - Conflito de UNIQUE detectado para ${phoneDigits}`);
+        console.log(`[CAPTURA] saveContact - DUPLICADO detectado via constraint para ${phoneDigits}`);
         throw new Error('DUPLICATE_CONTACT');
       }
-      console.error(`[CAPTURA] Supabase insert response ERROR:`, insertError);
-      throw new Error(`DB_INSERT_ERROR: ${insertError.code} - ${insertError.message} - ${insertError.details}`);
+      console.error(`[IMPORT_ERROR] Supabase insert failure:`, insertError);
+      throw new Error(`DB_INSERT_ERROR: ${insertError.code} - ${insertError.message}`);
     }
 
-    console.log(`[CAPTURA] Supabase insert response SUCCESS:`, contact);
-
+    console.log(`[IMPORT] Sucesso ao salvar contato no banco:`, contact);
     return contact;
   });
 
