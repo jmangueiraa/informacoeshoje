@@ -84,7 +84,6 @@ function ContactsPage() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: (acceptedFiles) => {
-      setFiles((prev) => [...prev, ...acceptedFiles])
       // Adiciona novos arquivos à fila
       const newItems = acceptedFiles.map(file => ({
         id: Math.random().toString(36).substring(7) + '-' + Date.now(),
@@ -97,10 +96,7 @@ function ContactsPage() {
   })
 
   const removeFile = (index: number) => {
-    const fileToRemove = files[index];
-    setFiles(files.filter((_, i) => i !== index))
-    // Remove também da fila se ainda estiver pendente ou erro
-    setQueue(prev => prev.filter(item => item.file !== fileToRemove));
+    setQueue(prev => prev.filter((_, i) => i !== index));
   }
 
   const clearAll = () => {
