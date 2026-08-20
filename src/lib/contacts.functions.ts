@@ -38,7 +38,8 @@ export const saveContact = createServerFn({ method: "POST" })
     phone: z.string(),
     needsReview: z.boolean().optional(),
     reviewReason: z.string().nullish(),
-    rawData: z.any().optional()
+    rawData: z.any().optional(),
+    status: z.string().optional() // Campo status opcional para facilitar controle do frontend
   }).parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as any;
