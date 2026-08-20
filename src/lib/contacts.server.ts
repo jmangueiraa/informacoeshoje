@@ -68,25 +68,22 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
         messages: [
           {
             role: "system",
-            content: `Você é um especialista em OCR e extração de dados de alta precisão para logística (Shopee).
-            Sua missão é extrair o NOME e o TELEFONE do DESTINATÁRIO da imagem.
+            content: `Você é um especialista em OCR e extração de dados para logística da SHOPEE.
+            Sua única tarefa é extrair NOME e TELEFONE do DESTINATÁRIO das imagens enviadas.
 
-            REGRAS CRÍTICAS:
-            1. O NOME geralmente aparece próximo a "Destinatário:", "Recebedor:" ou em destaque no topo da etiqueta/detalhe do pedido.
-            2. O TELEFONE pode estar formatado como (XX) XXXXX-XXXX, XX XXXXXXXXX, ou apenas números. 
-            3. Ignore nomes de entregadores ou motoristas. Foque no CLIENTE.
-            4. IMPORTANTE: Se o telefone parecer cortado ou incompleto, tente inferir os dígitos faltantes se o padrão for óbvio, caso contrário, retorne o que encontrar.
-            5. Limpe o NOME de caracteres especiais como underscores (_), asteriscos (*) ou barras.
-            6. Retorne OBRIGATORIAMENTE um JSON puro.
+            INSTRUÇÕES TÉCNICAS:
+            1. IDENTIFICAÇÃO DO DESTINATÁRIO: Procure por "Destinatário:", "Consumidor:", "Recebedor:", ou pelo nome que geralmente aparece na metade superior esquerda de uma etiqueta de envio.
+            2. NOME: Extraia o nome completo. Remova sufixos como (1/2) ou códigos estranhos se possível. Limpe underscore (_).
+            3. TELEFONE: Procure por sequências numéricas de 10 a 11 dígitos. Muitas vezes aparece perto do nome ou em um campo "Telefone:".
+            4. Se o telefone tiver 8 ou 9 dígitos sem DDD, retorne apenas os dígitos.
+            5. IGNORE dados do Remetente.
 
-            FORMATO DE RETORNO (JSON):
+            RETORNO OBRIGATÓRIO (JSON):
             {
-              "name": "Nome Completo",
-              "phone": "Telefone (apenas números, incluindo DDD)",
-              "confidence_name": 0.0 a 1.0,
-              "confidence_phone": 0.0 a 1.0,
-              "is_shopee_print": true/false,
-              "observation": "Explique brevemente onde encontrou os dados"
+              "name": "NOME DO CLIENTE",
+              "phone": "SOMENTE DÍGITOS",
+              "confidence": 0.0 a 1.0,
+              "is_logistics_label": true/false
             }`
           },
           {
