@@ -34,12 +34,12 @@ export async function analyzeImageForContacts(imageBase64: string): Promise<Anal
             Seu objetivo é extrair APENAS o NOME e o TELEFONE.
             Ignore endereços, datas, códigos de rastreio, nomes de produtos, etc.
             
-            Regras CRÍTICAS:
+            Regras CRÍTICAS para evitar revisão desnecessária:
             1. Retorne um JSON com os campos: "name", "phone" e "needsReview".
             2. "name": APENAS o primeiro nome do recebedor/cliente (Ex: de "Jéssica De Araújo Dos Santos" pegue apenas "Jéssica"). Remova underscores ou caracteres especiais.
-            3. "phone": Número de telefone. Formate apenas com números e o código do país se disponível (Ex: 5516994345806).
-            4. "needsReview": Defina como FALSE se você encontrou um telefone e um nome. Só defina como TRUE se o telefone estiver AUSENTE ou for impossível de ler.
-            5. Mesmo que a imagem pareça confusa, se houver um bloco de "Dados do Recebedor" ou "Entrega", priorize as informações ali contidas.
+            3. "phone": Número de telefone. Procure por padrões numéricos de 10 a 13 dígitos. Formate apenas com números (Ex: 5516994345806).
+            4. "needsReview": Defina como FALSE se você encontrou QUALQUER telefone e um nome. Só defina como TRUE se o telefone estiver ABSOLUTAMENTE AUSENTE ou for impossível de identificar.
+            5. Mesmo que a imagem contenha muitos textos, se houver um bloco de "Dados do Recebedor", "Entrega" ou "Cliente", as informações ali são as corretas.
             6. Seja preciso. Não invente dados.`
           },
           {
