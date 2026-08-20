@@ -30,17 +30,22 @@ export async function analyzeImageForContacts(imageBase64: string): Promise<Anal
         messages: [
           {
             role: "system",
-            content: `Você é um extrator de dados altamente preciso especializado em capturar informações de recebedores em prints de logística/entregas, como telas de detalhes de pedido da Shopee, iFood, Loggi, etc.
-            Seu objetivo é extrair APENAS o NOME e o TELEFONE.
-            Ignore endereços, datas, códigos de rastreio, nomes de produtos, etc.
-            
-            Regras CRÍTICAS para evitar revisão desnecessária:
-            1. Retorne um JSON com os campos: "name", "phone" e "needsReview".
-            2. "name": APENAS o primeiro nome do recebedor/cliente (Ex: de "Jéssica De Araújo Dos Santos" pegue apenas "Jéssica"). Remova underscores ou caracteres especiais.
-            3. "phone": Número de telefone. Procure por padrões numéricos de 10 a 13 dígitos. Formate apenas com números (Ex: 5516994345806).
-            4. "needsReview": Defina como FALSE se você encontrou QUALQUER telefone e um nome. Só defina como TRUE se o telefone estiver ABSOLUTAMENTE AUSENTE ou for impossível de identificar.
-            5. Mesmo que a imagem contenha muitos textos, se houver um bloco de "Dados do Recebedor", "Entrega" ou "Cliente", as informações ali são as corretas.
-            6. Seja preciso. Não invente dados.`
+            content: `Você é um extrator de dados altamente preciso especializado em capturar informações de recebedores em prints de logística/entregas.
+            Seu objetivo é extrair APENAS o NOME e o TELEFONE do recebedor/cliente.
+
+            CONTEXTO DA IMAGEM:
+            - Frequentemente são prints de apps como Shopee, iFood, Loggi.
+            - O nome do recebedor geralmente aparece acima do telefone.
+            - O telefone pode vir precedido de "Tel", "Telefone", "Celular" ou ícones.
+            - Procure por campos como "Informações do recebedor" ou "Destinatário".
+
+            Regras CRÍTICAS:
+            1. Retorne um JSON: {"name": string, "phone": string, "needsReview": boolean}.
+            2. "name": Extraia APENAS o primeiro nome. Se o nome for "Jéssica De Araújo Dos Santos_", retorne "Jéssica". Remova qualquer caractere especial como "_" no final.
+            3. "phone": Extraia o número de telefone completo. Remova parênteses, espaços e hifens. Mantenha o código do país se disponível (ex: 5516994345806).
+            4. "needsReview": Defina como FALSE se você encontrou um nome e um telefone. Só defina como TRUE se não encontrar NADA.
+            5. NUNCA ignore o telefone se ele estiver visível na imagem, mesmo que esteja em formato internacional.
+            6. Seja extremamente literal com o que vê na imagem.`
           },
           {
             role: "user",
