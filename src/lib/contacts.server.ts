@@ -131,11 +131,17 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
       const rawPhone = content.phone || "";
       
       const phoneResult = normalizeBrazilianPhone(rawPhone);
-      const cleanName = rawName
+      
+      // Normalização agressiva: Captura apenas o primeiro nome em Title Case
+      const rawCleanedName = rawName
         .replace(/Tel|Nome|Contato|Recebedor|Destinatário/gi, "")
-        .replace(/^[^a-zA-ZáéíóúÁÉÍÓÚñÑ]+|[^a-zA-ZáéíóúÁÉÍÓÚñÑ]+$/g, "")
+        .replace(/[_*]/g, " ")
+        .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "")
         .replace(/\s+/g, " ")
         .trim();
+        
+      const firstName = rawCleanedName.split(' ')[0] || "Cliente";
+      const cleanName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
       
       const isErrorString = (s: string) => ["erro", "null", "undefined", "cliente", "desconhecido"].includes(s.toLowerCase());
       const isNameValid = cleanName.length >= 2 && !isErrorString(cleanName) && !cleanName.toLowerCase().includes("shopee") && !cleanName.toLowerCase().includes("entrega");

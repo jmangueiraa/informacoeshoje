@@ -46,8 +46,11 @@ export const saveContact = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as any;
     
-    // Normalização básica para garantir que o telefone esteja limpo antes do banco
-    const cleanName = data.name.trim();
+    // Normalização agressiva: Captura apenas o primeiro nome em Title Case
+    const rawName = data.name.trim().replace(/[_*]/g, " ").replace(/\s+/g, " ");
+    const firstName = rawName.split(' ')[0] || "Cliente";
+    const cleanName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+    
     const phoneDigits = data.phone.replace(/\D/g, '');
     
     console.log(`[CAPTURA] saveContact - Processando:`, { 
@@ -120,7 +123,11 @@ export const runControlledTest = createServerFn({ method: "POST" })
     const { normalizeBrazilianPhone } = await import("./contacts.server");
     
     const phoneResult = normalizeBrazilianPhone(data.phone);
-    const cleanName = data.name.replace(/[_*]/g, " ").replace(/\s+/g, " ").trim();
+    
+    // Normalização agressiva: Captura apenas o primeiro nome em Title Case
+    const rawCleanedName = data.name.replace(/[_*]/g, " ").replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").replace(/\s+/g, " ").trim();
+    const firstName = rawCleanedName.split(' ')[0] || "Cliente";
+    const cleanName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
     
     const isErrorString = (s: string) => ["erro na ia", "null", "undefined", "cliente"].includes(s.toLowerCase());
     const isNameValid = cleanName.length >= 2 && !isErrorString(cleanName) && !cleanName.toLowerCase().includes("shopee");
