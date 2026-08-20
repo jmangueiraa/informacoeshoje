@@ -87,9 +87,16 @@ function ContactsPage() {
       })
 
       try {
-        console.log(`[IMPORT] Iniciando extração do arquivo: ${file.name}`);
+        console.log(`[IMPORT] Iniciando extração do arquivo: ${file.name} (tipo: ${file.type}, tamanho: ${file.size})`);
         
-        const response = await processImageOCR({ data: { imageBase64: base64, filename: file.name } });
+        const base64Data = base64.split(',')[1] || base64;
+        const response = await processImageOCR({ 
+          data: { 
+            imageBase64: base64Data, 
+            filename: file.name,
+            mimeType: file.type || 'image/jpeg'
+          } 
+        });
         console.log(`[IMPORT] Resposta da extração para ${file.name}:`, response);
         
         const extractedContacts = response.contacts || [];
