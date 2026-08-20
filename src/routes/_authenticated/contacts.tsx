@@ -128,6 +128,7 @@ function ContactsPage() {
               } 
             });
             
+            // Sincronizar com o banco: false -> 'new', true -> 'review'
             const finalStatus = savedContact.needs_review ? 'review' : 'new';
             currentDebug.statusSentToDB = result.needsReview ? 'review' : 'new';
             currentDebug.statusSavedInDB = finalStatus;
@@ -139,13 +140,14 @@ function ContactsPage() {
               newCount++;
             }
           } catch (err: any) {
+            console.error(`[CAPTURA] Erro ao salvar contato:`, err);
             if (err.message === 'DUPLICATE_CONTACT') {
               dupCount++;
               currentDebug.isDuplicate = 'SIM';
             } else {
               revCount++;
               currentDebug.decisionStep = 'frontend-fallback';
-              currentDebug.decisionRule = 'catch error on save';
+              currentDebug.decisionRule = `catch error on save: ${err.message}`;
             }
           }
         } else {
@@ -216,6 +218,7 @@ function ContactsPage() {
           if (saved.needs_review) revCount++
           else newCount++
         } catch (err: any) {
+          console.error(`[TESTE] Erro ao salvar contato controlado:`, err);
           if (err.message === 'DUPLICATE_CONTACT') {
             statusSaved = 'duplicate'
             dupCount++
