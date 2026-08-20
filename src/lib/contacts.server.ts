@@ -75,7 +75,7 @@ export async function analyzeImageForContacts(imageBase64: string) {
     const needsReview = phone.length < 8;
 
     return {
-      name: (content.name || "Cliente").split(/[_\s]/)[0],
+      name: name || "Cliente",
       phone: phone,
       needsReview: needsReview
     };
