@@ -590,9 +590,7 @@ function ContactsPage() {
                   <Progress value={progress} className="h-2" />
                   <div className="flex justify-between items-center text-[9px] text-muted-foreground mt-2">
                     <span className="flex items-center gap-1">
-                      {isCheckingApi ? (
-                        <span className="text-blue-600 font-bold uppercase">Verificando API...</span>
-                      ) : isWaiting ? (
+                      {isWaiting ? (
                         <span className="text-yellow-600 font-bold uppercase">Aguardando Limite ({waitTime}s)</span>
                       ) : (
                         <>
