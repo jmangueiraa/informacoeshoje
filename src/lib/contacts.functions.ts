@@ -46,60 +46,55 @@ export const saveContact = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as any;
     
-    // Lógica de validação do Nome (sincronizada com o servidor)
-    const rawName = data.name.trim();
-    const hasEllipsis = rawName.includes("...");
-    const hasSpecialChars = /[#@$%&|\\/]/.test(rawName);
-    const hasAsterisks = /[*_]{2,}/.test(rawName);
-    
-    const cleanedForLength = rawName
-      .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-    const firstNameForLength = cleanedForLength.split(' ')[0] || "";
-    const isNameTooShort = firstNameForLength.length < 3;
-
-    const isNameInvalid = !rawName || 
-                         rawName === "ILEGÍVEL" || 
-                         hasEllipsis || 
-                         hasSpecialChars || 
-                         hasAsterisks || 
-                         isNameTooShort ||
-                         rawName.toLowerCase().includes("shopee");
-
-    let cleanName = "";
-    if (isNameInvalid) {
-      // Gerar nome sequencial: Cliente00001, etc.
-      const { data: lastClients, error: fetchError } = await supabase
-        .from('contacts')
-        .select('name')
-        .eq('user_id', userId)
-        .like('name', 'Cliente%')
-        .order('name', { ascending: false })
-        .limit(1);
-
-      let nextNumber = 1;
-      if (lastClients && lastClients.length > 0) {
-        const lastNames = lastClients.map((c: any) => c.name);
-        const sequentials = lastNames
-          .map((n: any) => {
-            const nameStr = String(n || "");
-            const match = nameStr.match(/Cliente(\d+)/);
-            if (!match || !match[1]) return null;
-            return parseInt(match[1], 10);
-          })
-          .filter((n: number | null): n is number => n !== null);
-
-
-        
-        if (sequentials.length > 0) {
-          nextNumber = Math.max(...sequentials) + 1;
-        }
+    // Função de sanitização rigorosa conforme solicitado no backend/frontend
+    const cleanAndValidateName = (name: string, nextSequential: string): string => {
+      if (!name) return nextSequential;
+      
+      // 1. Remove pontos, sublinhados, traços, asteriscos, tils
+      const sanitized = name.replace(/[\._\-\*~]/g, '').trim();
+      
+      // 2. Se tiver menos de 3 letras válidas ou tiver caracteres de truncamento (..)
+      // Note: O regex /[\.]{2,}/.test(name) verifica o original para detectar truncamento/reticências
+      if (sanitized.length < 3 || /[\.]{2,}/.test(name)) {
+        return nextSequential;
       }
+      
+      return sanitized;
+    };
 
-      cleanName = `Cliente${String(nextNumber).padStart(5, '0')}`;
-    } else {
-      const firstName = rawName.split(' ')[0] || "Cliente";
+    // Primeiro, precisamos buscar o próximo nome sequencial para o caso de falha
+    const { data: lastClients } = await supabase
+      .from('contacts')
+      .select('name')
+      .eq('user_id', userId)
+      .like('name', 'Cliente%')
+      .order('name', { ascending: false })
+      .limit(1);
+
+    let nextNumber = 1;
+    if (lastClients && lastClients.length > 0) {
+      const lastNames = lastClients.map((c: any) => c.name);
+      const sequentials = lastNames
+        .map((n: any) => {
+          const nameStr = String(n || "");
+          const match = nameStr.match(/Cliente(\d+)/);
+          if (!match || !match[1]) return null;
+          return parseInt(match[1], 10);
+        })
+        .filter((n: number | null): n is number => n !== null);
+
+      if (sequentials.length > 0) {
+        nextNumber = Math.max(...sequentials) + 1;
+      }
+    }
+    const nextSequentialName = `Cliente${String(nextNumber).padStart(5, '0')}`;
+
+    const rawName = data.name.trim();
+    const sanitizedName = cleanAndValidateName(rawName, nextSequentialName);
+    
+    let cleanName = sanitizedName;
+    if (sanitizedName !== nextSequentialName) {
+      const firstName = sanitizedName.split(' ')[0] || "Cliente";
       cleanName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
     }
     
