@@ -83,13 +83,15 @@ function ContactsPage() {
         const result = await processImageOCR({ data: { imageBase64: base64 } })
         if (result.needsReview && !result.phone) {
           revCount++
-        } else {
+        } else if (result.phone) {
           try {
-            await saveContact({ data: { name: result.name || 'Sem nome', phone: result.phone } })
+            await saveContact({ data: { name: result.name || 'Cliente', phone: result.phone } })
             newCount++
           } catch (err) {
             dupCount++
           }
+        } else {
+          revCount++
         }
       } catch (err) {
         console.error("Erro ao processar imagem:", err)
@@ -115,7 +117,7 @@ function ContactsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Captura de Contatos</h1>
-          <p className="text-muted-foreground">Extraia automaticamente nomes e telefones de imagens de logística.</p>
+          <p className="text-muted-foreground">Extraia automaticamente nomes e telefones de imagens de logística (Shopee).</p>
         </div>
       </div>
       

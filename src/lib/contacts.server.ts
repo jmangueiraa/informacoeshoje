@@ -14,7 +14,7 @@ export async function analyzeImageForContacts(imageBase64: string) {
 
   try {
     // Attempting the most standard AI Gateway endpoint for TanStack Start
-    const response = await fetch("https://api.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -26,14 +26,14 @@ export async function analyzeImageForContacts(imageBase64: string) {
           {
             role: "system",
             content: `Você é um extrator de dados para prints de logística da Shopee.
-            Extraia o NOME e o TELEFONE do recebedor.
+            Extraia o NOME e o TELEFONE do destinatário/recebedor.
             
             REGRAS:
             1. Retorne JSON: {"name": string, "phone": string, "needsReview": boolean}.
-            2. "name": Apenas o primeiro nome (ex: "Maria").
-            3. "phone": Apenas números (ex: "5511999999999").
-            4. Se encontrar qualquer sequência de 8+ dígitos, use como telefone e defina needsReview=false.
-            5. Limpe o nome de caracteres como "_" ou "*" frequentemente encontrados em OCR.`
+            2. "name": Extraia o primeiro nome limpo.
+            3. "phone": Extraia apenas números do telefone (ex: 11999999999). Se houver DDI (55), inclua.
+            4. Se encontrar qualquer sequência numérica que pareça um telefone (8 a 13 dígitos), use-a.
+            5. Defina "needsReview" como false se encontrar um nome E um telefone válido (8+ dígitos).`
           },
           {
             role: "user",
@@ -59,25 +59,35 @@ export async function analyzeImageForContacts(imageBase64: string) {
       const errorText = await response.text();
       console.error(`AI Gateway error (${response.status}):`, errorText);
       
-      // Fallback: If AI fails, return object marked for review to avoid UI crash
+      // Fallback: Se a IA falhar, retornamos o objeto marcado para revisão
       return {
         name: "Revisão Necessária",
         phone: "",
-        needsReview: true
+        needsReview: true,
+        error: errorText // Passar o erro para log interno
       };
     }
 
     const result = await response.json();
     const content = JSON.parse(result.choices[0].message.content);
     
-    const name = (content.name || "Cliente").split(/[_\s]/)[0].replace(/[^a-zA-ZáàâãéèêíïóôõöúçÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇ]/g, "");
+    const name = (content.name || "Cliente")
+      .split(/[_\s]/)[0]
+      .replace(/[^a-zA-ZáàâãéèêíïóôõöúçÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇ]/g, "")
+      .trim();
+    
     const phone = (content.phone || "").replace(/\D/g, "");
-    const needsReview = phone.length < 8;
+    
+    // Forçar needsReview=false se tivermos o que parece ser um telefone
+    const hasPhone = phone.length >= 8;
+    const finalNeedsReview = content.needsReview !== undefined ? content.needsReview : !hasPhone;
+
+    console.log("Extraction results:", { name, phone, finalNeedsReview });
 
     return {
       name: name || "Cliente",
       phone: phone,
-      needsReview: needsReview
+      needsReview: finalNeedsReview && !hasPhone
     };
   } catch (error) {
     console.error("Failed to analyze image:", error);
