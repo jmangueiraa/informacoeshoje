@@ -500,9 +500,12 @@ function ContactsPage() {
                             {contact.name}
                             {contact.needs_review && (
                               <p className="text-[10px] text-red-500 font-normal mt-0.5">
-                                Motivo: {contact.review_reason}
+                                Motivo: {contact.review_reason || 'Revisão manual necessária'}
                               </p>
                             )}
+                            <p className="text-[9px] text-muted-foreground mt-0.5">
+                              ID: {contact.id.substring(0, 8)} | User: {contact.user_id?.substring(0, 8)}
+                            </p>
                           </TableCell>
                           <TableCell>
                             <span className="inline-flex items-center px-2 py-1 rounded bg-primary/10 text-primary text-xs font-mono">
