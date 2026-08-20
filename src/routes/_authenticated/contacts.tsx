@@ -292,8 +292,10 @@ function ContactsPage() {
         const completedCount = queue.filter(q => q.status === 'completed' || q.status === 'final_error').length;
         setProgress((completedCount / totalItemsInitial) * 100);
         
-        // Small gap between successful requests to respect quota
-        await new Promise(r => setTimeout(r, 12000)); // ~5 per minute = 1 every 12s
+        // Respect quota: ~5 per minute = 1 every 12s
+        if (!cancelRef.current) {
+          await new Promise(r => setTimeout(r, 12000));
+        }
       }
     } finally {
       setSummary({ 
