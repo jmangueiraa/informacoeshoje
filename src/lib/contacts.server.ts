@@ -59,11 +59,12 @@ export async function analyzeImageForContacts(imageBase64: string) {
       const errorText = await response.text();
       console.error(`AI Gateway error (${response.status}):`, errorText);
       
-      // Fallback: If AI fails, return object marked for review to avoid UI crash
+      // Fallback: Se a IA falhar, retornamos o objeto marcado para revisão
       return {
         name: "Revisão Necessária",
         phone: "",
-        needsReview: true
+        needsReview: true,
+        error: errorText // Passar o erro para log interno
       };
     }
 
