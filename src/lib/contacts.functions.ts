@@ -39,7 +39,6 @@ export const saveContact = createServerFn({ method: "POST" })
       .from('contacts')
       .insert([{
         name: firstName,
-        phone_original: data.phone,
         phone_normalized: phoneDigits,
       }])
       .select()
