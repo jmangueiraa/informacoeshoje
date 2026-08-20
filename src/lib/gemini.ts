@@ -15,53 +15,76 @@ export async function extractContactFromGemini(imageBase64: string, mimeType: st
   // Garante que o base64 está limpo (sem prefixo data:image/...)
   const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
 
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  // Lista de modelos para tentativa de fallback
+  // Nota: gemini-2.0-flash é o modelo atual estável/disponível no momento
+  const models = ["gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash"];
+  let lastError = "";
 
-  const response = await fetch(apiUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [
+  for (const model of models) {
+    try {
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
             {
-              text: "Você é um leitor de etiquetas e telas de pedidos/entrega da Shopee. Encontre o nome do destinatário/recebedor em 'Informações do recebedor' e o número de telefone com DDD. Retorne ESTRITAMENTE um JSON no formato: {\"name\": \"Nome\", \"phone\": \"Telefone com DDD\"}. Se houver múltiplos, retorne um array de objetos JSON."
-            },
-            {
-              inlineData: {
-                mimeType: mimeType,
-                data: cleanBase64
-              }
+              parts: [
+                {
+                  text: "Você é um leitor de etiquetas e telas de pedidos/entrega da Shopee. Encontre o nome do destinatário/recebedor em 'Informações do recebedor' e o número de telefone com DDD. Retorne ESTRITAMENTE um JSON no formato: {\"name\": \"Nome\", \"phone\": \"Telefone com DDD\"}. Se houver múltiplos, retorne um array de objetos JSON."
+                },
+                {
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: cleanBase64
+                  }
+                }
+              ]
             }
-          ]
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.1
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        // Se for 404 (modelo não encontrado) ou 400 (parâmetro inválido para o modelo), tenta o próximo
+        if (response.status === 404 || response.status === 400) {
+          console.warn(`Modelo ${model} não disponível ou não suportado. Tentando fallback...`);
+          lastError = `Erro Gemini (${response.status} no modelo ${model}): ${errorText}`;
+          continue;
         }
-      ],
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.1
+        throw new Error(`Erro Gemini (${response.status}): ${errorText}`);
       }
-    })
-  });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Erro Gemini (${response.status}): ${errorText}`);
+      const result = await response.json();
+      const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      if (!rawText) {
+        throw new Error("A IA não retornou nenhum texto processável.");
+      }
+
+      try {
+        const parsed = JSON.parse(rawText);
+        return Array.isArray(parsed) ? parsed : [parsed];
+      } catch (e) {
+        console.error("Falha ao parsear JSON da IA:", rawText);
+        throw new Error("A IA retornou um formato inválido: " + rawText.substring(0, 100));
+      }
+    } catch (err: any) {
+      if (err.message.includes("IA não retornou") || err.message.includes("formato inválido")) {
+        throw err;
+      }
+      lastError = err.message;
+      console.error(`Erro na tentativa com ${model}:`, err);
+    }
   }
 
-  const result = await response.json();
-  const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-  
-  if (!rawText) {
-    throw new Error("A IA não retornou nenhum texto processável.");
-  }
-
-  try {
-    const parsed = JSON.parse(rawText);
-    return Array.isArray(parsed) ? parsed : [parsed];
-  } catch (e) {
-    console.error("Falha ao parsear JSON da IA:", rawText);
-    throw new Error("A IA retornou um formato inválido: " + rawText.substring(0, 100));
-  }
+  throw new Error(`Falha em todos os modelos do Gemini. Último erro: ${lastError}`);
 }
