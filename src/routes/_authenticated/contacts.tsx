@@ -94,8 +94,8 @@ function ContactsPage() {
           extractedPhone: result.phone,
           normalizedName: result.name,
           normalizedPhone: result.phone,
-          isNameValid: !result.needsReview || result.reviewReason !== "Nome não identificado claramente",
-          isPhoneValid: !result.needsReview || (!result.reviewReason?.includes("Telefone inválido") && !result.reviewReason?.includes("sem DDD")),
+          isNameValid: result.name.length >= 2 && !result.name.toLowerCase().includes("erro"),
+          isPhoneValid: result.phone.length >= 10,
           confidence: result.raw_data?.confidence,
           serverStatus: result.needsReview ? 'review' : 'valid',
           reviewReason: result.reviewReason,
@@ -103,23 +103,37 @@ function ContactsPage() {
           decisionRule: `needsReview === ${result.needsReview}`
         };
 
-        if (result.phone && result.phone.length >= 8) {
+        // Se a IA já marcou como revisão por erro de comunicação, respeitamos
+        if (result.reviewReason === "Falha na comunicação com o provedor de IA" || result.reviewReason === "Erro interno no processamento da imagem") {
+          await saveContact({ 
+            data: { 
+              name: result.name || 'Erro IA', 
+              phone: result.phone || '0000000000',
+              needsReview: true,
+              reviewReason: result.reviewReason,
+              rawData: result.raw_data
+            } 
+          });
+          revCount++;
+          currentDebug.statusSentToDB = 'review';
+        } else if (result.phone && result.phone.length >= 8) {
           try {
             const savedContact = await saveContact({ 
               data: { 
                 name: result.name || 'Cliente', 
                 phone: result.phone,
-                needsReview: result.needsReview,
-                reviewReason: result.reviewReason,
-                rawData: result.raw_data
+                needsReview: !!result.needsReview,
+                reviewReason: result.reviewReason || null,
+                rawData: result.raw_data || null
               } 
             });
             
+            const finalStatus = savedContact.needs_review ? 'review' : 'new';
             currentDebug.statusSentToDB = result.needsReview ? 'review' : 'new';
-            currentDebug.statusSavedInDB = savedContact.needs_review ? 'review' : 'new';
-            currentDebug.statusReturnedToFront = savedContact.needs_review ? 'review' : 'new';
+            currentDebug.statusSavedInDB = finalStatus;
+            currentDebug.statusReturnedToFront = finalStatus;
 
-            if (result.needsReview) {
+            if (savedContact.needs_review) {
               revCount++;
             } else {
               newCount++;
