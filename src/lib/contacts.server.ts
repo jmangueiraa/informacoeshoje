@@ -1,25 +1,20 @@
 import { z } from "zod";
 
-const AnalysisResultSchema = z.object({
-  name: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
-  needsReview: z.boolean(),
-});
-
-type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
-
-export async function analyzeImageForContacts(imageBase64: string): Promise<AnalysisResult> {
+export async function analyzeImageForContacts(imageBase64: string) {
   const apiKey = process.env['LOVABLE_API_KEY'];
   
   if (!apiKey) {
-    throw new Error("LOVABLE_API_KEY is not configured. Please enable AI Gateway in the project settings.");
+    console.error("LOVABLE_API_KEY is missing");
+    throw new Error("Configuração de IA ausente");
   }
 
-  // Remove data URL prefix if present
-  const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+  // Removendo prefixo data:image/...;base64, se existir
+  const base64Data = imageBase64.includes('base64,') 
+    ? imageBase64.split('base64,')[1] 
+    : imageBase64;
 
   try {
-    // Tentando o endpoint padrão do AI Gateway que deveria funcionar
+    // Usando o endpoint correto do Lovable AI Gateway para projetos TanStack Start
     const response = await fetch("https://api.lovable.dev/v1/ai/chat/completions", {
       method: "POST",
       headers: {
@@ -31,27 +26,22 @@ export async function analyzeImageForContacts(imageBase64: string): Promise<Anal
         messages: [
           {
             role: "system",
-            content: `Você é um extrator de dados altamente preciso especializado em capturar informações de recebedores em prints de logística/entregas.
-            Seu objetivo é extrair APENAS o NOME e o TELEFONE do recebedor/cliente.
-
-            CONTEXTO DA IMAGEM:
-            - A imagem é um print de detalhes de pedido (ex: Shopee).
-            - O nome do recebedor geralmente aparece abaixo de "Informações do recebedor".
-            - O telefone aparece logo abaixo ou ao lado do nome, geralmente com "+55".
-
-            Regras CRÍTICAS:
-            1. Retorne um JSON: {"name": string, "phone": string, "needsReview": boolean}.
-            2. "name": Extraia APENAS o primeiro nome. Exemplo: "Jéssica De Araújo..." -> "Jéssica". Limpe caracteres como "_".
-            3. "phone": Extraia o número completo (ex: 5516994345806).
-            4. "needsReview": SEMPRE defina como FALSE se encontrar um telefone válido (8+ dígitos).
-            5. Procure por padrões numéricos longos caso não encontre etiquetas claras.`
+            content: `Você é um extrator de dados para prints de logística da Shopee.
+            Extraia o NOME e o TELEFONE do recebedor.
+            
+            REGRAS:
+            1. Retorne JSON: {"name": string, "phone": string, "needsReview": boolean}.
+            2. "name": Apenas o primeiro nome (ex: "Maria").
+            3. "phone": Apenas números (ex: "5511999999999").
+            4. Se encontrar qualquer sequência de 8+ dígitos, use como telefone e defina needsReview=false.
+            5. Limpe o nome de caracteres como "_" ou "*" frequentemente encontrados em OCR.`
           },
           {
             role: "user",
             content: [
               {
                 type: "text",
-                text: "Extraia o nome e telefone desta imagem de entrega."
+                text: "Extraia os dados deste print de entrega Shopee:"
               },
               {
                 type: "image_url",
@@ -62,38 +52,40 @@ export async function analyzeImageForContacts(imageBase64: string): Promise<Anal
             ]
           }
         ],
-        response_format: { type: "json_object" },
-        max_tokens: 300,
+        response_format: { type: "json_object" }
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI Gateway error:", response.status, errorText);
-      throw new Error(`AI Gateway error (${response.status})`);
+      console.error(`AI Gateway error (${response.status}):`, errorText);
+      
+      // Fallback para falha técnica: não travar a UI, mas marcar para revisão
+      return {
+        name: "Erro na extração",
+        phone: "",
+        needsReview: true
+      };
     }
 
     const result = await response.json();
     const content = JSON.parse(result.choices[0].message.content);
     
-    // Limpeza extra garantida no servidor
-    if (content.name) {
-      const cleaned = content.name.replace(/[_\W]+$/, '');
-      content.name = cleaned.split(' ')[0].split('_')[0].trim();
-    }
-    
-    // Força validade se houver telefone
-    if (content.phone && content.phone.replace(/\D/g, '').length >= 8) {
-      content.needsReview = false;
-    }
-    
-    return AnalysisResultSchema.parse(content);
-  } catch (error) {
-    console.error("Error analyzing image:", error);
+    // Pós-processamento de segurança
+    const phone = (content.phone || "").replace(/\D/g, "");
+    const needsReview = phone.length < 8;
+
     return {
-      name: null,
-      phone: null,
-      needsReview: true,
+      name: (content.name || "Cliente").split(/[_\s]/)[0],
+      phone: phone,
+      needsReview: needsReview
+    };
+  } catch (error) {
+    console.error("Failed to analyze image:", error);
+    return {
+      name: "Erro processamento",
+      phone: "",
+      needsReview: true
     };
   }
 }
