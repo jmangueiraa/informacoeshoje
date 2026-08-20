@@ -148,12 +148,19 @@ export async function analyzeImageForContacts(imageBase64: string) {
     let finalNeedsReview = false;
     let reviewReason = "";
 
-    if (!phoneResult.isValid) {
+    // Se a IA encontrou um telefone com confiança mínima, vamos tentar aceitar
+    // mesmo que a normalização aponte problemas de DDD, para não perder o lead.
+    if (phoneResult.normalized.length < 8) {
       finalNeedsReview = true;
-      reviewReason = phoneResult.reason || "Telefone inválido";
+      reviewReason = "Telefone não identificado ou muito curto";
     } else if (!hasName) {
       finalNeedsReview = true;
       reviewReason = "Nome não identificado";
+    } else if (!phoneResult.isValid) {
+      // Se tiver entre 8 e 9 dígitos, provavelmente falta o DDD, mas vamos salvar
+      // e marcar para revisão apenas para o usuário conferir o DDD.
+      finalNeedsReview = true;
+      reviewReason = "Verificar DDD do telefone";
     }
 
     console.log(`[CAPTURA] Classificação final: ${finalNeedsReview ? 'REVISAR' : 'OK'} - Motivo: ${reviewReason || 'Dados Claros'}`);
