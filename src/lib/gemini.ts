@@ -16,8 +16,8 @@ export async function extractContactFromGemini(imageBase64: string, mimeType: st
   const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
 
   // Lista de modelos para tentativa de fallback
-  // Modelo recomendado: gemini-2.5-flash
-  const models = ["gemini-2.5-flash"];
+  // Modelo recomendado: gemini-3.6-flash
+  const models = ["gemini-3.6-flash"];
   let lastError = "";
 
   for (const model of models) {
