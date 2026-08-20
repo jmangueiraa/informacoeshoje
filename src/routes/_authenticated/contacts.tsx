@@ -45,7 +45,6 @@ function ContactsPage() {
   
   // Controle de Rate Limit (429)
   const [isWaiting, setIsWaiting] = useState(false)
-  const [isCheckingApi, setIsCheckingApi] = useState(false)
   const [isApiReleased, setIsApiReleased] = useState(false)
   const [waitTime, setWaitTime] = useState(0)
   const waitTimerRef = useRef<NodeJS.Timeout | null>(null)
