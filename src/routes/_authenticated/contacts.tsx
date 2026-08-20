@@ -148,6 +148,11 @@ function ContactsPage() {
     if (confirm("Deseja realmente cancelar o processamento restante?")) {
       cancelRef.current = true;
       setProcessing(false);
+      setQueue(prev => prev.map(q => 
+        (q.status === 'pending' || q.status === 'processing' || q.status === 'waiting_limit') 
+          ? { ...q, status: 'cancelled' } 
+          : q
+      ));
       toast.error("Processamento cancelado");
     }
   }
