@@ -1,8 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { analyzeImageForContacts } from "./contacts.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const getContacts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context as any;
     
@@ -30,6 +32,7 @@ export const processImageOCR = createServerFn({ method: "POST" })
   });
 
 export const saveContact = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: any) => z.object({
     name: z.string(),
     phone: z.string(),
@@ -86,7 +89,7 @@ export const saveContact = createServerFn({ method: "POST" })
       needs_review: data.needsReview === true, 
       review_reason: data.reviewReason || null,
       raw_data: data.rawData || null,
-      user_id: finalUserId
+      user_id: userId // Agora garantido pelo middleware
     };
 
     console.log(`[CAPTURA] saveContact - Payload Enviado ao Supabase:`, payload);
@@ -110,6 +113,7 @@ export const saveContact = createServerFn({ method: "POST" })
   });
 
 export const runControlledTest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: any) => z.object({
     name: z.string(),
     phone: z.string()
