@@ -66,21 +66,30 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          needs_review: boolean | null
           phone_normalized: string
+          raw_data: Json | null
+          review_reason: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          needs_review?: boolean | null
           phone_normalized: string
+          raw_data?: Json | null
+          review_reason?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          needs_review?: boolean | null
           phone_normalized?: string
+          raw_data?: Json | null
+          review_reason?: string | null
           user_id?: string
         }
         Relationships: []
