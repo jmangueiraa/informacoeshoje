@@ -14,7 +14,7 @@ export function normalizeBrazilianPhone(phone: string | null | undefined): { nor
   let digits = phone.replace(/\D/g, "");
   
   // LOGICA AGRESSIVA DE EXTRAÇÃO DE DDD/NÚMERO
-  // Se tiver 12 ou 13 dígitos e começar com 55, remove o 55 (DDI Brasil)
+  // Se tiver de 12 a 13 dígitos e começar com 55, remove o 55 (DDI Brasil)
   if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
     digits = digits.substring(2);
   }
@@ -101,27 +101,26 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
     ]);
 
     const response = await result.response;
-    let rawContent = response.text();
-    console.log("[IMPORT] Resposta bruta do Gemini:", rawContent);
+    const rawContent = response.text();
+    console.log("[GEMINI_RESPONSE_RAW]:", rawContent);
     
-    // Sanitização rigorosa de JSON
-    if (rawContent.includes("```")) {
-      rawContent = rawContent.replace(/```json/g, "").replace(/```/g, "").trim();
-    }
-    
-    // Às vezes o Gemini retorna apenas um objeto em vez de um array se houver apenas um contato.
-    // Vamos garantir que seja um array.
     let contactsData: any[] = [];
     try {
-      const parsed = JSON.parse(rawContent);
+      // Limpeza de markdown e caracteres invisíveis
+      const cleanJson = rawContent.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(cleanJson);
       contactsData = Array.isArray(parsed) ? parsed : [parsed];
     } catch (e) {
       console.error("[IMPORT] Erro ao parsear JSON do Gemini:", e);
       // Fallback: tentar encontrar JSON no texto se houver lixo em volta
       const jsonMatch = rawContent.match(/\[.*\]|\{.*\}/s);
       if (jsonMatch) {
-        const parsedMatch = JSON.parse(jsonMatch[0]);
-        contactsData = Array.isArray(parsedMatch) ? parsedMatch : [parsedMatch];
+        try {
+          const parsedMatch = JSON.parse(jsonMatch[0]);
+          contactsData = Array.isArray(parsedMatch) ? parsedMatch : [parsedMatch];
+        } catch (innerError) {
+          console.error("[IMPORT] Falha no fallback de parse:", innerError);
+        }
       }
     }
 
@@ -154,6 +153,12 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
           finalNeedsReview = true;
           reviewReason = phoneResult.reason || "Telefone inválido";
         }
+      }
+
+      // Se encontrar nome e telefone válidos, garante que o status seja 'new' (needsReview: false)
+      if (isNameValid && isPhoneValid) {
+        finalNeedsReview = false;
+        reviewReason = "";
       }
 
       return {
