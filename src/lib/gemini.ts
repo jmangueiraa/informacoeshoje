@@ -5,7 +5,7 @@
  */
 export async function extractContactFromGemini(imageBase64: string, mimeType: string = "image/jpeg") {
   // No Lovable Cloud, tentamos ler do import.meta.env injetado ou process.env se disponível
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "AQ.Ab8RN6JmrTCG3VhxLQnIrq0PjpCSbiiKEJZMZxukNvh1PQprgA";
+  const apiKey = import.meta.env['VITE_GEMINI_API_KEY'] || "AQ.Ab8RN6JmrTCG3VhxLQnIrq0PjpCSbiiKEJZMZxukNvh1PQprgA";
   
   if (!apiKey) {
     throw new Error("API Key do Gemini não encontrada. Verifique as configurações de variáveis de ambiente (VITE_GEMINI_API_KEY ou GEMINI_API_KEY).");
