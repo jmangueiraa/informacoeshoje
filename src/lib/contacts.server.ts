@@ -43,10 +43,15 @@ export function normalizeBrazilianPhone(phone: string | null | undefined): { nor
   };
 }
 
-export async function analyzeImageForContacts(imageBase64: string, filename: string = "arquivo_upload.jpg") {
-  console.log(`\n========== CAPTURA GEMINI DEBUG ==========\n1. ARQUIVO:\n   nome: ${filename}\n   tamanho: ~${Math.round(imageBase64.length * 0.75 / 1024)} KB`);
+export async function analyzeImageForContacts(imageBase64: string, filename: string = "arquivo_upload.jpg", mimeType: string = "image/jpeg") {
+  console.log(`\n========== CAPTURA GEMINI DEBUG ==========`);
+  console.log(`[DEBUG] Arquivo: ${filename}`);
+  console.log(`[DEBUG] MimeType: ${mimeType}`);
+  console.log(`[DEBUG] Tamanho Base64 recebido: ${imageBase64?.length}`);
   
   const apiKey = process.env['GEMINI_API_KEY'];
+  console.log("[DEBUG] API Key presente?:", !!apiKey);
+
   if (!apiKey) {
     console.error("10. LOCAL DA DECISÃO: analyzeImageForContacts - Erro: GEMINI_API_KEY ausente");
     return {
@@ -56,9 +61,7 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
     };
   }
 
-  const base64Data = imageBase64.includes('base64,') 
-    ? imageBase64.split('base64,')[1] 
-    : imageBase64;
+  const base64Data = imageBase64;
 
   try {
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
