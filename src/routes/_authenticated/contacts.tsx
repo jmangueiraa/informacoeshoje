@@ -10,8 +10,10 @@ import { getContacts, saveContact, runControlledTest } from '@/lib/contacts.func
 import { extractContactFromGemini } from '@/lib/gemini'
 import { formatPhone } from '@/lib/utils'
 
-import { Trash2, Phone, Upload, CheckCircle2, AlertCircle, X, Search, Beaker } from 'lucide-react'
+import { Trash2, Phone, Upload, CheckCircle2, AlertCircle, X, Search, Beaker, Settings2, Key } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 
@@ -43,6 +45,26 @@ function ContactsPage() {
   const [debugData, setDebugData] = useState<any>(null)
   const [testResults, setTestResults] = useState<any[] | null>(null)
   const [isTesting, setIsTesting] = useState(false)
+  
+  // Estado para a chave da API do Gemini
+  const [geminiKey, setGeminiKey] = useState('')
+  const [isKeyDialogOpen, setIsKeyDialogOpen] = useState(false)
+
+  useEffect(() => {
+    const stored = localStorage.getItem('GEMINI_API_KEY_LOCAL')
+    if (stored) setGeminiKey(stored)
+  }, [])
+
+  const saveGeminiKey = () => {
+    if (geminiKey.trim()) {
+      localStorage.setItem('GEMINI_API_KEY_LOCAL', geminiKey.trim())
+      toast.success('Chave de API salva localmente!')
+    } else {
+      localStorage.removeItem('GEMINI_API_KEY_LOCAL')
+      toast.info('Chave removida. Usando padrão do sistema.')
+    }
+    setIsKeyDialogOpen(false)
+  }
   
   const queryClient = useQueryClient()
   const { data: contacts, isLoading } = useQuery({
@@ -276,15 +298,54 @@ function ContactsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Captura de Contatos</h1>
           <p className="text-muted-foreground">Extraia automaticamente nomes e telefones de imagens de logística (Shopee).</p>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={handleControlledTest} 
-          disabled={isTesting || processing}
-          className="flex items-center gap-2 border-yellow-500/50 text-yellow-600 hover:bg-yellow-50"
-        >
-          <Beaker className="h-4 w-4" />
-          {isTesting ? 'Testando...' : '🧪 TESTAR CLASSIFICAÇÃO'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Dialog open={isKeyDialogOpen} onOpenChange={setIsKeyDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="icon" className="h-10 w-10">
+                <Settings2 className="h-5 w-5" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Key className="h-5 w-5 text-primary" />
+                  Configuração de API Gemini
+                </DialogTitle>
+                <DialogDescription>
+                  Insira sua própria chave de API do Google Gemini se desejar. Ela será salva apenas no seu navegador (localStorage).
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="api-key">Chave de API</Label>
+                  <Input 
+                    id="api-key" 
+                    type="password" 
+                    value={geminiKey} 
+                    onChange={(e) => setGeminiKey(e.target.value)}
+                    placeholder="Cole sua chave AQ.Ab8RN..."
+                  />
+                  <p className="text-[10px] text-muted-foreground italic">
+                    Se deixar vazio, o sistema usará a chave padrão configurada.
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={saveGeminiKey}>Salvar Configurações</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Button 
+            variant="outline" 
+            onClick={handleControlledTest} 
+            disabled={isTesting || processing}
+            className="flex items-center gap-2 border-yellow-500/50 text-yellow-600 hover:bg-yellow-50"
+          >
+            <Beaker className="h-4 w-4" />
+            {isTesting ? 'Testando...' : '🧪 TESTAR CLASSIFICAÇÃO'}
+          </Button>
+        </div>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
