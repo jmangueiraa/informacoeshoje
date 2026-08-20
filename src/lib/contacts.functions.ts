@@ -69,9 +69,11 @@ export const saveContact = createServerFn({ method: "POST" })
           .map((n: any) => {
             const nameStr = String(n || "");
             const match = nameStr.match(/Cliente(\d+)/);
-            return match ? parseInt(match[1], 10) : null;
+            if (!match || !match[1]) return null;
+            return parseInt(match[1], 10);
           })
           .filter((n: number | null): n is number => n !== null);
+
 
         
         if (sequentials.length > 0) {
