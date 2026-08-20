@@ -112,7 +112,7 @@ function ContactsPage() {
 
         // 1. Verificar duplicata no mesmo lote
         if (phoneDigits && batchPhones.has(phoneDigits)) {
-          console.log(`[CAPTURA] Duplicata detectada no lote: ${phoneDigits}`);
+          console.log(`[IMPORT] Duplicata no lote detectada: ${phoneDigits}`);
           dupCount++;
           currentDebug.statusSentToDB = 'duplicate-batch';
           setDebugData(currentDebug);
@@ -124,69 +124,36 @@ function ContactsPage() {
           batchPhones.add(phoneDigits);
         }
 
-        // Se a IA já marcou como revisão por erro de comunicação, respeitamos
-        if (result.reviewReason === "Falha na comunicação com o provedor de IA" || result.reviewReason === "Erro interno no processamento da imagem") {
-          await saveContact({ 
+        // 2. Persistência com tratamento de status
+        try {
+          const savedContact = await saveContact({ 
             data: { 
-              name: result.name || 'Erro IA', 
-              phone: result.phone || '0000000000',
-              needsReview: true,
-              reviewReason: result.reviewReason,
-              rawData: result.raw_data
+              name: result.name || 'Cliente', 
+              phone: result.phone,
+              needsReview: !!result.needsReview,
+              reviewReason: result.reviewReason || null,
+              rawData: result.raw_data || null
             } 
           });
-          revCount++;
-          currentDebug.statusSentToDB = 'review';
-        } else if (phoneDigits && phoneDigits.length >= 8) {
-          try {
-            const savedContact = await saveContact({ 
-              data: { 
-                name: result.name || 'Cliente', 
-                phone: result.phone,
-                needsReview: !!result.needsReview,
-                reviewReason: result.reviewReason || null,
-                rawData: result.raw_data || null
-              } 
-            });
-            
-            // Sincronizar com o banco: false -> 'new', true -> 'review'
-            const finalStatus = savedContact.needs_review ? 'review' : 'new';
-            currentDebug.statusSentToDB = result.needsReview ? 'review' : 'new';
-            currentDebug.statusSavedInDB = finalStatus;
-            currentDebug.statusReturnedToFront = finalStatus;
-
-            if (savedContact.needs_review) {
-              revCount++;
-            } else {
-              newCount++;
-            }
-          } catch (err: any) {
-            console.error(`[CAPTURA] Erro ao salvar contato:`, err);
-            if (err.message === 'DUPLICATE_CONTACT') {
-              dupCount++;
-              currentDebug.isDuplicate = 'SIM';
-              currentDebug.statusSavedInDB = 'duplicate';
-            } else {
-              revCount++;
-              currentDebug.decisionStep = 'frontend-fallback';
-              currentDebug.decisionRule = `catch error on save: ${err.message}`;
-            }
+          
+          // Sucesso na gravação
+          if (savedContact.needs_review) {
+            revCount++;
+          } else {
+            newCount++;
           }
-        } else {
-          try {
-            await saveContact({ 
-              data: { 
-                name: result.name || 'Cliente', 
-                phone: result.phone || '00000000',
-                needsReview: true,
-                reviewReason: result.reviewReason || "Telefone não identificado",
-                rawData: result.raw_data
-              } 
-            });
-          } catch (e) {}
-          revCount++;
-          currentDebug.decisionStep = 'frontend';
-          currentDebug.decisionRule = 'phone.length < 8';
+          currentDebug.statusSavedInDB = savedContact.needs_review ? 'review' : 'new';
+        } catch (err: any) {
+          if (err.message === 'DUPLICATE_CONTACT') {
+            console.log(`[IMPORT] Duplicata no banco detectada para: ${phoneDigits}`);
+            dupCount++;
+            currentDebug.statusSavedInDB = 'duplicate';
+          } else {
+            console.error(`[IMPORT_ERROR] Falha na gravação do contato:`, err);
+            revCount++;
+            currentDebug.statusSavedInDB = 'error';
+            toast.error(`Erro ao salvar contato ${result.name}: ${err.message}`);
+          }
         }
         
         setDebugData(currentDebug);
