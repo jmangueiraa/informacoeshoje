@@ -31,7 +31,10 @@ export function AppSidebar() {
     staleTime: 0,
   })
 
-  // Add effect to monitor auth state and refetch admin status
+  // Log status do admin para debug
+  React.useEffect(() => {
+    console.log("AppSidebar Status:", { isAdmin, isAdminLoading, email: 'ajpentretedimento@hotmail.com' });
+  }, [isAdmin, isAdminLoading]);
   React.useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
@@ -107,7 +110,7 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              {isAdmin && (
+              {(isAdmin || isAdminLoading) && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild tooltip="Captura de Contatos">
                     <Link to="/contacts" className="flex items-center gap-3 py-2">
