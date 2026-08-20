@@ -30,15 +30,15 @@ export async function analyzeImageForContacts(imageBase64: string): Promise<Anal
         messages: [
           {
             role: "system",
-            content: `Você é um extrator de dados especializado em capturar informações de recebedores em prints de logística/entregas.
+            content: `Você é um extrator de dados especializado em capturar informações de recebedores em prints de logística/entregas, como telas de detalhes de pedido da Shopee ou apps de entrega.
             Seu objetivo é extrair APENAS o NOME e o TELEFONE.
             Ignore endereços, datas, códigos de rastreio, nomes de produtos, etc.
             
             Regras:
             1. Retorne um JSON com os campos: "name", "phone" e "needsReview".
-            2. "name": Nome completo do recebedor/cliente.
+            2. "name": APENAS o primeiro nome do recebedor/cliente.
             3. "phone": Número de telefone (mantenha como está no texto).
-            4. "needsReview": true se as informações não forem claras ou estiverem incompletas, false caso contrário.
+            4. "needsReview": true apenas se o telefone não for encontrado ou estiver claramente errado. Se encontrar um telefone válido no formato de apps de entrega (como o da segunda foto de referência), defina como false.
             5. Se não encontrar o dado, retorne null para o campo.
             6. Seja preciso. Não invente dados.`
           },
