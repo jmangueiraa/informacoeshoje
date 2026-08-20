@@ -12,7 +12,7 @@ export async function testOpenAI(apiKey: string) {
       messages: [{ role: "user", content: "hi" }],
       max_tokens: 5,
     });
-    return { ok: true, data: response.choices[0].message.content };
+    return { ok: true, data: response.choices[0]?.message?.content };
   } catch (e: any) {
     return { ok: false, error: e.message, status: e.status, name: e.name };
   }
@@ -33,8 +33,12 @@ export async function testDirect(apiKey: string) {
                 max_tokens: 5
             })
         });
-        return { url, status: response.status, ok: response.ok, body: await response.text() };
+        const status = response.status;
+        const ok = response.ok;
+        const body = await response.text();
+        return { url, status, ok, body };
     } catch (e: any) {
         return { url, error: e.message };
     }
 }
+
