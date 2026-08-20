@@ -199,33 +199,32 @@ export const runControlledTest = createServerFn({ method: "POST" })
     
     const phoneResult = normalizeBrazilianPhone(data.phone);
     
-    // Regras de validação do Nome (sincronizada com o servidor)
+    // Função de sanitização rigorosa conforme solicitado no backend/frontend
+    const cleanAndValidateName = (name: string, nextSequential: string): string => {
+      if (!name) return nextSequential;
+      
+      // 1. Remove pontos, sublinhados, traços, asteriscos, tils
+      const sanitized = name.replace(/[\._\-\*~]/g, '').trim();
+      
+      // 2. Se tiver menos de 3 letras válidas ou tiver caracteres de truncamento (..)
+      if (sanitized.length < 3 || /[\.]{2,}/.test(name)) {
+        return nextSequential;
+      }
+      
+      return sanitized;
+    };
+
     const rawName = data.name.trim();
-    const hasEllipsis = rawName.includes("...");
-    const hasSpecialChars = /[#@$%&|\\/]/.test(rawName);
-    const hasAsterisks = /[*_]{2,}/.test(rawName);
+    const sanitizedName = cleanAndValidateName(rawName, "Cliente00000");
     
-    const cleanedForLength = rawName
-      .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-    const firstNameForLength = cleanedForLength.split(' ')[0] || "";
-    const isNameTooShort = firstNameForLength.length < 3;
+    let cleanName = sanitizedName;
+    const isNameIllegible = sanitizedName === "Cliente00000";
 
-    const isNameIllegible = !rawName || 
-                           rawName === "ILEGÍVEL" || 
-                           hasEllipsis || 
-                           hasSpecialChars || 
-                           hasAsterisks || 
-                           isNameTooShort;
-
-    let cleanName = "";
-    if (isNameIllegible) {
-      cleanName = "Cliente00000"; // Mock sequencial para teste
-    } else {
-      const firstName = rawName.split(' ')[0] || "Cliente";
+    if (!isNameIllegible) {
+      const firstName = sanitizedName.split(' ')[0] || "Cliente";
       cleanName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
     }
+
     
     const isPhoneValid = phoneResult.isValid;
     
