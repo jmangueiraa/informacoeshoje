@@ -68,10 +68,11 @@ export const saveContact = createServerFn({ method: "POST" })
         const sequentials = lastNames
           .map((n: any) => {
             const nameStr = String(n || "");
-            const match = nameStr.match(/^Cliente(\d{5})$/);
+            const match = nameStr.match(/Cliente(\d+)/);
             return match ? parseInt(match[1], 10) : null;
           })
           .filter((n: number | null): n is number => n !== null);
+
         
         if (sequentials.length > 0) {
           nextNumber = Math.max(...sequentials) + 1;
