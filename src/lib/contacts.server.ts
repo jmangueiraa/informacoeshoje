@@ -14,7 +14,7 @@ export function normalizeBrazilianPhone(phone: string | null | undefined): { nor
   let digits = phone.replace(/\D/g, "");
   
   // LOGICA AGRESSIVA DE EXTRAÇÃO DE DDD/NÚMERO
-  // Se tiver 12 ou 13 dígitos e começar com 55, remove o 55 (DDI Brasil)
+  // Se tiver de 12 a 13 dígitos e começar com 55, remove o 55 (DDI Brasil)
   if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
     digits = digits.substring(2);
   }
@@ -153,6 +153,12 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
           finalNeedsReview = true;
           reviewReason = phoneResult.reason || "Telefone inválido";
         }
+      }
+
+      // Se encontrar nome e telefone válidos, garante que o status seja 'new' (needsReview: false)
+      if (isNameValid && isPhoneValid) {
+        finalNeedsReview = false;
+        reviewReason = "";
       }
 
       return {
