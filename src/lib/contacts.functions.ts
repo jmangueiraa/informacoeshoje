@@ -133,4 +133,56 @@ export const updateLastSend = createServerFn({ method: "POST" })
   });
 
 export const runControlledTest = createServerFn({ method: "POST" })
-... elided ...
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: any) => z.object({
+    name: z.string(),
+    phone: z.string()
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { userId } = context as any;
+    
+    console.log(`[TESTE-SERVER] Iniciando teste para:`, { name: data.name, phone: data.phone, userId });
+
+    const { normalizeBrazilianPhone } = await import("./contacts.server");
+    
+    const phoneResult = normalizeBrazilianPhone(data.phone);
+    
+    // Normalização agressiva: Captura apenas o primeiro nome em Title Case
+    const rawCleanedName = data.name.replace(/[_*]/g, " ").replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").replace(/\s+/g, " ").trim();
+    const firstName = rawCleanedName.split(' ')[0] || "Cliente";
+    const cleanName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+    
+    const isErrorString = (s: string) => ["erro na ia", "null", "undefined", "cliente"].includes(s.toLowerCase());
+    const isNameValid = cleanName.length >= 2 && !isErrorString(cleanName) && !cleanName.toLowerCase().includes("shopee");
+    const isPhoneValid = phoneResult.isValid;
+    
+    let needsReview = false;
+    let reviewReason = "";
+
+    if (!isNameValid) {
+      needsReview = true;
+      reviewReason = "Nome não identificado claramente";
+    } else if (!isPhoneValid) {
+      if (phoneResult.normalized.length >= 8 && phoneResult.normalized.length < 10) {
+        needsReview = true;
+        reviewReason = "Telefone capturado sem DDD";
+      } else {
+        needsReview = true;
+        reviewReason = phoneResult.reason || "Telefone inválido";
+      }
+    }
+
+    const testResult = {
+      name: cleanName,
+      phone: phoneResult.normalized,
+      needsReview,
+      reviewReason,
+      isNameValid,
+      isPhoneValid,
+      user_id: userId,
+      raw_data: { test: true, originalName: data.name, originalPhone: data.phone }
+    };
+    
+    console.log(`[TESTE-SERVER] Resultado calculado:`, testResult);
+    return testResult;
+  });
