@@ -176,7 +176,8 @@ function ContactsPage() {
     const getItemsToProcess = () => queue.filter(item => 
       item.status === 'pending' || 
       item.status === 'waiting_limit' || 
-      item.status === 'error'
+      item.status === 'error' ||
+      item.status === 'cancelled'
     );
 
     let itemsToProcess = getItemsToProcess();
