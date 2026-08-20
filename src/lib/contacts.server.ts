@@ -1,11 +1,53 @@
 import { z } from "zod";
 
-export async function analyzeImageForContacts(imageBase64: string) {
-  const apiKey = process.env['LOVABLE_API_KEY'];
+/**
+ * Normaliza números brasileiros.
+ * Aceita formatos como: (16) 99999-9999, +55 16 99999-9999, 5516999999999, etc.
+ * Retorna apenas os dígitos relevantes sem o prefixo DDI 55 (se presente).
+ */
+export function normalizeBrazilianPhone(phone: string): { normalized: string; isValid: boolean; reason: string | undefined } {
+  const digits = phone.replace(/\D/g, "");
   
+  console.log(`[CAPTURA] Normalizando telefone bruto: "${phone}" -> dígitos: "${digits}"`);
+
+  let result = digits;
+  
+  // Se começar com 55 e tiver 12 ou 13 dígitos, remove o 55
+  if (result.startsWith("55") && (result.length === 12 || result.length === 13)) {
+    result = result.substring(2);
+    console.log(`[CAPTURA] Removido prefixo 55 -> "${result}"`);
+  }
+
+  // Validação básica de tamanho para Brasil (DDD + Número)
+  // Celular: 11 dígitos (Ex: 11988887777)
+  // Fixo: 10 dígitos (Ex: 1133334444)
+  const isValid = result.length === 10 || result.length === 11;
+  
+  let reason;
+  if (!isValid) {
+    if (result.length === 0) reason = "Telefone não identificado";
+    else reason = `Formato inválido (${result.length} dígitos)`;
+  }
+
+  return { 
+    normalized: result, 
+    isValid,
+    reason
+  };
+}
+
+export async function analyzeImageForContacts(imageBase64: string) {
+  console.log("[CAPTURA] Imagem recebida para processamento");
+  
+  const apiKey = process.env['LOVABLE_API_KEY'];
   if (!apiKey) {
-    console.error("LOVABLE_API_KEY is missing");
-    throw new Error("Configuração de IA ausente");
+    console.error("[CAPTURA] ERRO: LOVABLE_API_KEY ausente");
+    return {
+      name: "Erro de Configuração",
+      phone: "",
+      needsReview: true,
+      reviewReason: "Configuração de IA ausente"
+    };
   }
 
   const base64Data = imageBase64.includes('base64,') 
@@ -13,7 +55,7 @@ export async function analyzeImageForContacts(imageBase64: string) {
     : imageBase64;
 
   try {
-    // Attempting the most standard AI Gateway endpoint for TanStack Start
+    console.log("[CAPTURA] OCR iniciado via GPT-4o-mini");
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -25,22 +67,31 @@ export async function analyzeImageForContacts(imageBase64: string) {
         messages: [
           {
             role: "system",
-            content: `Você é um extrator de dados para prints de logística da Shopee (especialmente prints de conversa ou detalhes do pedido).
-            Extraia o NOME e o TELEFONE do destinatário.
+            content: `Você é um especialista em extração de dados de logística e e-commerce (Shopee, Mercado Livre, etc).
+            Sua tarefa é encontrar o NOME e o TELEFONE do destinatário em prints de telas de celular, etiquetas ou conversas.
 
-            REGRAS DE EXTRAÇÃO:
-            1. Retorne APENAS um JSON: {"name": string, "phone": string, "needsReview": boolean}.
-            2. Procure por padrões como "Destinatário:", "Nome:", "Recebedor:" ou um nome no topo.
-            3. Procure por telefones em formatos brasileiros: (XX) XXXXX-XXXX, XX XXXXX XXXX, ou apenas os números.
-            4. Mesmo que o telefone esteja incompleto ou mascarado (ex: ****), tente extrair os dígitos visíveis.
-            5. "needsReview" deve ser false se você encontrar qualquer sequência que pareça um número de telefone.`
+            INSTRUÇÕES:
+            1. Procure por labels como: "Destinatário", "Recebedor", "Cliente", "Enviar para", "Nome".
+            2. Procure por números de telefone brasileiros (com ou sem DDD, com ou sem parênteses/traços).
+            3. Identifique o nome completo se disponível.
+            4. Se encontrar vários nomes, foque no que parece ser o cliente/destinatário final.
+            5. Retorne OBRIGATORIAMENTE um JSON puro no formato abaixo.
+
+            FORMATO DE RETORNO (JSON):
+            {
+              "name": "Nome Completo Encontrado",
+              "phone": "Telefone Encontrado (mantenha original)",
+              "confidence_name": 0.0 a 1.0,
+              "confidence_phone": 0.0 a 1.0,
+              "observation": "Breve nota se algo estiver estranho"
+            }`
           },
           {
             role: "user",
             content: [
               {
                 type: "text",
-                text: "Extraia os dados deste print de entrega Shopee:"
+                text: "Extraia o nome e telefone do destinatário desta imagem de logística:"
               },
               {
                 type: "image_url",
@@ -57,45 +108,67 @@ export async function analyzeImageForContacts(imageBase64: string) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`AI Gateway error (${response.status}):`, errorText);
-      
-      // Fallback: Se a IA falhar, retornamos o objeto marcado para revisão
+      console.error(`[CAPTURA] Erro na API de IA (${response.status}):`, errorText);
       return {
-        name: "Revisão Necessária",
+        name: "Erro na IA",
         phone: "",
         needsReview: true,
-        error: errorText // Passar o erro para log interno
+        reviewReason: "Falha na comunicação com o provedor de IA"
       };
     }
 
     const result = await response.json();
-    const content = JSON.parse(result.choices[0].message.content);
+    const rawContent = result.choices[0].message.content;
+    console.log("[CAPTURA] Resultado bruto da IA:", rawContent);
     
-    const nameRaw = content.name || "Cliente";
-    const name = nameRaw
-      .split(/[_\s]/)[0]
-      .replace(/[^a-zA-ZáàâãéèêíïóôõöúçÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇ]/g, "")
-      .trim() || "Cliente";
+    const content = JSON.parse(rawContent);
     
-    const phone = (content.phone || "").replace(/\D/g, "");
+    const rawName = content.name || "";
+    const rawPhone = content.phone || "";
     
-    // Forçar needsReview=false se tivermos pelo menos 8 dígitos
-    const hasPhone = phone.length >= 8;
-    const finalNeedsReview = hasPhone ? false : (content.needsReview ?? true);
+    // Normalização e Validação
+    const phoneResult = normalizeBrazilianPhone(rawPhone);
+    
+    // Limpeza de nome: remove underscores, garante capitalização básica se necessário
+    // mas mantém o nome completo conforme solicitado
+    const cleanName = rawName.replace(/_/g, " ").trim();
+    const hasName = cleanName.length >= 2;
+    
+    console.log("[CAPTURA] Nome extraído:", cleanName);
+    console.log("[CAPTURA] Telefone extraído:", rawPhone);
+    console.log("[CAPTURA] Telefone normalizado:", phoneResult.normalized);
+    console.log("[CAPTURA] Confiança Nome:", content.confidence_name);
+    console.log("[CAPTURA] Confiança Telefone:", content.confidence_phone);
 
-    console.log("Extraction results:", { name, phone, finalNeedsReview, rawName: nameRaw });
+    // Lógica de Classificação Final
+    let finalNeedsReview = false;
+    let reviewReason = "";
+
+    if (!phoneResult.isValid) {
+      finalNeedsReview = true;
+      reviewReason = phoneResult.reason || "Telefone inválido";
+    } else if (!hasName) {
+      finalNeedsReview = true;
+      reviewReason = "Nome não identificado";
+    }
+
+    console.log(`[CAPTURA] Classificação final: ${finalNeedsReview ? 'REVISAR' : 'OK'} - Motivo: ${reviewReason || 'Dados Claros'}`);
 
     return {
-      name: name || "Cliente",
-      phone: phone,
-      needsReview: finalNeedsReview && !hasPhone
+      name: cleanName || "Cliente",
+      phone: phoneResult.normalized,
+      needsReview: finalNeedsReview,
+      reviewReason: reviewReason,
+      raw_data: content
     };
+
   } catch (error) {
-    console.error("Failed to analyze image:", error);
+    console.error("[CAPTURA] Erro crítico no processamento:", error);
     return {
-      name: "Erro no Processamento",
+      name: "Erro no Sistema",
       phone: "",
-      needsReview: true
+      needsReview: true,
+      reviewReason: "Erro interno no processamento da imagem"
     };
   }
 }
