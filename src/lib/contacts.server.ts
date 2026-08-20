@@ -6,31 +6,33 @@ import { z } from "zod";
  * Retorna apenas os dígitos relevantes sem o prefixo DDI 55 (se presente).
  */
 export function normalizeBrazilianPhone(phone: string): { normalized: string; isValid: boolean; reason: string | undefined } {
-  const digits = phone.replace(/\D/g, "");
+  // Remove tudo que não é dígito
+  let digits = phone.replace(/\D/g, "");
   
   console.log(`[CAPTURA] Normalizando telefone bruto: "${phone}" -> dígitos: "${digits}"`);
 
-  let result = digits;
-  
-  // Se começar com 55 e tiver 12 ou 13 dígitos, remove o 55
-  if (result.startsWith("55") && (result.length === 12 || result.length === 13)) {
-    result = result.substring(2);
-    console.log(`[CAPTURA] Removido prefixo 55 -> "${result}"`);
+  // Se o número for muito curto (menos de 8 dígitos), é inválido de cara
+  if (digits.length < 8) {
+    return { normalized: digits, isValid: false, reason: "Telefone muito curto" };
   }
 
-  // Validação básica de tamanho para Brasil (DDD + Número)
-  // Celular: 11 dígitos (Ex: 11988887777)
-  // Fixo: 10 dígitos (Ex: 1133334444)
-  const isValid = result.length === 10 || result.length === 11;
+  // Se tiver 12 ou 13 dígitos e começar com 55, remove o 55 (DDI Brasil)
+  if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
+    digits = digits.substring(2);
+    console.log(`[CAPTURA] Removido prefixo 55 -> "${digits}"`);
+  }
+
+  // Se o número tiver 9 dígitos e não tiver DDD, ele é problemático para salvar, 
+  // mas vamos aceitar se tiver 10 ou 11 (DDD + Número)
+  const isValid = digits.length >= 10 && digits.length <= 11;
   
   let reason;
   if (!isValid) {
-    if (result.length === 0) reason = "Telefone não identificado";
-    else reason = `Formato inválido (${result.length} dígitos)`;
+    reason = `Formato suspeito (${digits.length} dígitos). Verifique o DDD.`;
   }
 
   return { 
-    normalized: result, 
+    normalized: digits, 
     isValid,
     reason
   };
@@ -67,23 +69,25 @@ export async function analyzeImageForContacts(imageBase64: string) {
         messages: [
           {
             role: "system",
-            content: `Você é um especialista em extração de dados de logística e e-commerce (Shopee, Mercado Livre, etc).
-            Sua tarefa é encontrar o NOME e o TELEFONE do destinatário em prints de telas de celular, etiquetas ou conversas.
+            content: `Você é um especialista em OCR e extração de dados de alta precisão para logística (Shopee).
+            Sua missão é extrair o NOME e o TELEFONE do DESTINATÁRIO da imagem.
 
-            INSTRUÇÕES:
-            1. Procure por labels como: "Destinatário", "Recebedor", "Cliente", "Enviar para", "Nome".
-            2. Procure por números de telefone brasileiros (com ou sem DDD, com ou sem parênteses/traços).
-            3. Identifique o nome completo se disponível.
-            4. Se encontrar vários nomes, foque no que parece ser o cliente/destinatário final.
-            5. Retorne OBRIGATORIAMENTE um JSON puro no formato abaixo.
+            REGRAS CRÍTICAS:
+            1. O NOME geralmente aparece próximo a "Destinatário:", "Recebedor:" ou em destaque no topo da etiqueta/detalhe do pedido.
+            2. O TELEFONE pode estar formatado como (XX) XXXXX-XXXX, XX XXXXXXXXX, ou apenas números. 
+            3. Ignore nomes de entregadores ou motoristas. Foque no CLIENTE.
+            4. IMPORTANTE: Se o telefone parecer cortado ou incompleto, tente inferir os dígitos faltantes se o padrão for óbvio, caso contrário, retorne o que encontrar.
+            5. Limpe o NOME de caracteres especiais como underscores (_), asteriscos (*) ou barras.
+            6. Retorne OBRIGATORIAMENTE um JSON puro.
 
             FORMATO DE RETORNO (JSON):
             {
-              "name": "Nome Completo Encontrado",
-              "phone": "Telefone Encontrado (mantenha original)",
+              "name": "Nome Completo",
+              "phone": "Telefone (apenas números, incluindo DDD)",
               "confidence_name": 0.0 a 1.0,
               "confidence_phone": 0.0 a 1.0,
-              "observation": "Breve nota se algo estiver estranho"
+              "is_shopee_print": true/false,
+              "observation": "Explique brevemente onde encontrou os dados"
             }`
           },
           {
@@ -144,12 +148,19 @@ export async function analyzeImageForContacts(imageBase64: string) {
     let finalNeedsReview = false;
     let reviewReason = "";
 
-    if (!phoneResult.isValid) {
+    // Se a IA encontrou um telefone com confiança mínima, vamos tentar aceitar
+    // mesmo que a normalização aponte problemas de DDD, para não perder o lead.
+    if (phoneResult.normalized.length < 8) {
       finalNeedsReview = true;
-      reviewReason = phoneResult.reason || "Telefone inválido";
+      reviewReason = "Telefone não identificado ou muito curto";
     } else if (!hasName) {
       finalNeedsReview = true;
       reviewReason = "Nome não identificado";
+    } else if (!phoneResult.isValid) {
+      // Se tiver entre 8 e 9 dígitos, provavelmente falta o DDD, mas vamos salvar
+      // e marcar para revisão apenas para o usuário conferir o DDD.
+      finalNeedsReview = true;
+      reviewReason = "Verificar DDD do telefone";
     }
 
     console.log(`[CAPTURA] Classificação final: ${finalNeedsReview ? 'REVISAR' : 'OK'} - Motivo: ${reviewReason || 'Dados Claros'}`);
