@@ -101,27 +101,26 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
     ]);
 
     const response = await result.response;
-    let rawContent = response.text();
-    console.log("[IMPORT] Resposta bruta do Gemini:", rawContent);
+    const rawContent = response.text();
+    console.log("[GEMINI_RESPONSE_RAW]:", rawContent);
     
-    // Sanitização rigorosa de JSON
-    if (rawContent.includes("```")) {
-      rawContent = rawContent.replace(/```json/g, "").replace(/```/g, "").trim();
-    }
-    
-    // Às vezes o Gemini retorna apenas um objeto em vez de um array se houver apenas um contato.
-    // Vamos garantir que seja um array.
     let contactsData: any[] = [];
     try {
-      const parsed = JSON.parse(rawContent);
+      // Limpeza de markdown e caracteres invisíveis
+      const cleanJson = rawContent.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(cleanJson);
       contactsData = Array.isArray(parsed) ? parsed : [parsed];
     } catch (e) {
       console.error("[IMPORT] Erro ao parsear JSON do Gemini:", e);
       // Fallback: tentar encontrar JSON no texto se houver lixo em volta
       const jsonMatch = rawContent.match(/\[.*\]|\{.*\}/s);
       if (jsonMatch) {
-        const parsedMatch = JSON.parse(jsonMatch[0]);
-        contactsData = Array.isArray(parsedMatch) ? parsedMatch : [parsedMatch];
+        try {
+          const parsedMatch = JSON.parse(jsonMatch[0]);
+          contactsData = Array.isArray(parsedMatch) ? parsedMatch : [parsedMatch];
+        } catch (innerError) {
+          console.error("[IMPORT] Falha no fallback de parse:", innerError);
+        }
       }
     }
 
