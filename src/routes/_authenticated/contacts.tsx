@@ -565,7 +565,7 @@ function ContactsPage() {
                       <Loader2 className="h-2.5 w-2.5 animate-spin" />
                       Lote em andamento...
                     </span>
-                    <span>{queue.filter(q => q.status === 'completed').length} / {queue.length} concluídos</span>
+                    <span>Concluídas: {queue.filter(q => q.status === 'completed').length} / {queue.length}</span>
                   </div>
                 </div>
               )}
