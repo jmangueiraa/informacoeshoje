@@ -26,14 +26,14 @@ export async function analyzeImageForContacts(imageBase64: string) {
           {
             role: "system",
             content: `Você é um extrator de dados para prints de logística da Shopee.
-            Extraia o NOME e o TELEFONE do recebedor.
+            Extraia o NOME e o TELEFONE do destinatário/recebedor.
             
             REGRAS:
             1. Retorne JSON: {"name": string, "phone": string, "needsReview": boolean}.
-            2. "name": Apenas o primeiro nome (ex: "Maria").
-            3. "phone": Apenas números (ex: "5511999999999").
-            4. Se encontrar qualquer sequência de 8+ dígitos, use como telefone e defina needsReview=false.
-            5. Limpe o nome de caracteres como "_" ou "*" frequentemente encontrados em OCR.`
+            2. "name": Extraia o primeiro nome limpo.
+            3. "phone": Extraia apenas números do telefone (ex: 11999999999). Se houver DDI (55), inclua.
+            4. Se encontrar qualquer sequência numérica que pareça um telefone (8 a 13 dígitos), use-a.
+            5. Defina "needsReview" como false se encontrar um nome E um telefone válido (8+ dígitos).`
           },
           {
             role: "user",
