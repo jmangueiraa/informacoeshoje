@@ -115,7 +115,14 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
       // Limpeza de markdown e caracteres invisíveis
       const cleanJson = rawContent.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(cleanJson);
-      contactsData = Array.isArray(parsed) ? parsed : [parsed];
+      
+      // Mapeia para garantir compatibilidade com o retorno esperado pelo processador
+      const items = Array.isArray(parsed) ? parsed : [parsed];
+      contactsData = items.map(item => ({
+        name: item.name || "",
+        phone: item.phone || "",
+        ...item
+      }));
     } catch (e) {
       console.error("[IMPORT] Erro ao parsear JSON do Gemini:", e);
       // Fallback: tentar encontrar JSON no texto se houver lixo em volta
@@ -123,7 +130,11 @@ export async function analyzeImageForContacts(imageBase64: string, filename: str
       if (jsonMatch) {
         try {
           const parsedMatch = JSON.parse(jsonMatch[0]);
-          contactsData = Array.isArray(parsedMatch) ? parsedMatch : [parsedMatch];
+          const items = Array.isArray(parsedMatch) ? parsedMatch : [parsedMatch];
+          contactsData = items.map(item => ({
+            name: item.name || "",
+            phone: item.phone || ""
+          }));
         } catch (innerError) {
           console.error("[IMPORT] Falha no fallback de parse:", innerError);
         }
