@@ -48,7 +48,6 @@ function AuthenticatedLayout() {
         <main className="flex-1 overflow-y-auto flex flex-col">
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 md:hidden">
             <div className="flex items-center gap-2">
-              <import { SidebarTrigger } from "@/components/ui/sidebar" />
               <SidebarTrigger />
               <span className="font-bold text-lg tracking-tight text-primary">LinkAfiliado</span>
             </div>
