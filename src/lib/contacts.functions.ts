@@ -55,9 +55,9 @@ export const saveContact = createServerFn({ method: "POST" })
       .insert([{
         name: cleanName,
         phone_normalized: phoneDigits,
-        needs_review: data.needsReview ?? false,
-        review_reason: data.reviewReason,
-        raw_data: data.rawData
+        needs_review: data.needsReview === true, // Garante booleano estrito
+        review_reason: data.reviewReason || null,
+        raw_data: data.rawData || null
       }])
       .select()
       .single();
