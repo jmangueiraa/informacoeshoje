@@ -81,7 +81,7 @@ function ContactsPage() {
 
       try {
         const result = await processImageOCR({ data: { imageBase64: base64 } })
-        if (result.needsReview || !result.phone) {
+        if (result.needsReview && !result.phone) {
           revCount++
         } else {
           try {
