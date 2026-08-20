@@ -188,15 +188,16 @@ function ContactsPage() {
         
         let statusSaved = 'error'
         try {
-          const saved = await saveContact({ 
-            data: { 
-              name: result.name, 
-              phone: result.phone,
-              needsReview: result.needsReview,
-              reviewReason: result.reviewReason,
-              rawData: result.raw_data
-            } 
-          })
+          const payload = { 
+            name: result.name, 
+            phone: result.phone,
+            needsReview: !!result.needsReview,
+            reviewReason: result.reviewReason || null,
+            rawData: result.raw_data || null
+          };
+          
+          const saved = await saveContact({ data: payload });
+          
           statusSaved = saved.needs_review ? 'review' : 'new'
           if (saved.needs_review) revCount++
           else newCount++
