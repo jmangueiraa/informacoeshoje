@@ -417,35 +417,9 @@ function ContactsPage() {
                   <p className="text-xs text-muted-foreground">PNG, JPG, WEBP (Máx. 5MB por arquivo)</p>
                 </div>
               </div>
-              
-              {summary && (
-                <div className="p-4 bg-background/80 rounded-xl border border-primary/10 space-y-3 animate-in zoom-in-95 duration-300">
-                  <div className="flex items-center gap-2 text-sm font-bold border-b pb-2 mb-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    Resumo do Processamento
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-[11px]">
-                    <div className="flex flex-col bg-muted/30 p-2 rounded border border-muted">
-                      <span className="text-muted-foreground uppercase text-[9px] font-bold">Total Processado</span>
-                      <span className="text-lg font-bold">{summary.processed}</span>
-                    </div>
-                    <div className="flex flex-col bg-green-500/10 p-2 rounded border border-green-200/50">
-                      <span className="text-green-600 uppercase text-[9px] font-bold">Novos Contatos</span>
-                      <span className="text-lg font-bold text-green-700">{summary.new}</span>
-                    </div>
-                    <div className="flex flex-col bg-yellow-500/10 p-2 rounded border border-yellow-200/50">
-                      <span className="text-yellow-600 uppercase text-[9px] font-bold">Duplicados</span>
-                      <span className="text-lg font-bold text-yellow-700">{summary.duplicates}</span>
-                    </div>
-                    <div className="flex flex-col bg-red-500/10 p-2 rounded border border-red-200/50">
-                      <span className="text-red-600 uppercase text-[9px] font-bold">Para Revisar</span>
-                      <span className="text-lg font-bold text-red-700">{summary.review}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
+
 
 
           <Card className="border-primary/20 bg-primary/5 shadow-sm">
