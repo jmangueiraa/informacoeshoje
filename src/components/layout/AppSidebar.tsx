@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner"
 import { checkIsAdmin } from "@/lib/admin.functions"
 import { useQuery } from "@tanstack/react-query"
+import { CONTACTS_BLOCKED_EMAILS } from "@/lib/constants"
 
 export function AppSidebar() {
   const navigate = useNavigate()
