@@ -20,6 +20,15 @@ import { useQuery } from "@tanstack/react-query"
 
 export function AppSidebar() {
   const navigate = useNavigate()
+  const [userEmail, setUserEmail] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserEmail(session?.user?.email ?? null)
+    })
+  }, [])
+
+  const canUseContacts = !CONTACTS_BLOCKED_EMAILS.includes((userEmail || '').toLowerCase())
   const { data: isAdmin, isLoading: isAdminLoading, refetch } = useQuery({
     queryKey: ['is-admin'],
     queryFn: async () => {
