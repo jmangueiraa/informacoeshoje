@@ -162,150 +162,150 @@ function ContactsPage() {
 
 
   const processImages = async () => {
+    // Trava dura: impede qualquer execução concorrente do worker
     if (processingRef.current) return;
-    
-    setProcessing(true);
     processingRef.current = true;
+
+    setProcessing(true);
     pausedRef.current = false;
     cancelRef.current = false;
     setIsPaused(false);
     setProgress(0);
-    
+
     countsRef.current = { new: 0, dup: 0, rev: 0, processed: 0 };
     const batchPhones = new Set<string>();
-    
-    const getItemsToProcess = () => {
-      // Prioritize items waiting for limit, then pending/cancelled
-      return queue.filter(item => 
-        item.status === 'pending' || 
-        item.status === 'waiting_limit' || 
-        item.status === 'error' ||
-        item.status === 'cancelled'
-      );
+
+    // Snapshot local da fila (evita closure obsoleta sobre `queue`,
+    // que fazia o mesmo arquivo ser reenviado indefinidamente).
+    const items = queue.filter(item =>
+      item.status === 'pending' ||
+      item.status === 'waiting_limit' ||
+      item.status === 'error' ||
+      item.status === 'cancelled'
+    );
+    const totalItems = items.length;
+
+    // Cada id só pode ser enviado uma vez com sucesso/erro final
+    const finishedIds = new Set<string>();
+    let doneCount = 0;
+
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    const waitWhilePaused = async () => {
+      while (pausedRef.current && !cancelRef.current) await sleep(300);
     };
 
-    const totalItemsInitial = queue.length;
-    
     try {
-      while (!cancelRef.current) {
-        const currentItems = getItemsToProcess();
-        if (currentItems.length === 0) break;
+      for (const item of items) {
+        if (cancelRef.current) break;
+        if (finishedIds.has(item.id)) continue;
 
-        const item = currentItems[0];
-        if (!item) break; // Extra safety for TS
-
-        // Wait if paused
-        while (pausedRef.current && !cancelRef.current) {
-          await new Promise(r => setTimeout(r, 500));
-        }
+        await waitWhilePaused();
         if (cancelRef.current) break;
 
-        // Wait for 429 backoff
-        while (isWaiting && waitTime > 0 && !cancelRef.current) {
-          while (pausedRef.current && !cancelRef.current) {
-            await new Promise(r => setTimeout(r, 500));
-          }
-          await new Promise(r => setTimeout(r, 500));
-        }
-        if (cancelRef.current) break;
-
-        // Set status to processing for this specific item
         setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'processing' } : q));
 
-        try {
-          const base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(item.file);
-          });
-          
-          const base64Data = base64.split(',')[1] || base64;
-          
-          // Real extraction attempt
-          const extractedContacts = await extractContactFromGemini(base64Data, item.file.type || 'image/jpeg');
-          
-          // If successful and we were waiting, show success feedback
-          if (isWaiting) {
+        // No máximo 1 nova tentativa por 429 para o MESMO arquivo
+        let attempt = 0;
+        let settled = false;
+
+        while (!settled && attempt < 2 && !cancelRef.current) {
+          attempt++;
+          try {
+            const base64 = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(item.file);
+            });
+            const base64Data = base64.split(',')[1] || base64;
+
+            const extractedContacts = await extractContactFromGemini(base64Data, item.file.type || 'image/jpeg');
+
             setIsWaiting(false);
-            setIsApiReleased(true);
-            setTimeout(() => {
-              setIsApiReleased(false);
-            }, 3000);
-          }
+            setWaitTime(0);
 
-          if (!extractedContacts || extractedContacts.length === 0) {
-            countsRef.current.rev++;
-            setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'final_error', error: 'Nenhum contato identificado' } : q));
-          } else {
-            for (const contactData of extractedContacts) {
-              const phoneDigits = contactData.phone ? String(contactData.phone).replace(/\D/g, '') : '';
-              if (phoneDigits && batchPhones.has(phoneDigits)) {
-                countsRef.current.dup++;
-                continue;
-              }
-              if (phoneDigits) batchPhones.add(phoneDigits);
+            if (!extractedContacts || extractedContacts.length === 0) {
+              countsRef.current.rev++;
+              setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'final_error', error: 'Nenhum contato identificado' } : q));
+            } else {
+              for (const contactData of extractedContacts) {
+                const phoneDigits = contactData.phone ? String(contactData.phone).replace(/\D/g, '') : '';
+                if (phoneDigits && batchPhones.has(phoneDigits)) {
+                  countsRef.current.dup++;
+                  continue;
+                }
+                if (phoneDigits) batchPhones.add(phoneDigits);
 
-              try {
-                const savedContact = await saveContact({ 
-                  data: { 
-                    name: contactData.name || 'Cliente', 
-                    phone: contactData.phone,
-                    needsReview: !contactData.name || !contactData.phone,
-                    reviewReason: (!contactData.name || !contactData.phone) ? 'Dados incompletos' : null,
-                    rawData: contactData || null
-                  } 
-                });
-                if (savedContact.needs_review) countsRef.current.rev++;
-                else countsRef.current.new++;
-              } catch (err: any) {
-                if (err.message === 'DUPLICATE_CONTACT') countsRef.current.dup++;
-                else {
-                  countsRef.current.rev++;
-                  throw err;
+                try {
+                  const savedContact = await saveContact({
+                    data: {
+                      name: contactData.name || 'Cliente',
+                      phone: contactData.phone,
+                      needsReview: !contactData.name || !contactData.phone,
+                      reviewReason: (!contactData.name || !contactData.phone) ? 'Dados incompletos' : null,
+                      rawData: contactData || null
+                    }
+                  });
+                  if (savedContact.needs_review) countsRef.current.rev++;
+                  else countsRef.current.new++;
+                } catch (err: any) {
+                  if (err.message === 'DUPLICATE_CONTACT') countsRef.current.dup++;
+                  else countsRef.current.rev++;
                 }
               }
+              countsRef.current.processed++;
+              setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'completed' } : q));
             }
-            countsRef.current.processed++;
-            setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'completed' } : q));
-          }
-        } catch (err: any) {
-          if (err.status === 429) {
-            const wait = err.retryAfter || 60;
-            console.warn(`[429] Limite atingido. Aguardando ${wait}s...`);
-            
-            setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'waiting_limit' } : q));
-            setIsApiReleased(false);
-            setWaitTime(wait);
-            setIsWaiting(true);
-            
-            // Do not break the loop, it will wait in the next iteration
-            continue; 
-          }
+            settled = true;
+          } catch (err: any) {
+            if (err?.status === 429 && attempt < 2) {
+              const wait = err.retryAfter || 60;
+              setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'waiting_limit' } : q));
+              setIsApiReleased(false);
+              setWaitTime(wait);
+              setIsWaiting(true);
 
-          console.error(`Erro no item ${item.id}:`, err);
-          setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'final_error', error: err.message } : q));
-          countsRef.current.rev++;
+              // Aguarda o backoff antes da única nova tentativa real
+              for (let s = 0; s < wait && !cancelRef.current; s++) {
+                await waitWhilePaused();
+                await sleep(1000);
+              }
+              setIsWaiting(false);
+              setWaitTime(0);
+              setIsApiReleased(true);
+              setTimeout(() => setIsApiReleased(false), 3000);
+              setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'processing' } : q));
+              continue;
+            }
+
+            console.error(`Erro no item ${item.id}:`, err);
+            setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'final_error', error: err?.message || 'Falha na extração' } : q));
+            countsRef.current.rev++;
+            settled = true;
+          }
         }
 
-        // Update progress
-        const completedCount = queue.filter(q => q.status === 'completed' || q.status === 'final_error').length;
-        setProgress((completedCount / totalItemsInitial) * 100);
-        
-        // Respect quota: ~5 per minute = 1 every 12s
-        if (!cancelRef.current) {
-          await new Promise(r => setTimeout(r, 12000));
+        finishedIds.add(item.id);
+        doneCount++;
+        setProgress(totalItems > 0 ? Math.round((doneCount / totalItems) * 100) : 100);
+
+        // Respeita a cota (~5 req/min) somente se ainda houver itens
+        if (!cancelRef.current && doneCount < totalItems) {
+          await sleep(12000);
         }
       }
     } finally {
-      setSummary({ 
-        processed: countsRef.current.processed, 
-        new: countsRef.current.new, 
-        duplicates: countsRef.current.dup, 
-        review: countsRef.current.rev 
+      setSummary({
+        processed: countsRef.current.processed,
+        new: countsRef.current.new,
+        duplicates: countsRef.current.dup,
+        review: countsRef.current.rev
       });
-      
+
+      setProgress(100);
       setProcessing(false);
+      setIsWaiting(false);
+      setWaitTime(0);
       processingRef.current = false;
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
       if (!cancelRef.current) toast.success("Processamento concluído");
