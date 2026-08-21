@@ -12,13 +12,16 @@ import { extractContactFromGemini } from '@/lib/gemini'
 import { formatPhone, cn } from '@/lib/utils'
 import { differenceInDays, addDays, parseISO, format } from 'date-fns'
 
-import { Trash2, Phone, Upload, CheckCircle2, AlertCircle, X, Search, Settings2, Key, Loader2, Pause, Play, Ban, AlertTriangle, Clock } from 'lucide-react'
+import { Trash2, Phone, Upload, CheckCircle2, AlertCircle, X, Search, Settings2, Key, Loader2, Pause, Play, Ban, AlertTriangle, Clock, FileSpreadsheet } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import * as XLSX from 'xlsx'
+import Papa from 'papaparse'
+import { importContactsFromExcel } from '@/lib/excel-import.functions'
 
 
 export const Route = createFileRoute('/_authenticated/contacts')({
@@ -403,6 +406,80 @@ function ContactsPage() {
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1 space-y-6">
+          <Card className="border-green-500/20 bg-green-50/5 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileSpreadsheet className="h-5 w-5 text-green-600" />
+                Upload Excel / CSV
+              </CardTitle>
+              <CardDescription>Importe contatos em massa rapidamente</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div 
+                className="border-2 border-dashed border-green-200 rounded-xl p-8 text-center transition-all cursor-pointer hover:bg-green-50/50"
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = '.xlsx, .xls, .csv';
+                  input.onchange = async (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0];
+                    if (!file) return;
+
+                    toast.loading("Processando arquivo...");
+                    
+                    try {
+                      let contacts: { name: string; phone: string }[] = [];
+                      
+                      if (file.name.endsWith('.csv')) {
+                        const text = await file.text();
+                        const result = Papa.parse(text, { header: true, skipEmptyLines: true });
+                        contacts = (result.data as any[]).map(row => ({
+                          name: String(row.nome || row.name || row.Nome || row.Name || Object.values(row)[0] || ""),
+                          phone: String(row.telefone || row.phone || row.Telefone || row.Phone || Object.values(row)[1] || "")
+                        }));
+                      } else {
+                        const data = await file.arrayBuffer();
+                        const workbook = XLSX.read(data);
+                        const firstSheetName = workbook.SheetNames[0];
+                        if (!firstSheetName) throw new Error("Arquivo Excel vazio");
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        if (!worksheet) throw new Error("Planilha não encontrada");
+                        const json = XLSX.utils.sheet_to_json(worksheet);
+                        contacts = json.map((row: any) => ({
+                          name: String(row.nome || row.name || row.Nome || row.Name || Object.values(row)[0] || ""),
+                          phone: String(row.telefone || row.phone || row.Telefone || row.Phone || Object.values(row)[1] || "")
+                        }));
+                      }
+
+                      contacts = contacts.filter(c => c.name && c.phone);
+
+                      if (contacts.length === 0) {
+                        toast.dismiss();
+                        toast.error("Nenhum contato válido encontrado no arquivo.");
+                        return;
+                      }
+
+                      const result = await importContactsFromExcel({ data: { contacts } });
+                      toast.dismiss();
+                      toast.success(`Importação concluída: ${result.imported} salvos, ${result.duplicates} duplicados.`);
+                      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+                    } catch (err) {
+                      toast.dismiss();
+                      toast.error("Erro ao processar arquivo Excel/CSV.");
+                    }
+                  };
+                  input.click();
+                }}
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <FileSpreadsheet className="h-8 w-8 text-green-600" />
+                  <p className="text-sm font-medium">Clique para selecionar Excel/CSV</p>
+                  <p className="text-[10px] text-muted-foreground uppercase">Colunas esperadas: Nome, Telefone</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="border-primary/20 bg-primary/5 shadow-sm">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
