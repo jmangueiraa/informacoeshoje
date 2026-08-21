@@ -440,7 +440,9 @@ function ContactsPage() {
                       } else {
                         const data = await file.arrayBuffer();
                         const workbook = XLSX.read(data);
-                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const firstSheetName = workbook.SheetNames[0];
+                        if (!firstSheetName) throw new Error("Arquivo Excel vazio");
+                        const worksheet = workbook.Sheets[firstSheetName];
                         const json = XLSX.utils.sheet_to_json(worksheet);
                         contacts = json.map((row: any) => ({
                           name: String(row.nome || row.name || row.Nome || row.Name || Object.values(row)[0] || ""),
@@ -456,7 +458,7 @@ function ContactsPage() {
                         return;
                       }
 
-                      const result = await importContactsFromExcel({ contacts });
+                      const result = await importContactsFromExcel({ data: { contacts } });
                       toast.dismiss();
                       toast.success(`Importação concluída: ${result.imported} salvos, ${result.duplicates} duplicados.`);
                       queryClient.invalidateQueries({ queryKey: ['contacts'] });
