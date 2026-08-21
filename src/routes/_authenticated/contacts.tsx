@@ -477,6 +477,24 @@ function ContactsPage() {
                   <p className="text-[10px] text-muted-foreground uppercase">Colunas esperadas: Nome, Telefone</p>
                 </div>
               </div>
+
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full gap-2 text-xs"
+                onClick={() => {
+                  const ws = XLSX.utils.aoa_to_sheet([
+                    ["Nome", "Telefone"],
+                    ["Exemplo Cliente", "19981356505"]
+                  ]);
+                  const wb = XLSX.utils.book_new();
+                  XLSX.utils.book_append_sheet(wb, ws, "Modelo");
+                  XLSX.writeFile(wb, "modelo_importacao_contatos.xlsx");
+                }}
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                Baixar Modelo de Planilha
+              </Button>
             </CardContent>
           </Card>
 
