@@ -12,13 +12,16 @@ import { extractContactFromGemini } from '@/lib/gemini'
 import { formatPhone, cn } from '@/lib/utils'
 import { differenceInDays, addDays, parseISO, format } from 'date-fns'
 
-import { Trash2, Phone, Upload, CheckCircle2, AlertCircle, X, Search, Settings2, Key, Loader2, Pause, Play, Ban, AlertTriangle, Clock } from 'lucide-react'
+import { Trash2, Phone, Upload, CheckCircle2, AlertCircle, X, Search, Settings2, Key, Loader2, Pause, Play, Ban, AlertTriangle, Clock, FileSpreadsheet } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import * as XLSX from 'xlsx'
+import Papa from 'papaparse'
+import { importContactsFromExcel } from '@/lib/excel-import.functions'
 
 
 export const Route = createFileRoute('/_authenticated/contacts')({
