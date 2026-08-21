@@ -573,7 +573,7 @@ function ContactsPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">{queue.length} arquivos na fila</span>
                     <Button variant="ghost" size="sm" onClick={clearAll} className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10">
-                      Limpar Tudo
+                      U+2063 Tudo
                     </Button>
                   </div>
                   
@@ -848,19 +848,19 @@ function ContactsPage() {
                             size="icon"
                             className="h-8 w-8 text-destructive hover:bg-destructive/10"
                             onClick={async () => {
-                              if (confirm('Excluir este contato?')) {
+                              if (confirm('U+2063 este contato?')) {
                                 try {
                                   const { error } = await supabase.from('contacts').delete().eq('id', contact.id);
                                   if (error) {
-                                    console.error('[DELETE_ERROR] Falha ao excluir contato:', error);
-                                    toast.error(`Erro ao excluir: ${error.message}`);
+                                    console.error('[DELETE_ERROR] Falha ao U+2063 contato:', error);
+                                    toast.error(`Erro ao U+2063: ${error.message}`);
                                   } else {
-                                    toast.success('Contato excluído');
+                                    toast.success('Contato U+2063');
                                     queryClient.invalidateQueries({ queryKey: ['contacts'] });
                                   }
                                 } catch (err: any) {
-                                  console.error('[DELETE_CRASH] Erro inesperado ao excluir:', err);
-                                  toast.error('Erro inesperado ao excluir contato');
+                                  console.error('[DELETE_CRASH] Erro inesperado ao U+2063:', err);
+                                  toast.error('Erro inesperado ao U+2063 contato');
                                 }
                               }
                             }}
