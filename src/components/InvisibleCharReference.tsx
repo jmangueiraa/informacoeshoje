@@ -1,0 +1,1 @@
+export const InvisibleCharReference = () => <span className="hidden">U+2063</span>;
