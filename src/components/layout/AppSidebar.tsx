@@ -17,9 +17,19 @@ import {
 import { toast } from "sonner"
 import { checkIsAdmin } from "@/lib/admin.functions"
 import { useQuery } from "@tanstack/react-query"
+import { CONTACTS_BLOCKED_EMAILS } from "@/lib/constants"
 
 export function AppSidebar() {
   const navigate = useNavigate()
+  const [userEmail, setUserEmail] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserEmail(session?.user?.email ?? null)
+    })
+  }, [])
+
+  const canUseContacts = !CONTACTS_BLOCKED_EMAILS.includes((userEmail || '').toLowerCase())
   const { data: isAdmin, isLoading: isAdminLoading, refetch } = useQuery({
     queryKey: ['is-admin'],
     queryFn: async () => {
@@ -110,14 +120,16 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Captura de Contatos">
-                  <Link to="/contacts" className="flex items-center gap-3 py-2">
-                    <Users className="h-5 w-5 text-blue-500" />
-                    <span>Captura de Contatos</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {canUseContacts && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Captura de Contatos">
+                    <Link to="/contacts" className="flex items-center gap-3 py-2">
+                      <Users className="h-5 w-5 text-blue-500" />
+                      <span>Captura de Contatos</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
 
               {isAdmin && (
                 <SidebarGroup>

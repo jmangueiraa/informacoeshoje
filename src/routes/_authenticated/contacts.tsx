@@ -1,4 +1,5 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
+import { CONTACTS_BLOCKED_EMAILS } from '@/lib/constants'
 import { useState, useEffect, useRef } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/button'
@@ -21,6 +22,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 
 export const Route = createFileRoute('/_authenticated/contacts')({
+  beforeLoad: async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const email = (session?.user?.email || '').toLowerCase()
+    if (CONTACTS_BLOCKED_EMAILS.includes(email)) {
+      throw redirect({ to: '/dashboard' })
+    }
+  },
   component: ContactsPage,
 })
 
