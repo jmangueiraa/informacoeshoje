@@ -21,6 +21,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 
 export const Route = createFileRoute('/_authenticated/contacts')({
+  beforeLoad: async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const email = (session?.user?.email || '').toLowerCase()
+    if (CONTACTS_BLOCKED_EMAILS.includes(email)) {
+      throw redirect({ to: '/dashboard' })
+    }
+  },
   component: ContactsPage,
 })
 
