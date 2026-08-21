@@ -443,6 +443,7 @@ function ContactsPage() {
                         const firstSheetName = workbook.SheetNames[0];
                         if (!firstSheetName) throw new Error("Arquivo Excel vazio");
                         const worksheet = workbook.Sheets[firstSheetName];
+                        if (!worksheet) throw new Error("Planilha não encontrada");
                         const json = XLSX.utils.sheet_to_json(worksheet);
                         contacts = json.map((row: any) => ({
                           name: String(row.nome || row.name || row.Nome || row.Name || Object.values(row)[0] || ""),
