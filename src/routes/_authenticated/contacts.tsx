@@ -51,6 +51,7 @@ import {
 import { cn } from "@/lib/utils";
 import { processarTextoComGemini } from "@/lib/gemini-ocr.functions";
 import Tesseract from 'tesseract.js';
+import Tesseract from 'tesseract.js';
 
 import { useServerFn } from "@tanstack/react-start";
 
