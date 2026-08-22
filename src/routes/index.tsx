@@ -101,6 +101,7 @@ function gerarLinkWhatsApp(contato: string, primeiroNome: string, slugLink: stri
 
 Ao clicar no botão de WhatsApp da tabela ou da fila de envios, use gerarLinkWhatsApp para abrir a conversa já com a mensagem completa formatada."`}
           nao esta contabilizando os cliques verificar e corrigir
+          o contador de cliques nao esta funcionando
         </pre>
       </div>
 
