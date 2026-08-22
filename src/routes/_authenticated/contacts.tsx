@@ -630,7 +630,9 @@ function Index() {
                                         </span>
                                       </div>
                                     ) : (
-                                      <span className="text-[10px] text-muted-foreground italic">-</span>
+                                      <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1">
+                                        <Clock className="size-2.5" /> Primeiro envio pendente
+                                      </Badge>
                                     )}
                                   </TableCell>
                                   <TableCell className="text-right">
