@@ -21,6 +21,7 @@ export function extrairPrimeiroNomeReal(textoBruto: string, index: number): stri
   if (indexTel > 0) {
     for (let i = indexTel - 1; i >= 0; i--) {
       const linha = linhas[i];
+      if (!linha) continue;
       // Pega as palavras da linha que tenham apenas letras
       const palavras = linha.split(/[\s,.-]+/).map(p => p.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, '').trim()).filter(p => p.length >= 3);
       
