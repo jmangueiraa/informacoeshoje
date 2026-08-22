@@ -88,10 +88,10 @@ function Index() {
   const [clientCounter, setClientCounter] = useState(1);
   const [extractedContacts, setExtractedContacts] = useState<(Contact & { 
     id: string; 
-    imgId: string; 
-    fileName: string; 
-    preview: string;
-    contactIdx: number;
+    imgId?: string; 
+    fileName?: string; 
+    preview?: string;
+    contactIdx?: number;
   })[]>([]);
   
   const extractWithAI = useServerFn(extractContactsWithAI);
