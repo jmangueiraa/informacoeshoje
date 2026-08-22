@@ -595,17 +595,6 @@ function Index() {
                               paginatedContacts.map((contact) => (
                                 <TableRow key={contact.id}>
                                   <TableCell>
-                                    <div className="size-10 rounded overflow-hidden border bg-muted">
-                                      {contact.preview ? (
-                                        <img src={contact.preview} alt="Preview" className="size-full object-cover" />
-                                      ) : (
-                                        <div className="size-full flex items-center justify-center">
-                                          <FileText className="size-4 text-muted-foreground" />
-                                        </div>
-                                      )}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
                                     <div className="flex items-center gap-2">
                                       <User className="size-3 text-muted-foreground" />
                                       <Input 
