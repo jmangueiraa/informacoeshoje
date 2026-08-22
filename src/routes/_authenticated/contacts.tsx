@@ -174,6 +174,73 @@ function Index() {
     setIsSettingsOpen(false);
     toast.success("Configurações salvas!");
   };
+
+  const saveTemplates = (templates: typeof msgTemplates) => {
+    localStorage.setItem("linkafiliado_msg_templates", JSON.stringify(templates));
+    setMsgTemplates(templates);
+    setIsTemplatesOpen(false);
+    toast.success("Templates de mensagem salvos!");
+  };
+
+  const getFormattedMessage = (contact: Contact, isFirst: boolean) => {
+    const template = isFirst ? msgTemplates.first : msgTemplates.reminder;
+    return template
+      .replace(/{primeiroNome}/g, contact.name)
+      .replace(/{contato}/g, contact.phone);
+  };
+
+  const handleDispatch = (contact: Contact & { id: string }) => {
+    const isFirst = !contact.lastContact;
+    const cleanPhone = contact.phone.replace(/\D/g, "");
+    const phoneWithCountry = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+    
+    const now = new Date();
+    const next = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    
+    setExtractedContacts(prev => prev.map(c => 
+      c.id === contact.id ? {
+        ...c,
+        lastContact: now.toISOString(),
+        nextReminder: next.toISOString()
+      } : c
+    ));
+
+    const message = encodeURIComponent(getFormattedMessage(contact, isFirst));
+    window.open(`https://wa.me/${phoneWithCountry}?text=${message}`, "_blank");
+  };
+
+  const startDispatcher = () => {
+    const now = new Date();
+    const queue = extractedContacts.filter(c => {
+      if (!c.nextReminder) return true;
+      return new Date(c.nextReminder) <= now;
+    });
+
+    if (queue.length === 0) {
+      toast.info("Não há contatos pendentes para envio.");
+      return;
+    }
+
+    setDispatcherQueue(queue);
+    setDispatcherIndex(0);
+    setIsDispatcherOpen(true);
+  };
+
+  const advanceQueue = () => {
+    if (dispatcherIndex < dispatcherQueue.length - 1) {
+      setDispatcherIndex(prev => prev + 1);
+    } else {
+      setIsDispatcherOpen(false);
+      toast.success("Fila de disparos finalizada!");
+    }
+  };
+
+  const handleQueueSend = () => {
+    const current = dispatcherQueue[dispatcherIndex];
+    handleDispatch(current);
+    advanceQueue();
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
