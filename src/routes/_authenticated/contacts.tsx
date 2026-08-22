@@ -52,7 +52,14 @@ import {
   Calendar,
   Filter,
   Check,
-  XCircle
+  XCircle,
+  MessageSquare,
+  Play,
+  SkipForward,
+  Pause,
+  StopCircle,
+  ChevronRight,
+  ChevronLeft
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { processarTextoComGemini } from "@/lib/gemini-ocr.functions";
