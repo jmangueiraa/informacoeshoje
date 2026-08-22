@@ -46,10 +46,18 @@ Formato de resposta JSON obrigatório:
 
       const responseData = await res.json();
       const json = JSON.parse(responseData.candidates[0].content.parts[0].text);
+      
+      let contato = 'Não encontrado';
+      if (json.contato) {
+        contato = extrairTelefoneValido(json.contato);
+        if (contato === 'Não encontrado') {
+          contato = extrairTelefoneValido(textoBruto);
+        }
+      }
 
       return {
         primeiroNome: json.primeiro_nome && json.primeiro_nome !== 'null' ? json.primeiro_nome : fallbackNome,
-        contato: json.contato || 'Não encontrado'
+        contato
       };
     } catch (e) {
       console.error('Fallback acionado:', e);
