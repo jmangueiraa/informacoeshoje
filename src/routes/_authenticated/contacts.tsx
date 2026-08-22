@@ -88,10 +88,10 @@ function Index() {
   const [clientCounter, setClientCounter] = useState(1);
   const [extractedContacts, setExtractedContacts] = useState<(Contact & { 
     id: string; 
-    imgId: string; 
-    fileName: string; 
-    preview: string;
-    contactIdx: number;
+    imgId?: string; 
+    fileName?: string; 
+    preview?: string;
+    contactIdx?: number;
   })[]>([]);
   
   const extractWithAI = useServerFn(extractContactsWithAI);
@@ -112,7 +112,31 @@ function Index() {
   useEffect(() => {
     const savedKey = localStorage.getItem("fototext_api_key");
     if (savedKey) setUserApiKey(savedKey);
+    
+    // Load contacts from localStorage
+    const savedContacts = localStorage.getItem("linkafiliado_contacts_storage");
+    if (savedContacts) {
+      try {
+        setExtractedContacts(JSON.parse(savedContacts));
+      } catch (e) {
+        console.error("Erro ao carregar contatos do localStorage", e);
+      }
+    }
+    
+    // Load counter
+    const savedCounter = localStorage.getItem("linkafiliado_client_counter");
+    if (savedCounter) setClientCounter(parseInt(savedCounter, 10));
   }, []);
+
+  // Sync contacts to localStorage
+  useEffect(() => {
+    localStorage.setItem("linkafiliado_contacts_storage", JSON.stringify(extractedContacts));
+  }, [extractedContacts]);
+
+  // Sync counter to localStorage
+  useEffect(() => {
+    localStorage.setItem("linkafiliado_client_counter", clientCounter.toString());
+  }, [clientCounter]);
 
   const saveSettings = (key: string) => {
     localStorage.setItem("fototext_api_key", key);
@@ -227,6 +251,8 @@ function Index() {
   const clearContacts = () => {
     setExtractedContacts([]);
     setClientCounter(1);
+    localStorage.removeItem("linkafiliado_contacts_storage");
+    localStorage.removeItem("linkafiliado_client_counter");
     toast.info("Lista de contatos limpa");
   };
 
@@ -346,9 +372,9 @@ function Index() {
             <div className="size-8 bg-primary rounded-lg flex items-center justify-center">
               <FileText className="size-5 text-primary-foreground" />
             </div>
-            <h1 className="text-4xl font-extrabold tracking-tighter">Fototext</h1>
+            <h1 className="text-4xl font-extrabold tracking-tighter">Extrator de Contatos</h1>
           </div>
-          <p className="text-muted-foreground text-lg">Conversor em lote de Imagem para Texto</p>
+          <p className="text-muted-foreground text-lg">Extração inteligente de contatos da Shopee via Gemini Vision AI</p>
         </header>
 
         <div className="grid lg:grid-cols-3 gap-8">
@@ -454,83 +480,38 @@ function Index() {
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                   <CheckCircle2 className="size-4 text-emerald-500" /> Resultados Extraídos
                 </h2>
-                {images.some(img => img.status === 'completed') && (
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => copyToClipboard(consolidatedText)}>
-                      <Copy className="size-3 mr-2" /> Copiar Tudo
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={downloadText}>
-                      <Download className="size-3 mr-2" /> Baixar .txt
-                    </Button>
-                  </div>
-                )}
+                <div className="flex gap-2">
+                  <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                    {allContacts.length} {allContacts.length === 1 ? "contato" : "contatos"}
+                  </Badge>
+                </div>
               </div>
               
               <div className="flex-1 flex flex-col p-6">
-                {!images.some(img => img.status === 'completed') ? (
+                {allContacts.length === 0 && !images.some(img => img.status === 'processing') ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground space-y-4 opacity-40">
                     <div className="size-16 rounded-2xl bg-muted flex items-center justify-center">
-                      <FileText className="size-8" />
+                      <TableIcon className="size-8" />
                     </div>
                     <p>O texto extraído aparecerá aqui após o processamento.</p>
                   </div>
                 ) : (
-                  <Tabs defaultValue="consolidated" className="flex-1 flex flex-col">
-                    <TabsList className="mb-4">
-                      <TabsTrigger value="consolidated">Consolidado</TabsTrigger>
-                      <TabsTrigger value="individual">Individual</TabsTrigger>
-                      <TabsTrigger value="contacts" className="flex items-center gap-2">
-                        <TableIcon className="size-3" /> Contatos
-                      </TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="consolidated" className="flex-1 mt-0">
-                      <Textarea 
-                        value={consolidatedText} 
-                        readOnly 
-                        className="h-[450px] font-mono text-sm leading-relaxed resize-none bg-muted/30"
-                      />
-                    </TabsContent>
-                    
-                    <TabsContent value="individual" className="flex-1 mt-0">
-                      <ScrollArea className="h-[450px] border rounded-md p-4 bg-muted/30">
-                        <div className="space-y-8">
-                          {images.filter(img => img.status === 'completed').map((img, idx) => (
-                            <div key={img.id} className="space-y-3">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="size-5 rounded bg-primary text-[10px] text-primary-foreground flex items-center justify-center font-bold">{idx + 1}</span>
-                                  <span className="text-xs font-semibold">{img.file.name}</span>
-                                </div>
-                                <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={() => copyToClipboard(img.text)}>
-                                  Copiar este
-                                </Button>
-                              </div>
-                              <Textarea 
-                                value={img.text} 
-                                readOnly 
-                                className="min-h-[100px] font-mono text-xs bg-background"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    </TabsContent>
-
-                    <TabsContent value="contacts" className="flex-1 mt-0 space-y-4">
-                      <div className="flex justify-between items-center">
-                        <Button variant="ghost" size="sm" onClick={clearContacts} disabled={loading} className="text-destructive hover:text-destructive hover:bg-destructive/10">
-                          <Trash2 className="size-3 mr-2" /> Limpar Contatos
+                  <div className="flex-1 flex flex-col space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Button variant="ghost" size="sm" onClick={clearContacts} disabled={loading} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                        <Trash2 className="size-3 mr-2" /> Limpar Contatos
+                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={copyFormattedList}>
+                          <Copy className="size-3 mr-2" /> Copiar Lista
                         </Button>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={copyFormattedList}>
-                            <Copy className="size-3 mr-2" /> Copiar Lista
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={exportToCSV}>
-                            <FileSpreadsheet className="size-3 mr-2" /> Exportar CSV
-                          </Button>
-                        </div>
+                        <Button variant="outline" size="sm" onClick={exportToCSV}>
+                          <FileSpreadsheet className="size-3 mr-2" /> Exportar CSV
+                        </Button>
                       </div>
+                    </div>
+                    
+                    <ScrollArea className="flex-1 h-[500px]">
                       <div className="border rounded-md overflow-hidden bg-background">
                         <Table>
                           <TableHeader>
@@ -545,15 +526,21 @@ function Index() {
                             {allContacts.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                                  Nenhum contato identificado.
+                                  Nenhum contato identificado. Comece processando imagens.
                                 </TableCell>
                               </TableRow>
                             ) : (
                               allContacts.map((contact) => (
                                 <TableRow key={contact.id}>
                                   <TableCell>
-                                    <div className="size-10 rounded overflow-hidden border">
-                                      <img src={contact.preview} alt="Preview" className="size-full object-cover" />
+                                    <div className="size-10 rounded overflow-hidden border bg-muted">
+                                      {contact.preview ? (
+                                        <img src={contact.preview} alt="Preview" className="size-full object-cover" />
+                                      ) : (
+                                        <div className="size-full flex items-center justify-center">
+                                          <FileText className="size-4 text-muted-foreground" />
+                                        </div>
+                                      )}
                                     </div>
                                   </TableCell>
                                   <TableCell>
@@ -587,11 +574,11 @@ function Index() {
                                       <Button 
                                         variant="outline" 
                                         size="icon" 
-                                        className="size-7"
+                                        className="size-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
                                         title="Abrir WhatsApp"
                                         onClick={() => {
                                           const cleanPhone = contact.phone.replace(/\D/g, "");
-                                          const phoneWithCountry = cleanPhone.length === 11 ? `55${cleanPhone}` : cleanPhone;
+                                          const phoneWithCountry = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
                                           window.open(`https://wa.me/${phoneWithCountry}`, "_blank");
                                         }}
                                       >
@@ -607,8 +594,8 @@ function Index() {
                           </TableBody>
                         </Table>
                       </div>
-                    </TabsContent>
-                  </Tabs>
+                    </ScrollArea>
+                  </div>
                 )}
               </div>
             </Card>
@@ -617,7 +604,7 @@ function Index() {
       </div>
       
       <footer className="max-w-5xl mx-auto mt-20 pt-8 border-t text-center text-xs text-muted-foreground">
-        <p>Fototext © 2024 • Processamento Inteligente • Gemini Vision AI</p>
+        <p>Desenvolvido pela AJP Entretenimento • Gemini Vision AI</p>
       </footer>
     </div>
   );
