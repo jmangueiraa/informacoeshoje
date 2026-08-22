@@ -57,18 +57,48 @@ Formato de resposta JSON obrigatório:
     }
   });
 
-function extrairRegexLocal(texto: string, fallbackNome: string) {
-  let contato = 'Não encontrado';
-  const matchTel = texto.match(/(?:tel|\+55)?\s*\(?(\d{2})\)?\s*(9?\d{4})[-.\s]?(\d{4})/i) || texto.match(/\b55(\d{2})(\d{5})(\d{4})\b/);
-  if (matchTel) {
-    if (matchTel[0].startsWith('55') && matchTel[0].length >= 12) {
-      const ddd = matchTel[0].substring(2, 4);
-      const p1 = matchTel[0].substring(4, 9);
-      const p2 = matchTel[0].substring(9);
-      contato = `(${ddd}) ${p1}-${p2}`;
-    } else if (matchTel[1] && matchTel[2] && matchTel[3]) {
-      contato = `(${matchTel[1]}) ${matchTel[2]}-${matchTel[3]}`;
+export function extrairTelefoneValido(textoBruto: string): string {
+  // 1. Procura primeiro pela linha que contém 'Tel' ou '+55'
+  const linhas = textoBruto.split('\n');
+  for (const linha of linhas) {
+    if (/tel|\+55/i.test(linha)) {
+      const apenasDigitos = linha.replace(/\D/g, '');
+      
+      // Se começar com 55 e tiver 13 dígitos (55 + DDD + 9 dígitos)
+      if (apenasDigitos.startsWith('55') && apenasDigitos.length === 13) {
+        const ddd = apenasDigitos.substring(2, 4);
+        const p1 = apenasDigitos.substring(4, 9);
+        const p2 = apenasDigitos.substring(9, 13);
+        return `(${ddd}) ${p1}-${p2}`;
+      }
+      
+      // Se tiver 11 dígitos direto (DDD + 9 dígitos)
+      if (apenasDigitos.length === 11 && apenasDigitos[2] === '9') {
+        const ddd = apenasDigitos.substring(0, 2);
+        const p1 = apenasDigitos.substring(2, 7);
+        const p2 = apenasDigitos.substring(7, 11);
+        return `(${ddd}) ${p1}-${p2}`;
+      }
     }
   }
+
+  // 2. Fallback de busca global no texto inteiro
+  const todosNumeros = textoBruto.replace(/\D/g, ' ');
+  const blocos = todosNumeros.split(/\s+/).filter(b => b.length >= 10);
+
+  for (const b of blocos) {
+    if (b.startsWith('55') && b.length === 13) {
+      return `(${b.substring(2, 4)}) ${b.substring(4, 9)}-${b.substring(9, 13)}`;
+    }
+    if (b.length === 11 && b[2] === '9') {
+      return `(${b.substring(0, 2)}) ${b.substring(2, 7)}-${b.substring(7, 11)}`;
+    }
+  }
+
+  return 'Não encontrado';
+}
+
+function extrairRegexLocal(texto: string, fallbackNome: string) {
+  const contato = extrairTelefoneValido(texto);
   return { primeiroNome: fallbackNome, contato };
 }
