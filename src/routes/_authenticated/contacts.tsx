@@ -227,13 +227,13 @@ function Index() {
 
         const now = new Date();
         const extractionDate = now.toISOString();
-        const nextReminder = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
         const newContact = {
           ...extracted,
           id: Math.random().toString(36).substring(7),
           extractionDate,
-          nextReminder,
+          lastContact: null,
+          nextReminder: null,
         };
 
         setExtractedContacts(prev => [...prev, newContact]);
