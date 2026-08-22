@@ -82,7 +82,7 @@ interface OCRImage {
 function Index() {
   const [images, setImages] = useState<OCRImage[]>([]);
   const [loading, setLoading] = useState(false);
-  const [lang, setLang] = useState("por");
+  
   const [overallStatus, setOverallStatus] = useState("");
   const [userApiKey, setUserApiKey] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -430,15 +430,6 @@ function Index() {
               </ScrollArea>
 
               <div className="flex gap-3">
-                <Select value={lang} onValueChange={setLang} disabled={loading}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Idioma" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="por">Português</SelectItem>
-                    <SelectItem value="eng">Inglês</SelectItem>
-                  </SelectContent>
-                </Select>
                 <Button className="flex-1" onClick={processOCR} disabled={loading || images.length === 0 || images.every(i => i.status === 'completed')}>
                   {loading ? <Loader2 className="size-4 animate-spin mr-2" /> : "Iniciar Batch"}
                 </Button>
@@ -627,7 +618,7 @@ function Index() {
       </div>
       
       <footer className="max-w-5xl mx-auto mt-20 pt-8 border-t text-center text-xs text-muted-foreground">
-        <p>Fototext © 2024 • Processamento Local Privado • Baseado em Tesseract.js</p>
+        <p>Fototext © 2024 • Processamento Inteligente • Gemini Vision AI</p>
       </footer>
     </div>
   );
