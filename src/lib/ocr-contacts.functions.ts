@@ -17,7 +17,7 @@ export const extractContactsWithAI = createServerFn({ method: "POST" })
       throw new Error("API Key não configurada. Por favor, configure nas configurações.");
     }
 
-    // We use the Lovable AI Gateway for safety and reliability, pointing it to the Gemini model
+    // Usando o Lovable AI Gateway para segurança e confiabilidade, apontando para o modelo Gemini
     const response = await fetch("https://api.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
