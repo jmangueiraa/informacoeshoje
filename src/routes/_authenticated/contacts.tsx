@@ -920,6 +920,102 @@ function Index() {
         </div>
       </div>
       
+      {/* Modais de Templates e Dispatcher */}
+      <Dialog open={isTemplatesOpen} onOpenChange={setIsTemplatesOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Configurar Modelos de Mensagem</DialogTitle>
+            <DialogDescription>
+              Personalize as mensagens disparadas pelo WhatsApp. Use {"{primeiroNome}"} e {"{contato}"} como tags dinâmicas.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-6 py-4">
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Mensagem de Primeiro Contato</Label>
+              <Textarea 
+                value={msgTemplates.first} 
+                onChange={(e) => setMsgTemplates(prev => ({ ...prev, first: e.target.value }))}
+                rows={3}
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Mensagem de Retorno (7 Dias)</Label>
+              <Textarea 
+                value={msgTemplates.reminder} 
+                onChange={(e) => setMsgTemplates(prev => ({ ...prev, reminder: e.target.value }))}
+                rows={3}
+                className="text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsTemplatesOpen(false)}>Cancelar</Button>
+            <Button onClick={() => saveTemplates(msgTemplates)}>Salvar Templates</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDispatcherOpen} onOpenChange={setIsDispatcherOpen}>
+        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-none bg-transparent shadow-none">
+          <Card className="border shadow-2xl overflow-hidden">
+            <div className="bg-primary p-6 text-primary-foreground">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    <MessageSquare className="size-5" /> Fila de Envios
+                  </h3>
+                  <p className="text-primary-foreground/70 text-xs">Modo Semi-automático</p>
+                </div>
+                <Badge variant="outline" className="text-primary-foreground border-primary-foreground/30 bg-primary-foreground/10">
+                  {dispatcherIndex + 1} de {dispatcherQueue.length}
+                </Badge>
+              </div>
+              <Progress value={((dispatcherIndex + 1) / dispatcherQueue.length) * 100} className="h-2 bg-white/20" />
+            </div>
+
+            <div className="p-6 space-y-6 bg-background">
+              {dispatcherQueue[dispatcherIndex] && (
+                <>
+                  <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/30 border">
+                    <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="size-6 text-primary" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-lg">{dispatcherQueue[dispatcherIndex].name}</h4>
+                      <p className="text-muted-foreground text-sm">{dispatcherQueue[dispatcherIndex].phone}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Pré-visualização da Mensagem</Label>
+                    <div className="p-4 rounded-xl bg-muted/20 border text-sm italic whitespace-pre-wrap leading-relaxed">
+                      {getFormattedMessage(dispatcherQueue[dispatcherIndex], !dispatcherQueue[dispatcherIndex].lastContact)}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <Button variant="outline" className="w-full" onClick={advanceQueue}>
+                  <SkipForward className="size-4 mr-2" /> Pular
+                </Button>
+                <Button variant="outline" className="w-full" onClick={() => setIsDispatcherOpen(false)}>
+                  <StopCircle className="size-4 mr-2" /> Encerrar
+                </Button>
+              </div>
+              
+              <Button 
+                className="w-full h-14 text-lg font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20"
+                onClick={handleQueueSend}
+              >
+                Abrir WhatsApp e Avançar <ChevronRight className="size-5 ml-2" />
+              </Button>
+            </div>
+          </Card>
+        </DialogContent>
+      </Dialog>
+      
       <footer className="max-w-5xl mx-auto mt-20 pt-8 border-t text-center text-xs text-muted-foreground">
         <p>Desenvolvido pela AJP Entretenimento • Gemini Vision AI</p>
       </footer>
