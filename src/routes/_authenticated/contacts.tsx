@@ -180,7 +180,8 @@ function Index() {
 
     const currentImages = [...images];
     let currentIndexForClient = clientCounter;
-    const isGeminiKey = userApiKey.startsWith("AIzaSy");
+    let addedCount = 0;
+    let duplicateCount = 0;
 
     for (let i = 0; i < currentImages.length; i++) {
       const currentImage = currentImages[i];
@@ -220,6 +221,20 @@ function Index() {
           name: aiResult.primeiroNome,
           phone: aiResult.contato
         };
+
+        // Validação de Duplicidade
+        const cleanPhone = extracted.phone.replace(/\D/g, "");
+        const isDuplicate = extractedContacts.some(c => c.phone.replace(/\D/g, "") === cleanPhone);
+
+        if (cleanPhone && cleanPhone.length >= 8 && isDuplicate) {
+          duplicateCount++;
+          setImages((prev) =>
+            prev.map((img) =>
+              img.id === currentId ? { ...img, status: "completed", text: `Duplicado ignorado: ${extracted.phone}`, contacts: [], progress: 100 } : img
+            )
+          );
+          continue;
+        }
         
         if (extracted.name.startsWith("Cliente")) {
           currentIndexForClient++;
@@ -238,6 +253,7 @@ function Index() {
 
         setExtractedContacts(prev => [...prev, newContact]);
         setClientCounter(currentIndexForClient);
+        addedCount++;
 
         setImages((prev) =>
           prev.map((img) =>
@@ -257,7 +273,12 @@ function Index() {
 
     setLoading(false);
     setOverallStatus("Processamento concluído!");
-    toast.success("Batch processado com sucesso!");
+    
+    if (duplicateCount > 0) {
+      toast.success(`${addedCount} contatos adicionados e ${duplicateCount} duplicados ignorados.`);
+    } else {
+      toast.success(`${addedCount} contatos processados com sucesso!`);
+    }
   };
 
   const clearAll = () => {
