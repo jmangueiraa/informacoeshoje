@@ -587,7 +587,7 @@ function Index() {
                           <TableBody>
                             {allContacts.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                                <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
                                   Nenhum contato identificado. Comece processando imagens.
                                 </TableCell>
                               </TableRow>
