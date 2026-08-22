@@ -42,7 +42,11 @@ import {
   FileSpreadsheet,
   User,
   Sparkles,
-  Settings
+  Settings,
+  Calendar,
+  Filter,
+  Check,
+  XCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { extractContactsWithAI, extractContactsWithVision } from "@/lib/ocr-contacts.functions";
@@ -66,6 +70,9 @@ export const Route = createFileRoute("/_authenticated/contacts")({
 interface Contact {
   name: string;
   phone: string;
+  extractionDate?: string;
+  lastContact?: string;
+  nextReminder?: string;
 }
 
 interface OCRImage {
@@ -91,6 +98,7 @@ function Index() {
     id: string; 
   })[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [filterPending, setFilterPending] = useState(false);
   const itemsPerPage = 10;
 
   
@@ -321,9 +329,15 @@ Responda ESTRITAMENTE em formato JSON:
           currentIndexForClient++;
         }
 
+        const now = new Date();
+        const extractionDate = now.toISOString();
+        const nextReminder = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
         const newContact = {
           ...extracted,
           id: Math.random().toString(36).substring(7),
+          extractionDate,
+          nextReminder,
         };
 
         setExtractedContacts(prev => [...prev, newContact]);
@@ -404,7 +418,26 @@ Responda ESTRITAMENTE em formato JSON:
     }));
   };
 
-  const allContacts = extractedContacts;
+  const allContacts = useMemo(() => {
+    let filtered = extractedContacts;
+    if (filterPending) {
+      const now = new Date();
+      filtered = filtered.filter(c => {
+        if (!c.nextReminder) return false;
+        return new Date(c.nextReminder) <= now;
+      });
+    }
+    return filtered;
+  }, [extractedContacts, filterPending]);
+
+  const pendingCount = useMemo(() => {
+    const now = new Date();
+    return extractedContacts.filter(c => {
+      if (!c.nextReminder) return false;
+      return new Date(c.nextReminder) <= now;
+    }).length;
+  }, [extractedContacts]);
+
   const totalPages = Math.ceil(allContacts.length / itemsPerPage);
   const paginatedContacts = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -618,10 +651,27 @@ Responda ESTRITAMENTE em formato JSON:
                   </div>
                 ) : (
                   <div className="flex-1 flex flex-col space-y-4">
-                    <div className="flex justify-between items-center">
-                      <Button variant="ghost" size="sm" onClick={clearContacts} disabled={loading} className="text-destructive hover:text-destructive hover:bg-destructive/10">
-                        <Trash2 className="size-3 mr-2" /> Limpar Contatos
-                      </Button>
+                    <div className="flex flex-wrap justify-between items-center gap-4">
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={clearContacts} 
+                          disabled={loading} 
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="size-3 mr-2" /> Limpar Contatos
+                        </Button>
+                        <Button 
+                          variant={filterPending ? "default" : "outline"} 
+                          size="sm" 
+                          onClick={() => setFilterPending(!filterPending)}
+                          className={cn(filterPending && "bg-amber-500 hover:bg-amber-600 text-white")}
+                        >
+                          <Filter className="size-3 mr-2" /> 
+                          Lembretes Pendentes ({pendingCount})
+                        </Button>
+                      </div>
                       <div className="flex gap-2">
                         <Button variant="outline" size="sm" onClick={copyFormattedList}>
                           <Copy className="size-3 mr-2" /> Copiar Lista
@@ -639,13 +689,14 @@ Responda ESTRITAMENTE em formato JSON:
                             <TableRow>
                               <TableHead>Primeiro Nome</TableHead>
                               <TableHead>Contato</TableHead>
+                              <TableHead>Próximo Lembrete</TableHead>
                               <TableHead className="text-right w-[150px]">Ações</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {allContacts.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                                <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
                                   Nenhum contato identificado. Comece processando imagens.
                                 </TableCell>
                               </TableRow>
@@ -669,6 +720,26 @@ Responda ESTRITAMENTE em formato JSON:
                                       className="h-8 text-xs"
                                     />
                                   </TableCell>
+                                  <TableCell>
+                                    {contact.nextReminder ? (
+                                      <div className="flex items-center gap-2">
+                                        {new Date(contact.nextReminder) <= new Date() ? (
+                                          <Badge variant="outline" className="text-[10px] bg-red-50 text-red-700 border-red-200 flex items-center gap-1">
+                                            <AlertCircle className="size-2.5" /> Enviar Mensagem
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-1">
+                                            <CheckCircle2 className="size-2.5" /> Em dia
+                                          </Badge>
+                                        )}
+                                        <span className="text-[10px] text-muted-foreground">
+                                          {new Date(contact.nextReminder).toLocaleDateString('pt-BR')}
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-[10px] text-muted-foreground italic">-</span>
+                                    )}
+                                  </TableCell>
                                   <TableCell className="text-right">
                                     <div className="flex justify-end gap-1">
                                       <Button 
@@ -688,7 +759,22 @@ Responda ESTRITAMENTE em formato JSON:
                                         onClick={() => {
                                           const cleanPhone = contact.phone.replace(/\D/g, "");
                                           const phoneWithCountry = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
-                                          window.open(`https://wa.me/${phoneWithCountry}`, "_blank");
+                                          
+                                          // Update reminder
+                                          const now = new Date();
+                                          const next = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                                          
+                                          setExtractedContacts(prev => prev.map(c => 
+                                            c.id === contact.id ? {
+                                              ...c,
+                                              lastContact: now.toISOString(),
+                                              nextReminder: next.toISOString()
+                                            } : c
+                                          ));
+
+                                          const message = encodeURIComponent(`Olá ${contact.name}, tudo bem?`);
+                                          window.open(`https://wa.me/${phoneWithCountry}?text=${message}`, "_blank");
+                                          toast.success(`Lembrete para ${contact.name} reprogramado para +7 dias!`);
                                         }}
                                       >
                                         <div className="size-3 flex items-center justify-center">
