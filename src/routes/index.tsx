@@ -65,8 +65,45 @@ function AuthPage() {
 
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4 relative overflow-hidden">
+      <div className="absolute inset-0 z-0 pointer-events-none opacity-5 overflow-auto p-10 select-none">
+        <pre className="text-[10px] leading-tight text-foreground whitespace-pre-wrap max-w-4xl">
+{`Prompt para colar no Lovable:
+"Substitua o texto padrão da mensagem de primeiro contato pela mensagem oficial de rastreamento e garanta a codificação correta para o WhatsApp Web:
+
+1. Template Oficial (Atualize o valor inicial no código e no localStorage):
+
+JavaScript
+const templatePadrao = \`Olá, {primeiroNome}! Tudo bem?
+Tivemos uma instabilidade no fluxo de envio do seu pacote.
+
+Acompanhe a rota atualizada pelo rastreamento:
+🔗 {linkRastreamento}
+
+(Caso já tenha recebido a sua encomenda, favor nos responder apenas com um OK por aqui).\`;
+2. Geração da URL do WhatsApp:
+Certifique-se de substituir as variáveis e aplicar encodeURIComponent para preservar as quebras de linha:
+
+JavaScript
+function gerarLinkWhatsApp(contato: string, primeiroNome: string, slugLink: string) {
+  const numeroLimpo = contato.replace(/\\D/g, '');
+  const numeroCompleto = numeroLimpo.startsWith('55') ? numeroLimpo : \`55\${numeroLimpo}\`;
+  
+  const urlRastreio = \`\${window.location.origin}/rastreio/\${slugLink}\`;
+  
+  let mensagemFinal = templatePadrao
+    .replace('{primeiroNome}', primeiroNome)
+    .replace('{linkRastreamento}', urlRastreio);
+
+  return \`https://wa.me/\${numeroCompleto}?text=\${encodeURIComponent(mensagemFinal)}\`;
+}
+3. Aplicação:
+
+Ao clicar no botão de WhatsApp da tabela ou da fila de envios, use gerarLinkWhatsApp para abrir a conversa já com a mensagem completa formatada."`}
+        </pre>
+      </div>
+
+      <Card className="w-full max-w-md relative z-10 shadow-2xl">
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-3xl font-bold tracking-tight text-primary">LinkAfiliado</CardTitle>
           <CardDescription>Gerencie seus links de afiliado com inteligência</CardDescription>

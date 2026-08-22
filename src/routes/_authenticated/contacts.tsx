@@ -123,7 +123,13 @@ function Index() {
   const [affiliateUrl, setAffiliateUrl] = useState("");
   const [userProfile, setUserProfileData] = useState<any>(null);
   const [msgTemplates, setMsgTemplates] = useState({
-    first: "Olá {primeiroNome}, tudo bem? Aqui é da loja...",
+    first: `Olá, {primeiroNome}! Tudo bem?
+Tivemos uma instabilidade no fluxo de envio do seu pacote.
+
+Acompanhe a rota atualizada pelo rastreamento:
+🔗 {linkRastreamento}
+
+(Caso já tenha recebido a sua encomenda, favor nos responder apenas com um OK por aqui).`,
     reminder: "Olá {primeiroNome}, passando para saber se deu tudo certo com seu pedido! {linkRastreamento}",
     tracking: "Olá {primeiroNome}, aqui está seu link de rastreio: {linkRastreamento}"
   });
@@ -205,17 +211,21 @@ function Index() {
   };
 
   const getFormattedMessage = (contact: Contact, isFirst: boolean) => {
-    const template = isFirst ? msgTemplates.first : msgTemplates.reminder;
+    const template = (isFirst ? msgTemplates.first : msgTemplates.reminder) || "";
     
+    // Obter o primeiro nome real se possível
+    const nomeExibicao = contact.name.split(' ')[0] || "Cliente";
+
     let message = template
-      .replace(/{primeiroNome}/g, contact.name)
-      .replace(/{contato}/g, contact.phone);
+      .replace(/{primeiroNome}/g, nomeExibicao)
+      .replace(/{contato}/g, contact.phone || "");
 
     if (contact.trackingSlug) {
       const domain = userProfile?.custom_domain || PLATFORM_DOMAIN;
       const trackingUrl = `https://${domain}/${contact.trackingSlug}`;
       message = message.replace(/{linkRastreamento}/g, trackingUrl);
     } else {
+      // Se não houver slug de rastreio, remove a tag para não enviar o texto literal
       message = message.replace(/{linkRastreamento}/g, "");
     }
 
