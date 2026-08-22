@@ -186,6 +186,7 @@ function Index() {
     let indexTel = -1;
     for (let i = 0; i < linhas.length; i++) {
       const linha = linhas[i];
+      if (!linha) continue;
       if (/tel|\+55|\b55\d{8,11}\b/i.test(linha)) {
         indexTel = i;
         const nums = linha.replace(/\D/g, '');
@@ -213,6 +214,7 @@ function Index() {
     const limiteFim = indexTel !== -1 ? indexTel : linhas.length;
     for (let i = 0; i < limiteFim; i++) {
       const linha = linhas[i];
+      if (!linha) continue;
       const palavras = linha.split(/\s+/);
       for (const p of palavras) {
         const limpa = p.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, '').trim();
