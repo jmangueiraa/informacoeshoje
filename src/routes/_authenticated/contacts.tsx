@@ -322,10 +322,10 @@ Responda ESTRITAMENTE em formato JSON:
             extracted = aiResult;
           } else {
             // Fallback to local logic if AI fails or returns null
-            extracted = extrairDadosComprovante(text, currentIndexForClient - 1);
+            extracted = extrairContatoShopee(text, currentIndexForClient - 1);
           }
         } else {
-          extracted = extrairDadosComprovante(text, currentIndexForClient - 1);
+          extracted = extrairContatoShopee(text, currentIndexForClient - 1);
         }
         
         if (extracted.name.startsWith("Cliente")) {
