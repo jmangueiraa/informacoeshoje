@@ -674,7 +674,7 @@ function Index() {
                 ) : (
                   <div className="flex-1 flex flex-col space-y-4">
                     <div className="flex flex-wrap justify-between items-center gap-4">
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button 
                           variant={!filterPending ? "default" : "outline"} 
                           size="sm" 
@@ -690,6 +690,23 @@ function Index() {
                         >
                           <Filter className="size-3 mr-2" /> 
                           Lembretes Pendentes ({pendingCount})
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setIsTemplatesOpen(true)}
+                        >
+                          <Settings className="size-3 mr-2" /> 
+                          Configurar Mensagens
+                        </Button>
+                        <Button 
+                          variant="default" 
+                          size="sm" 
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                          onClick={startDispatcher}
+                        >
+                          <Play className="size-3 mr-2" /> 
+                          Iniciar Fila de Envios ({pendingCount})
                         </Button>
                       </div>
                       <div className="flex gap-2">
