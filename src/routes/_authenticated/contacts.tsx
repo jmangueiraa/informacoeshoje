@@ -124,7 +124,10 @@ function Index() {
         
         // Aumenta o contraste e binariza o texto
         for (let i = 0; i < d.length; i += 4) {
-          const media = (d[i] + d[i + 1] + d[i + 2]) / 3;
+          const r = d[i] ?? 0;
+          const g = d[i + 1] ?? 0;
+          const b = d[i + 2] ?? 0;
+          const media = (r + g + b) / 3;
           // Se for cinza ou escuro vira preto puro (0), fundo claro vira branco puro (255)
           const v = media < 185 ? 0 : 255;
           d[i] = v;
