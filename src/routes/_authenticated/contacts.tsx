@@ -141,7 +141,7 @@ function Index() {
     let indexTel = -1;
     for (let i = 0; i < linhas.length; i++) {
       const linha = linhas[i];
-      if (linha.toLowerCase().includes('tel') || linha.includes('+55') || /\b55\d{8,11}\b/.test(linha)) {
+      if (linha && (linha.toLowerCase().includes('tel') || linha.includes('+55') || /\b55\d{8,11}\b/.test(linha))) {
         indexTel = i;
         const nums = linha.replace(/\D/g, '');
         const sem55 = nums.startsWith('55') ? nums.substring(2) : nums;
@@ -158,27 +158,31 @@ function Index() {
 
     // 2. Localiza a linha "Informações do recebedor"
     const indexRecebedor = linhas.findIndex(l => 
-      l.toLowerCase().includes('recebedor') || 
-      l.toLowerCase().includes('informa')
+      l && (l.toLowerCase().includes('recebedor') || 
+      l.toLowerCase().includes('informa'))
     );
 
     // 3. O Primeiro Nome é sempre a primeira palavra da PRIMEIRA linha do bloco de recebedor
     if (indexRecebedor !== -1 && indexRecebedor + 1 < (indexTel !== -1 ? indexTel : linhas.length)) {
       const primeiraLinhaBloco = linhas[indexRecebedor + 1];
-      const match = primeiraLinhaBloco.match(/[A-Za-zÀ-ÖØ-öø-ÿ]+/);
-      if (match) {
-        const palavra = match[0].trim();
-        const proibidas = ['entregue', 'detalhes', 'informações', 'recebedor', 'pedido', 'tempo', 'rua', 'tel'];
-        if (!proibidas.includes(palavra.toLowerCase())) {
-          primeiroNome = palavra.charAt(0).toUpperCase() + palavra.slice(1).toLowerCase();
+      if (primeiraLinhaBloco) {
+        const match = primeiraLinhaBloco.match(/[A-Za-zÀ-ÖØ-öø-ÿ]+/);
+        if (match) {
+          const palavra = match[0].trim();
+          const proibidas = ['entregue', 'detalhes', 'informações', 'recebedor', 'pedido', 'tempo', 'rua', 'tel'];
+          if (!proibidas.includes(palavra.toLowerCase())) {
+            primeiroNome = palavra.charAt(0).toUpperCase() + palavra.slice(1).toLowerCase();
+          }
         }
       }
     } else if (indexTel > 0) {
       // Fallback caso não ache o cabeçalho 'recebedor'
       const linhaAcima = linhas[indexTel - 1];
-      const match = linhaAcima.match(/[A-Za-zÀ-ÖØ-öø-ÿ]+/);
-      if (match) {
-        primeiroNome = match[0].charAt(0).toUpperCase() + match[0].slice(1).toLowerCase();
+      if (linhaAcima) {
+        const match = linhaAcima.match(/[A-Za-zÀ-ÖØ-öø-ÿ]+/);
+        if (match) {
+          primeiroNome = match[0].charAt(0).toUpperCase() + match[0].slice(1).toLowerCase();
+        }
       }
     }
 
