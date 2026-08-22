@@ -103,7 +103,7 @@ function Index() {
   const itemsPerPage = 10;
 
   
-  const extractWithAI = useServerFn(extractContactsWithAI);
+  
   const processarComGemini = useServerFn(processarComprovanteComGemini);
 
   const preprocessarImagem = (file: File): Promise<string> => {
