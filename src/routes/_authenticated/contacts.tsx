@@ -342,15 +342,21 @@ function Index() {
   };
 
   const allContacts = useMemo(() => {
-    let filtered = extractedContacts;
+    // Ordenação: Mais recentes no topo (createdAt/extractionDate decrescente)
+    let sorted = [...extractedContacts].sort((a, b) => {
+      const dateA = a.extractionDate ? new Date(a.extractionDate).getTime() : 0;
+      const dateB = b.extractionDate ? new Date(b.extractionDate).getTime() : 0;
+      return dateB - dateA;
+    });
+
     if (filterPending) {
       const now = new Date();
-      filtered = filtered.filter(c => {
+      sorted = sorted.filter(c => {
         if (!c.nextReminder) return false;
         return new Date(c.nextReminder) <= now;
       });
     }
-    return filtered;
+    return sorted;
   }, [extractedContacts, filterPending]);
 
   const pendingCount = useMemo(() => {
