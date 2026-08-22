@@ -52,7 +52,14 @@ import {
   Calendar,
   Filter,
   Check,
-  XCircle
+  XCircle,
+  MessageSquare,
+  Play,
+  SkipForward,
+  Pause,
+  StopCircle,
+  ChevronRight,
+  ChevronLeft
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { processarTextoComGemini } from "@/lib/gemini-ocr.functions";
@@ -106,6 +113,14 @@ function Index() {
   })[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [filterPending, setFilterPending] = useState(false);
+  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
+  const [isDispatcherOpen, setIsDispatcherOpen] = useState(false);
+  const [dispatcherQueue, setDispatcherQueue] = useState<(Contact & { id: string })[]>([]);
+  const [dispatcherIndex, setDispatcherIndex] = useState(0);
+  const [msgTemplates, setMsgTemplates] = useState({
+    first: "Olá {primeiroNome}, tudo bem? Aqui é da loja...",
+    reminder: "Olá {primeiroNome}, passando para saber se deu tudo certo com seu pedido!"
+  });
   const itemsPerPage = 10;
 
   
@@ -131,6 +146,16 @@ function Index() {
     // Load counter
     const savedCounter = localStorage.getItem("linkafiliado_client_counter");
     if (savedCounter) setClientCounter(parseInt(savedCounter, 10));
+
+    // Load templates
+    const savedTemplates = localStorage.getItem("linkafiliado_msg_templates");
+    if (savedTemplates) {
+      try {
+        setMsgTemplates(JSON.parse(savedTemplates));
+      } catch (e) {
+        console.error("Erro ao carregar templates", e);
+      }
+    }
   }, []);
 
   // Sync contacts to localStorage
@@ -149,6 +174,75 @@ function Index() {
     setIsSettingsOpen(false);
     toast.success("Configurações salvas!");
   };
+
+  const saveTemplates = (templates: typeof msgTemplates) => {
+    localStorage.setItem("linkafiliado_msg_templates", JSON.stringify(templates));
+    setMsgTemplates(templates);
+    setIsTemplatesOpen(false);
+    toast.success("Templates de mensagem salvos!");
+  };
+
+  const getFormattedMessage = (contact: Contact, isFirst: boolean) => {
+    const template = isFirst ? msgTemplates.first : msgTemplates.reminder;
+    return template
+      .replace(/{primeiroNome}/g, contact.name)
+      .replace(/{contato}/g, contact.phone);
+  };
+
+  const handleDispatch = (contact: Contact & { id: string }) => {
+    const isFirst = !contact.lastContact;
+    const cleanPhone = contact.phone.replace(/\D/g, "");
+    const phoneWithCountry = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+    
+    const now = new Date();
+    const next = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    
+    setExtractedContacts(prev => prev.map(c => 
+      c.id === contact.id ? {
+        ...c,
+        lastContact: now.toISOString(),
+        nextReminder: next.toISOString()
+      } : c
+    ));
+
+    const message = encodeURIComponent(getFormattedMessage(contact, isFirst));
+    window.open(`https://wa.me/${phoneWithCountry}?text=${message}`, "_blank");
+  };
+
+  const startDispatcher = () => {
+    const now = new Date();
+    const queue = extractedContacts.filter(c => {
+      if (!c.nextReminder) return true;
+      return new Date(c.nextReminder) <= now;
+    });
+
+    if (queue.length === 0) {
+      toast.info("Não há contatos pendentes para envio.");
+      return;
+    }
+
+    setDispatcherQueue(queue);
+    setDispatcherIndex(0);
+    setIsDispatcherOpen(true);
+  };
+
+  const advanceQueue = () => {
+    if (dispatcherIndex < dispatcherQueue.length - 1) {
+      setDispatcherIndex(prev => prev + 1);
+    } else {
+      setIsDispatcherOpen(false);
+      toast.success("Fila de disparos finalizada!");
+    }
+  };
+
+  const handleQueueSend = () => {
+    const current = dispatcherQueue[dispatcherIndex];
+    if (current) {
+      handleDispatch(current);
+      advanceQueue();
+    }
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -582,7 +676,7 @@ function Index() {
                 ) : (
                   <div className="flex-1 flex flex-col space-y-4">
                     <div className="flex flex-wrap justify-between items-center gap-4">
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button 
                           variant={!filterPending ? "default" : "outline"} 
                           size="sm" 
@@ -598,6 +692,23 @@ function Index() {
                         >
                           <Filter className="size-3 mr-2" /> 
                           Lembretes Pendentes ({pendingCount})
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setIsTemplatesOpen(true)}
+                        >
+                          <Settings className="size-3 mr-2" /> 
+                          Configurar Mensagens
+                        </Button>
+                        <Button 
+                          variant="default" 
+                          size="sm" 
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                          onClick={startDispatcher}
+                        >
+                          <Play className="size-3 mr-2" /> 
+                          Iniciar Fila de Envios ({pendingCount})
                         </Button>
                       </div>
                       <div className="flex gap-2">
@@ -700,26 +811,11 @@ function Index() {
                                                 isDisabled && "opacity-50 cursor-not-allowed pointer-events-auto"
                                               )}
                                               disabled={isDisabled}
-                                              onClick={() => {
-                                                if (isDisabled) return;
-                                                const cleanPhone = contact.phone.replace(/\D/g, "");
-                                                const phoneWithCountry = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
-                                                
-                                                const now = new Date();
-                                                const next = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-                                                
-                                                setExtractedContacts(prev => prev.map(c => 
-                                                  c.id === contact.id ? {
-                                                    ...c,
-                                                    lastContact: now.toISOString(),
-                                                    nextReminder: next.toISOString()
-                                                  } : c
-                                                ));
-
-                                                const message = encodeURIComponent(`Olá ${contact.name}, tudo bem?`);
-                                                window.open(`https://wa.me/${phoneWithCountry}?text=${message}`, "_blank");
-                                                toast.success(`Lembrete para ${contact.name} reprogramado para +7 dias!`);
-                                              }}
+                                                onClick={() => {
+                                                  if (isDisabled) return;
+                                                  handleDispatch(contact);
+                                                  toast.success(`Lembrete para ${contact.name} reprogramado para +7 dias!`);
+                                                }}
                                             >
                                               <div className="size-3 flex items-center justify-center">
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
@@ -808,6 +904,102 @@ function Index() {
           </div>
         </div>
       </div>
+      
+      {/* Modais de Templates e Dispatcher */}
+      <Dialog open={isTemplatesOpen} onOpenChange={setIsTemplatesOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Configurar Modelos de Mensagem</DialogTitle>
+            <DialogDescription>
+              Personalize as mensagens disparadas pelo WhatsApp. Use {"{primeiroNome}"} e {"{contato}"} como tags dinâmicas.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-6 py-4">
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Mensagem de Primeiro Contato</Label>
+              <Textarea 
+                value={msgTemplates.first} 
+                onChange={(e) => setMsgTemplates(prev => ({ ...prev, first: e.target.value }))}
+                rows={3}
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Mensagem de Retorno (7 Dias)</Label>
+              <Textarea 
+                value={msgTemplates.reminder} 
+                onChange={(e) => setMsgTemplates(prev => ({ ...prev, reminder: e.target.value }))}
+                rows={3}
+                className="text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsTemplatesOpen(false)}>Cancelar</Button>
+            <Button onClick={() => saveTemplates(msgTemplates)}>Salvar Templates</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDispatcherOpen} onOpenChange={setIsDispatcherOpen}>
+        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-none bg-transparent shadow-none">
+          <Card className="border shadow-2xl overflow-hidden">
+            <div className="bg-primary p-6 text-primary-foreground">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    <MessageSquare className="size-5" /> Fila de Envios
+                  </h3>
+                  <p className="text-primary-foreground/70 text-xs">Modo Semi-automático</p>
+                </div>
+                <Badge variant="outline" className="text-primary-foreground border-primary-foreground/30 bg-primary-foreground/10">
+                  {dispatcherIndex + 1} de {dispatcherQueue.length}
+                </Badge>
+              </div>
+              <Progress value={((dispatcherIndex + 1) / dispatcherQueue.length) * 100} className="h-2 bg-white/20" />
+            </div>
+
+            <div className="p-6 space-y-6 bg-background">
+              {dispatcherQueue[dispatcherIndex] && (
+                <>
+                  <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/30 border">
+                    <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="size-6 text-primary" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-lg">{dispatcherQueue[dispatcherIndex].name}</h4>
+                      <p className="text-muted-foreground text-sm">{dispatcherQueue[dispatcherIndex].phone}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Pré-visualização da Mensagem</Label>
+                    <div className="p-4 rounded-xl bg-muted/20 border text-sm italic whitespace-pre-wrap leading-relaxed">
+                      {getFormattedMessage(dispatcherQueue[dispatcherIndex], !dispatcherQueue[dispatcherIndex].lastContact)}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <Button variant="outline" className="w-full" onClick={advanceQueue}>
+                  <SkipForward className="size-4 mr-2" /> Pular
+                </Button>
+                <Button variant="outline" className="w-full" onClick={() => setIsDispatcherOpen(false)}>
+                  <StopCircle className="size-4 mr-2" /> Encerrar
+                </Button>
+              </div>
+              
+              <Button 
+                className="w-full h-14 text-lg font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20"
+                onClick={handleQueueSend}
+              >
+                Abrir WhatsApp e Avançar <ChevronRight className="size-5 ml-2" />
+              </Button>
+            </div>
+          </Card>
+        </DialogContent>
+      </Dialog>
       
       <footer className="max-w-5xl mx-auto mt-20 pt-8 border-t text-center text-xs text-muted-foreground">
         <p>Desenvolvido pela AJP Entretenimento • Gemini Vision AI</p>
