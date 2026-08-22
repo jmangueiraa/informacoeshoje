@@ -78,7 +78,27 @@ function LinksPage() {
   const { data: links, isLoading } = useQuery({
     queryKey: ['user-links'],
     queryFn: () => getUserLinks(),
+    refetchOnWindowFocus: true,
   })
+
+  // Realtime: atualiza a tabela sempre que um clique for registrado
+  useEffect(() => {
+    const channel = supabase
+      .channel('links-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'links' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['user-links'] })
+        queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clicks' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['user-links'] })
+        queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [queryClient])
 
   // A atualização automática de domínio foi removida para respeitar a nova lógica de user_domains
 
