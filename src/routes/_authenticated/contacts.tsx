@@ -237,8 +237,10 @@ function Index() {
 
   const handleQueueSend = () => {
     const current = dispatcherQueue[dispatcherIndex];
-    handleDispatch(current);
-    advanceQueue();
+    if (current) {
+      handleDispatch(current);
+      advanceQueue();
+    }
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
