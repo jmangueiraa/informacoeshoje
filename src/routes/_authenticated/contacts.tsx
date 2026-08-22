@@ -240,11 +240,13 @@ function Index() {
           const aiContact = await extractWithAI({ data: { text, userApiKey } });
           
           let name = aiContact.primeiro_nome;
-          let currentCounter = clientCounter;
           
-          if (!name || name.toLowerCase() === "não identificado" || name === "null") {
-            name = `Cliente ${String(currentCounter).padStart(5, '0')}`;
-            currentCounter++;
+          // Se o Gemini retornou "Cliente XXXXX" ou algo inválido, garantimos o contador sequencial
+          if (!name || name === "null" || name.toLowerCase() === "não identificado" || name.toLowerCase().includes("cliente")) {
+             // Se já for "Cliente XXXXX", mantemos o que a IA mandou, senão geramos um
+             if (!name || !name.startsWith("Cliente")) {
+               name = `Cliente ${String(clientCounter).padStart(5, '0')}`;
+             }
           }
           
           contacts = [{
@@ -252,7 +254,10 @@ function Index() {
             phone: aiContact.contato || "Não encontrado"
           }];
           
-          setClientCounter(currentCounter);
+          // Incrementa o contador apenas se usamos um nome padrão "Cliente XXXXX"
+          if (name.startsWith("Cliente")) {
+            setClientCounter(prev => prev + 1);
+          }
 
           // Add to accumulated contacts
           setExtractedContacts(prev => [...prev, {

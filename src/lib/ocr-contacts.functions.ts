@@ -17,7 +17,7 @@ export const extractContactsWithAI = createServerFn({ method: "POST" })
       throw new Error("API Key não configurada. Por favor, configure nas configurações.");
     }
 
-    // We use the Lovable AI Gateway for safety and reliability, pointing it to the Gemini model
+    // Usando o Lovable AI Gateway para segurança e confiabilidade, apontando para o modelo Gemini
     const response = await fetch("https://api.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -29,26 +29,13 @@ export const extractContactsWithAI = createServerFn({ method: "POST" })
         messages: [
           {
             role: "user",
-            content: `Você é um extrator de dados especializado em comprovantes de entrega (Shopee/SPX).
-Sua tarefa é analisar o texto bruto vindo de um OCR e extrair informações do recebedor com precisão absoluta para EXATAMENTE UM contato por imagem.
+            content: `Você é um assistente de extração de dados de comprovantes de entrega da Shopee/SPX.
+Analise o texto do comprovante e extraia:
+1. primeiro_nome: Apenas o PRIMEIRO NOME do recebedor (ex: Jéssica, Marta, Carlos). Ignore termos como 'BR', 'Detalhes', 'Entregue', 'LM Hub', etc. Se o nome não estiver presente, retorne 'Cliente XXXXX'.
+2. contato: O número de telefone/celular com DDD no formato '(XX) 9XXXX-XXXX'.
 
-Regras de Extração e Localização:
-1. Como localizar o Nome:
-   - O nome da pessoa está SEMPRE localizado no bloco de texto 'Informações do recebedor'.
-   - Ele é a primeira palavra da PRIMEIRA linha útil que aparece imediatamente após o cabeçalho 'Informações do recebedor'.
-   - Se houver quebra de linha (ex: nome em uma linha e sobrenome na outra), capture APENAS a primeira palavra da primeira linha (ex: "Jéssica").
-   - NUNCA pegue palavras de outros blocos como 'Detalhes', 'Entregue', 'Rua', 'Informações' ou códigos de rastreio.
-   - Remova pontos finais ou caracteres extras (ex: "Viviane." vira "Viviane"; "Marta Lúcia..." vira "Marta").
-   - Se o bloco 'Informações do recebedor' estiver vazio ou ilegível, use a linha imediatamente ACIMA da linha do telefone como fallback, pegando a primeira palavra.
-
-2. Como localizar o Celular/Contato:
-   - O telefone está SEMPRE na linha que começa com "Tel", "Tel:", "Telefone" ou "+55".
-   - Capture o número de telefone completo. Remova o +55 se houver.
-   - NUNCA capture códigos de rastreio (ex: sequências numéricas longas que começam com 26... ou códigos que começam com BR) no campo de telefone.
-   - Formate o número final como (XX) 9XXXX-XXXX (ex: +5516991272583 deve virar (16) 99127-2583).
-
-3. Saída:
-   - Retorne EXCLUSIVAMENTE um objeto JSON no formato {"primeiro_nome": "...", "contato": "(XX) 9XXXX-XXXX"}.
+Responda ESTRITAMENTE em formato JSON puro:
+{"primeiro_nome": "...", "contato": "..."}
 
 Texto para análise:
 ${data.text}`
