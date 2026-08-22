@@ -501,62 +501,22 @@ function Index() {
                     <p>O texto extraído aparecerá aqui após o processamento.</p>
                   </div>
                 ) : (
-                  <Tabs defaultValue="consolidated" className="flex-1 flex flex-col">
-                    <TabsList className="mb-4">
-                      <TabsTrigger value="consolidated">Consolidado</TabsTrigger>
-                      <TabsTrigger value="individual">Individual</TabsTrigger>
-                      <TabsTrigger value="contacts" className="flex items-center gap-2">
-                        <TableIcon className="size-3" /> Contatos
-                      </TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="consolidated" className="flex-1 mt-0">
-                      <Textarea 
-                        value={consolidatedText} 
-                        readOnly 
-                        className="h-[450px] font-mono text-sm leading-relaxed resize-none bg-muted/30"
-                      />
-                    </TabsContent>
-                    
-                    <TabsContent value="individual" className="flex-1 mt-0">
-                      <ScrollArea className="h-[450px] border rounded-md p-4 bg-muted/30">
-                        <div className="space-y-8">
-                          {images.filter(img => img.status === 'completed').map((img, idx) => (
-                            <div key={img.id} className="space-y-3">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="size-5 rounded bg-primary text-[10px] text-primary-foreground flex items-center justify-center font-bold">{idx + 1}</span>
-                                  <span className="text-xs font-semibold">{img.file.name}</span>
-                                </div>
-                                <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={() => copyToClipboard(img.text)}>
-                                  Copiar este
-                                </Button>
-                              </div>
-                              <Textarea 
-                                value={img.text} 
-                                readOnly 
-                                className="min-h-[100px] font-mono text-xs bg-background"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    </TabsContent>
-
-                    <TabsContent value="contacts" className="flex-1 mt-0 space-y-4">
-                      <div className="flex justify-between items-center">
-                        <Button variant="ghost" size="sm" onClick={clearContacts} disabled={loading} className="text-destructive hover:text-destructive hover:bg-destructive/10">
-                          <Trash2 className="size-3 mr-2" /> Limpar Contatos
+                  <div className="flex-1 flex flex-col space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Button variant="ghost" size="sm" onClick={clearContacts} disabled={loading} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                        <Trash2 className="size-3 mr-2" /> Limpar Contatos
+                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={copyFormattedList}>
+                          <Copy className="size-3 mr-2" /> Copiar Lista
                         </Button>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={copyFormattedList}>
-                            <Copy className="size-3 mr-2" /> Copiar Lista
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={exportToCSV}>
-                            <FileSpreadsheet className="size-3 mr-2" /> Exportar CSV
-                          </Button>
-                        </div>
+                        <Button variant="outline" size="sm" onClick={exportToCSV}>
+                          <FileSpreadsheet className="size-3 mr-2" /> Exportar CSV
+                        </Button>
                       </div>
+                    </div>
+                    
+                    <ScrollArea className="flex-1 h-[500px]">
                       <div className="border rounded-md overflow-hidden bg-background">
                         <Table>
                           <TableHeader>
@@ -571,15 +531,21 @@ function Index() {
                             {allContacts.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                                  Nenhum contato identificado.
+                                  Nenhum contato identificado. Comece processando imagens.
                                 </TableCell>
                               </TableRow>
                             ) : (
                               allContacts.map((contact) => (
                                 <TableRow key={contact.id}>
                                   <TableCell>
-                                    <div className="size-10 rounded overflow-hidden border">
-                                      <img src={contact.preview} alt="Preview" className="size-full object-cover" />
+                                    <div className="size-10 rounded overflow-hidden border bg-muted">
+                                      {contact.preview ? (
+                                        <img src={contact.preview} alt="Preview" className="size-full object-cover" />
+                                      ) : (
+                                        <div className="size-full flex items-center justify-center">
+                                          <FileText className="size-4 text-muted-foreground" />
+                                        </div>
+                                      )}
                                     </div>
                                   </TableCell>
                                   <TableCell>
@@ -613,11 +579,11 @@ function Index() {
                                       <Button 
                                         variant="outline" 
                                         size="icon" 
-                                        className="size-7"
+                                        className="size-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
                                         title="Abrir WhatsApp"
                                         onClick={() => {
                                           const cleanPhone = contact.phone.replace(/\D/g, "");
-                                          const phoneWithCountry = cleanPhone.length === 11 ? `55${cleanPhone}` : cleanPhone;
+                                          const phoneWithCountry = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
                                           window.open(`https://wa.me/${phoneWithCountry}`, "_blank");
                                         }}
                                       >
@@ -633,8 +599,8 @@ function Index() {
                           </TableBody>
                         </Table>
                       </div>
-                    </TabsContent>
-                  </Tabs>
+                    </ScrollArea>
+                  </div>
                 )}
               </div>
             </Card>
