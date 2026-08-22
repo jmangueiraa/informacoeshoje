@@ -156,37 +156,10 @@ function Index() {
       }
     }
 
-    // Lista de termos proibidos (cabeçalhos, códigos, termos de sistema)
-    const proibidas = ['br', 'entregue', 'detalhes', 'informações', 'recebedor', 'pedido', 'tempo', 'rua', 'tel', 'screenshot', 'imagem', 'hub', 'lm'];
-
-    // 2. Extração do Primeiro Nome
-    // Tenta buscar primeiro nas linhas entre 'recebedor' e o telefone
-    const indexRecebedor = linhas.findIndex(l => 
-      l.toLowerCase().includes('recebedor') || 
-      l.toLowerCase().includes('informa')
-    );
-
-    const limiteInicio = indexRecebedor !== -1 ? indexRecebedor + 1 : 0;
-    const limiteFim = indexTel !== -1 ? indexTel : linhas.length;
-
-    for (let i = limiteInicio; i < limiteFim; i++) {
-      const linha = linhas[i] || '';
-      const palavras = linha.split(/\s+/);
-      for (const p of palavras) {
-        const limpa = p.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, '').trim();
-        if (limpa.length >= 2 && !proibidas.includes(limpa.toLowerCase())) {
-          primeiroNome = limpa.charAt(0).toUpperCase() + limpa.slice(1).toLowerCase();
-          break;
-        }
-      }
-      if (primeiroNome) break;
-    }
-
-    // Fallback se não achar
-    if (!primeiroNome || proibidas.includes(primeiroNome.toLowerCase())) {
-      const numFormatado = String(index + 1).padStart(5, '0');
-      primeiroNome = `Cliente ${numFormatado}`;
-    }
+    // A extração de nome via regex local foi removida para priorizar a precisão da API do Gemini.
+    // Este fallback local agora apenas gera o identificador sequencial se necessário.
+    const numFormatado = String(index + 1).padStart(5, '0');
+    primeiroNome = `Cliente ${numFormatado}`;
 
     return [{ name: primeiroNome, phone: contato || "Não encontrado" }];
   };
