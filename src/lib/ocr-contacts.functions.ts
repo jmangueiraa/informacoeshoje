@@ -41,11 +41,6 @@ Texto para análise:
 ${data.text}`
           }
         ],
-
-Texto para análise:
-${data.text}`
-          }
-        ],
         response_format: { type: "json_object" },
         temperature: 0.1,
       }),
