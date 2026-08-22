@@ -89,10 +89,6 @@ function Index() {
   const [clientCounter, setClientCounter] = useState(1);
   const [extractedContacts, setExtractedContacts] = useState<(Contact & { 
     id: string; 
-    imgId?: string; 
-    fileName?: string; 
-    preview?: string;
-    contactIdx?: number;
   })[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -270,10 +266,6 @@ function Index() {
         const newContact = {
           ...extracted,
           id: Math.random().toString(36).substring(7),
-          imgId: currentId,
-          fileName: currentImage.file.name,
-          preview: currentImage.preview,
-          contactIdx: 0
         };
 
         setExtractedContacts(prev => [...prev, newContact]);
@@ -587,7 +579,6 @@ function Index() {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead className="w-[60px]">Imagem</TableHead>
                               <TableHead>Primeiro Nome</TableHead>
                               <TableHead>Contato</TableHead>
                               <TableHead className="text-right w-[150px]">Ações</TableHead>
@@ -596,24 +587,13 @@ function Index() {
                           <TableBody>
                             {allContacts.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                                <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
                                   Nenhum contato identificado. Comece processando imagens.
                                 </TableCell>
                               </TableRow>
                             ) : (
                               paginatedContacts.map((contact) => (
                                 <TableRow key={contact.id}>
-                                  <TableCell>
-                                    <div className="size-10 rounded overflow-hidden border bg-muted">
-                                      {contact.preview ? (
-                                        <img src={contact.preview} alt="Preview" className="size-full object-cover" />
-                                      ) : (
-                                        <div className="size-full flex items-center justify-center">
-                                          <FileText className="size-4 text-muted-foreground" />
-                                        </div>
-                                      )}
-                                    </div>
-                                  </TableCell>
                                   <TableCell>
                                     <div className="flex items-center gap-2">
                                       <User className="size-3 text-muted-foreground" />
