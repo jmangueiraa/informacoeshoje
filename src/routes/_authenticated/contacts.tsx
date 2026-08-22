@@ -556,9 +556,16 @@ function Index() {
                     <div className="flex flex-wrap justify-between items-center gap-4">
                       <div className="flex gap-2">
                         <Button 
+                          variant={!filterPending ? "default" : "outline"} 
+                          size="sm" 
+                          onClick={() => setFilterPending(false)}
+                        >
+                          Todos os Contatos ({extractedContacts.length})
+                        </Button>
+                        <Button 
                           variant={filterPending ? "default" : "outline"} 
                           size="sm" 
-                          onClick={() => setFilterPending(!filterPending)}
+                          onClick={() => setFilterPending(true)}
                           className={cn(filterPending && "bg-amber-500 hover:bg-amber-600 text-white")}
                         >
                           <Filter className="size-3 mr-2" /> 
@@ -590,7 +597,7 @@ function Index() {
                             {allContacts.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                                  Nenhum contato identificado. Comece processando imagens.
+                                  {filterPending ? "Nenhum lembrete pendente no momento." : "Nenhum contato identificado. Comece processando imagens."}
                                 </TableCell>
                               </TableRow>
                             ) : (
