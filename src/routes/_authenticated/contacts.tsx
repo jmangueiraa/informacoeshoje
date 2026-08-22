@@ -173,20 +173,19 @@ function Index() {
   };
 
 
-  const extrairDadosComprovante = (textoBruto: string, index: number) => {
-    let primeiroNome = '';
+  const extrairContatoShopee = (textoBruto: string, index: number) => {
     let contato = '';
+    let primeiroNome = '';
 
     const linhas = textoBruto
       .split('\n')
       .map(l => l.trim())
       .filter(Boolean);
 
-    // 1. Extração e formatação do telefone
+    // 1. Extrai o telefone
     let indexTel = -1;
     for (let i = 0; i < linhas.length; i++) {
       const linha = linhas[i];
-      if (!linha) continue;
       if (/tel|\+55|\b55\d{8,11}\b/i.test(linha)) {
         indexTel = i;
         const nums = linha.replace(/\D/g, '');
@@ -202,17 +201,22 @@ function Index() {
       }
     }
 
-    const proibidas = ['br', 'bra', 'brg', 'bsb', 'bal', 'estrada', 'rua', 'entregue', 'detalhes', 'informações', 'recebedor', 'pedido', 'tempo', 'tel', 'screenshot', 'hub', 'lm', 'não', 'encontrado'];
+    // Lista de termos e ruídos comuns de OCR da Shopee para BLOQUEAR
+    const blacklist = [
+      'br', 'bra', 'brg', 'bsb', 'bal', 'ball', 'bull', 'bem', 'bém', 'beaule', 'beaulé', 
+      'bragança', 'braganca', 'estrada', 'rua', 'avenida', 'av', 'entregue', 'detalhes', 
+      'informações', 'informacoes', 'recebedor', 'pedido', 'tempo', 'tel', 'screenshot', 
+      'hub', 'lm', 'spx', 'shopee', 'não', 'encontrado', 'lm hub', 'entrega', 'pacote'
+    ];
 
-    // 2. Extração do primeiro nome (varredura do bloco anterior ao telefone)
+    // 2. Extrai o Primeiro Nome: busca linhas antes do telefone ignorando a blacklist
     const limiteFim = indexTel !== -1 ? indexTel : linhas.length;
     for (let i = 0; i < limiteFim; i++) {
       const linha = linhas[i];
-      if (!linha) continue;
       const palavras = linha.split(/\s+/);
       for (const p of palavras) {
         const limpa = p.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, '').trim();
-        if (limpa.length >= 3 && !proibidas.includes(limpa.toLowerCase())) {
+        if (limpa.length >= 3 && !blacklist.includes(limpa.toLowerCase())) {
           primeiroNome = limpa.charAt(0).toUpperCase() + limpa.slice(1).toLowerCase();
           break;
         }
@@ -220,10 +224,9 @@ function Index() {
       if (primeiroNome) break;
     }
 
-    // Fallback sequencial correto usando o índice incremental
-    if (!primeiroNome || proibidas.includes(primeiroNome.toLowerCase())) {
-      const numFormatado = String(index + 1).padStart(5, '0');
-      primeiroNome = `Cliente ${numFormatado}`;
+    // Se mesmo assim cair em ruído ou não achar, aplica Cliente sequencial
+    if (!primeiroNome || blacklist.includes(primeiroNome.toLowerCase())) {
+      primeiroNome = `Cliente ${String(index + 1).padStart(5, '0')}`;
     }
 
     if (!contato) {
