@@ -41,6 +41,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Label } from '@/components/ui/label'
+import { supabase } from '@/integrations/supabase/client'
 
 export const Route = createFileRoute('/_authenticated/links')({
   component: LinksPage,
