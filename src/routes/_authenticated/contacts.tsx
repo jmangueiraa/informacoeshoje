@@ -666,6 +666,45 @@ function Index() {
                         </Table>
                       </div>
                     </ScrollArea>
+                    
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between pt-4 border-t mt-auto">
+                        <p className="text-xs text-muted-foreground">
+                          Mostrando de {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, allContacts.length)} de {allContacts.length} registros
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                            className="h-8 text-xs"
+                          >
+                            Anterior
+                          </Button>
+                          <span className="text-xs font-medium px-2">
+                            Página {currentPage} de {totalPages}
+                          </span>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={currentPage === totalPages}
+                            className="h-8 text-xs"
+                          >
+                            Próxima
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    {allContacts.length > 0 && totalPages <= 1 && (
+                      <div className="pt-2">
+                        <p className="text-[10px] text-muted-foreground text-center italic">
+                          mostra de 10 em 10 registro
+                        </p>
+                      </div>
+                    )}
+
                   </div>
                 )}
               </div>
