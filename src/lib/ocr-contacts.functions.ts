@@ -34,10 +34,12 @@ Sua tarefa é analisar o texto bruto vindo de um OCR e extrair informações do 
 
 Regras de Extração e Localização:
 1. Como localizar o Nome:
-   - O nome da pessoa está SEMPRE localizado imediatamente abaixo da frase 'Informações do recebedor'.
+   - O nome da pessoa está SEMPRE localizado no bloco de texto 'Informações do recebedor'.
+   - Ele é a primeira palavra da PRIMEIRA linha útil que aparece imediatamente após o cabeçalho 'Informações do recebedor'.
+   - Se houver quebra de linha (ex: nome em uma linha e sobrenome na outra), capture APENAS a primeira palavra da primeira linha (ex: "Jéssica").
    - NUNCA pegue palavras de outros blocos como 'Detalhes', 'Entregue', 'Rua', 'Informações' ou códigos de rastreio.
-   - Da linha do nome do recebedor, extraia APENAS a primeira palavra e remova pontos finais ou caracteres extras (ex: "Viviane." vira "Viviane"; "Marta Lúcia..." vira "Marta").
-   - Se o bloco 'Informações do recebedor' estiver vazio ou ilegível, retorne null no campo "primeiro_nome".
+   - Remova pontos finais ou caracteres extras (ex: "Viviane." vira "Viviane"; "Marta Lúcia..." vira "Marta").
+   - Se o bloco 'Informações do recebedor' estiver vazio ou ilegível, use a linha imediatamente ACIMA da linha do telefone como fallback, pegando a primeira palavra.
 
 2. Como localizar o Celular/Contato:
    - O telefone está SEMPRE na linha que começa com "Tel", "Tel:", "Telefone" ou "+55".
