@@ -49,8 +49,9 @@ import {
   XCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { extractContactsWithAI, extractContactsWithVision } from "@/lib/ocr-contacts.functions";
-import Tesseract from 'tesseract.js';
+
+import { processarComprovanteComGemini } from "@/lib/gemini-ocr.functions";
+
 import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/_authenticated/contacts")({
@@ -102,45 +103,9 @@ function Index() {
   const itemsPerPage = 10;
 
   
-  const extractWithAI = useServerFn(extractContactsWithAI);
-  const extractWithVision = useServerFn(extractContactsWithVision);
+  
+  const processarComGemini = useServerFn(processarComprovanteComGemini);
 
-  const preprocessarImagem = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d')!;
-        
-        // Upscale 2x para aumentar a nitidez das fontes pequenas
-        canvas.width = img.width * 2;
-        canvas.height = img.height * 2;
-        
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const d = imgData.data;
-        
-        // Aumenta o contraste e binariza o texto
-        for (let i = 0; i < d.length; i += 4) {
-          const r = d[i] ?? 0;
-          const g = d[i + 1] ?? 0;
-          const b = d[i + 2] ?? 0;
-          const media = (r + g + b) / 3;
-          // Se for cinza ou escuro vira preto puro (0), fundo claro vira branco puro (255)
-          const v = media < 185 ? 0 : 255;
-          d[i] = v;
-          d[i + 1] = v;
-          d[i + 2] = v;
-        }
-        
-        ctx.putImageData(imgData, 0, 0);
-        resolve(canvas.toDataURL('image/png'));
-      };
-      img.src = URL.createObjectURL(file);
-    });
-  };
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -210,113 +175,6 @@ function Index() {
   };
 
 
-  const extrairContatoShopee = (textoBruto: string, index: number) => {
-    let contato = '';
-    let primeiroNome = '';
-
-    const linhas = textoBruto
-      .split('\n')
-      .map(l => l.trim())
-      .filter(Boolean);
-
-    // 1. Extrai o telefone
-    let indexTel = -1;
-    for (let i = 0; i < linhas.length; i++) {
-      const linha = linhas[i];
-      if (!linha) continue;
-      if (/tel|\+55|\b55\d{8,11}\b/i.test(linha)) {
-        indexTel = i;
-        const nums = linha.replace(/\D/g, '');
-        const sem55 = nums.startsWith('55') ? nums.substring(2) : nums;
-        if (sem55.length === 11) {
-          contato = `(${sem55.substring(0, 2)}) ${sem55.substring(2, 7)}-${sem55.substring(7)}`;
-        } else if (sem55.length === 10) {
-          contato = `(${sem55.substring(0, 2)}) ${sem55.substring(2, 6)}-${sem55.substring(6)}`;
-        } else if (nums.length >= 8) {
-          contato = nums;
-        }
-        break;
-      }
-    }
-
-    // Lista de termos e ruídos comuns de OCR da Shopee para BLOQUEAR
-    const blacklist = [
-      'br', 'bra', 'brg', 'bsb', 'bal', 'ball', 'bull', 'bem', 'bém', 'beaule', 'beaulé', 
-      'bragança', 'braganca', 'estrada', 'rua', 'avenida', 'av', 'entregue', 'detalhes', 
-      'informações', 'informacoes', 'recebedor', 'pedido', 'tempo', 'tel', 'screenshot', 
-      'hub', 'lm', 'spx', 'shopee', 'não', 'encontrado', 'lm hub', 'entrega', 'pacote'
-    ];
-
-    // 2. Extrai o Primeiro Nome: busca linhas antes do telefone ignorando a blacklist
-    const limiteFim = indexTel !== -1 ? indexTel : linhas.length;
-    for (let i = 0; i < limiteFim; i++) {
-      const linha = linhas[i];
-      if (!linha) continue;
-      const palavras = linha.split(/\s+/);
-      for (const p of palavras) {
-        const limpa = p.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, '').trim();
-        if (limpa.length >= 3 && !blacklist.includes(limpa.toLowerCase())) {
-          primeiroNome = limpa.charAt(0).toUpperCase() + limpa.slice(1).toLowerCase();
-          break;
-        }
-      }
-      if (primeiroNome) break;
-    }
-
-    // Se mesmo assim cair em ruído ou não achar, aplica Cliente sequencial
-    if (!primeiroNome || blacklist.includes(primeiroNome.toLowerCase())) {
-      primeiroNome = `Cliente ${String(index + 1).padStart(5, '0')}`;
-    }
-
-    if (!contato) {
-      contato = 'Não encontrado';
-    }
-
-    return { name: primeiroNome, phone: contato };
-  };
-
-  const extrairComGemini = async (textoOCR: string, apiKey: string) => {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    
-    const prompt = `
-Você é um especialista em ler comprovantes de entrega da Shopee/SPX.
-Analise o texto OCR abaixo e extraia:
-1. primeiro_nome: Apenas o PRIMEIRO NOME da pessoa recebedora (ex: 'Jéssica', 'Marta', 'Antônia', 'Carlos'). Ignore ruídos de OCR (como 'Ball', 'Bull', 'Beaulé', 'Bragança', 'Bsb', 'Bal', 'Br', 'Estrada'), códigos de rastreio ou termos de entrega. Se não houver nome de pessoa válido, retorne null.
-2. contato: O número de celular com DDD formatado como '(XX) 9XXXX-XXXX'.
-
-Texto OCR:
-"""
-${textoOCR}
-"""
-
-Responda ESTRITAMENTE em formato JSON:
-{"primeiro_nome": "...", "contato": "..."}
-`;
-
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: "application/json" }
-        })
-      });
-
-      const data = await response.json();
-      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!content) throw new Error("Resposta da IA vazia");
-      
-      const parsed = JSON.parse(content);
-      return { 
-        name: parsed.primeiro_nome || null, 
-        phone: parsed.contato || null 
-      };
-    } catch (err) {
-      console.error("Erro na extração Gemini:", err);
-      return null;
-    }
-  };
 
   const processOCR = async () => {
     const pendingImages = images.filter((img) => img.status === "pending" || img.status === "error");
@@ -341,33 +199,23 @@ Responda ESTRITAMENTE em formato JSON:
 
       try {
         const originalFile = currentImage.file;
-        const imagemTratada = await preprocessarImagem(originalFile);
+        const base64 = await fileToBase64(originalFile);
         
-        const { data: { text } } = await Tesseract.recognize(imagemTratada, 'por', {
-          logger: m => {
-            if (m.status === 'recognizing text') {
-              setImages(prev => prev.map(img => 
-                img.id === currentId ? { ...img, progress: Math.round(m.progress * 80) } : img
-              ));
-            }
+        setOverallStatus(`IA extraindo dados da imagem ${i + 1}...`);
+        
+        const aiResult = await processarComGemini({
+          data: {
+            base64,
+            mimeType: originalFile.type,
+            index: currentIndexForClient - 1,
+            apiKey: userApiKey
           }
         });
-
-        let extracted;
         
-        if (isGeminiKey && userApiKey) {
-          setOverallStatus(`IA extraindo dados da imagem ${i + 1}...`);
-          const aiResult = await extrairComGemini(text, userApiKey);
-          
-          if (aiResult && aiResult.name && aiResult.phone) {
-            extracted = aiResult;
-          } else {
-            // Fallback to local logic if AI fails or returns null
-            extracted = extrairContatoShopee(text, currentIndexForClient - 1);
-          }
-        } else {
-          extracted = extrairContatoShopee(text, currentIndexForClient - 1);
-        }
+        const extracted = {
+          name: aiResult.primeiroNome,
+          phone: aiResult.contato
+        };
         
         if (extracted.name.startsWith("Cliente")) {
           currentIndexForClient++;
@@ -389,7 +237,7 @@ Responda ESTRITAMENTE em formato JSON:
 
         setImages((prev) =>
           prev.map((img) =>
-            img.id === currentId ? { ...img, status: "completed", text, contacts: [extracted], progress: 100 } : img
+            img.id === currentId ? { ...img, status: "completed", text: `Nome: ${extracted.name}, Contato: ${extracted.phone}`, contacts: [extracted], progress: 100 } : img
           )
         );
       } catch (err) {
@@ -572,7 +420,7 @@ Responda ESTRITAMENTE em formato JSON:
             </div>
             <h1 className="text-4xl font-extrabold tracking-tighter">Extrator de Contatos</h1>
           </div>
-          <p className="text-muted-foreground text-lg">Extração inteligente de contatos da Shopee via Tesseract.js (OCR Local)</p>
+          <p className="text-muted-foreground text-lg">Extração inteligente de contatos da Shopee via Google Gemini (Multimodal)</p>
         </header>
 
         <div className="grid lg:grid-cols-3 gap-8">
