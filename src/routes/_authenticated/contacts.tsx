@@ -372,9 +372,9 @@ function Index() {
             <div className="size-8 bg-primary rounded-lg flex items-center justify-center">
               <FileText className="size-5 text-primary-foreground" />
             </div>
-            <h1 className="text-4xl font-extrabold tracking-tighter">Fototext</h1>
+            <h1 className="text-4xl font-extrabold tracking-tighter">Extrator de Contatos</h1>
           </div>
-          <p className="text-muted-foreground text-lg">Conversor em lote de Imagem para Texto</p>
+          <p className="text-muted-foreground text-lg">Extração inteligente de contatos da Shopee via Gemini Vision AI</p>
         </header>
 
         <div className="grid lg:grid-cols-3 gap-8">
