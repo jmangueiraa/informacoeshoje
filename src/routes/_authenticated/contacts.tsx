@@ -137,7 +137,7 @@ function Index() {
       .map(l => l.trim())
       .filter(Boolean);
 
-    // 1. Localiza a linha do Telefone
+    // 1. Extração do Telefone
     let indexTel = -1;
     for (let i = 0; i < linhas.length; i++) {
       const linha = linhas[i];
@@ -156,38 +156,34 @@ function Index() {
       }
     }
 
-    // 2. Localiza a linha "Informações do recebedor"
+    // Lista de termos proibidos (cabeçalhos, códigos, termos de sistema)
+    const proibidas = ['br', 'entregue', 'detalhes', 'informações', 'recebedor', 'pedido', 'tempo', 'rua', 'tel', 'screenshot', 'imagem', 'hub', 'lm'];
+
+    // 2. Extração do Primeiro Nome
+    // Tenta buscar primeiro nas linhas entre 'recebedor' e o telefone
     const indexRecebedor = linhas.findIndex(l => 
-      l && (l.toLowerCase().includes('recebedor') || 
-      l.toLowerCase().includes('informa'))
+      l.toLowerCase().includes('recebedor') || 
+      l.toLowerCase().includes('informa')
     );
 
-    // 3. O Primeiro Nome é sempre a primeira palavra da PRIMEIRA linha do bloco de recebedor
-    if (indexRecebedor !== -1 && indexRecebedor + 1 < (indexTel !== -1 ? indexTel : linhas.length)) {
-      const primeiraLinhaBloco = linhas[indexRecebedor + 1];
-      if (primeiraLinhaBloco) {
-        const match = primeiraLinhaBloco.match(/[A-Za-zÀ-ÖØ-öø-ÿ]+/);
-        if (match) {
-          const palavra = match[0].trim();
-          const proibidas = ['entregue', 'detalhes', 'informações', 'recebedor', 'pedido', 'tempo', 'rua', 'tel'];
-          if (!proibidas.includes(palavra.toLowerCase())) {
-            primeiroNome = palavra.charAt(0).toUpperCase() + palavra.slice(1).toLowerCase();
-          }
+    const limiteInicio = indexRecebedor !== -1 ? indexRecebedor + 1 : 0;
+    const limiteFim = indexTel !== -1 ? indexTel : linhas.length;
+
+    for (let i = limiteInicio; i < limiteFim; i++) {
+      const linha = linhas[i] || '';
+      const palavras = linha.split(/\s+/);
+      for (const p of palavras) {
+        const limpa = p.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, '').trim();
+        if (limpa.length >= 2 && !proibidas.includes(limpa.toLowerCase())) {
+          primeiroNome = limpa.charAt(0).toUpperCase() + limpa.slice(1).toLowerCase();
+          break;
         }
       }
-    } else if (indexTel > 0) {
-      // Fallback caso não ache o cabeçalho 'recebedor'
-      const linhaAcima = linhas[indexTel - 1];
-      if (linhaAcima) {
-        const match = linhaAcima.match(/[A-Za-zÀ-ÖØ-öø-ÿ]+/);
-        if (match) {
-          primeiroNome = match[0].charAt(0).toUpperCase() + match[0].slice(1).toLowerCase();
-        }
-      }
+      if (primeiroNome) break;
     }
 
-    // Fallback se não encontrar nome
-    if (!primeiroNome || primeiroNome.toLowerCase() === 'detalhes') {
+    // Fallback se não achar
+    if (!primeiroNome || proibidas.includes(primeiroNome.toLowerCase())) {
       const numFormatado = String(index + 1).padStart(5, '0');
       primeiroNome = `Cliente ${numFormatado}`;
     }
