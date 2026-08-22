@@ -222,11 +222,11 @@ function Index() {
           phone: aiResult.contato
         };
 
-        // Validação de Duplicidade
+        // Validação de Duplicidade Estrita
         const cleanPhone = extracted.phone.replace(/\D/g, "");
-        const isDuplicate = extractedContacts.some(c => c.phone.replace(/\D/g, "") === cleanPhone);
+        const isDuplicateInList = extractedContacts.some(c => c.phone.replace(/\D/g, "") === cleanPhone);
 
-        if (cleanPhone && cleanPhone.length >= 8 && isDuplicate) {
+        if (cleanPhone && cleanPhone.length >= 8 && isDuplicateInList) {
           duplicateCount++;
           setImages((prev) =>
             prev.map((img) =>
@@ -251,7 +251,8 @@ function Index() {
           nextReminder: null,
         };
 
-        setExtractedContacts(prev => [...prev, newContact]);
+        // Insere no início da lista (Ordenação: Mais recentes no topo)
+        setExtractedContacts(prev => [newContact, ...prev]);
         setClientCounter(currentIndexForClient);
         addedCount++;
 
@@ -341,15 +342,21 @@ function Index() {
   };
 
   const allContacts = useMemo(() => {
-    let filtered = extractedContacts;
+    // Ordenação: Mais recentes no topo (createdAt/extractionDate decrescente)
+    let sorted = [...extractedContacts].sort((a, b) => {
+      const dateA = a.extractionDate ? new Date(a.extractionDate).getTime() : 0;
+      const dateB = b.extractionDate ? new Date(b.extractionDate).getTime() : 0;
+      return dateB - dateA;
+    });
+
     if (filterPending) {
       const now = new Date();
-      filtered = filtered.filter(c => {
+      sorted = sorted.filter(c => {
         if (!c.nextReminder) return false;
         return new Date(c.nextReminder) <= now;
       });
     }
-    return filtered;
+    return sorted;
   }, [extractedContacts, filterPending]);
 
   const pendingCount = useMemo(() => {
