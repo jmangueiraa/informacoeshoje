@@ -225,15 +225,59 @@ function Index() {
     return { name: primeiroNome, phone: contato };
   };
 
+  const extrairComGemini = async (textoOCR: string, apiKey: string) => {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    
+    const prompt = `
+Você é um especialista em ler comprovantes de entrega da Shopee/SPX.
+Analise o texto OCR abaixo e extraia:
+1. primeiro_nome: Apenas o PRIMEIRO NOME da pessoa recebedora (ex: 'Jéssica', 'Marta', 'Antônia', 'Carlos'). Ignore ruídos de OCR (como 'Ball', 'Bull', 'Beaulé', 'Bragança', 'Bsb', 'Bal', 'Br', 'Estrada'), códigos de rastreio ou termos de entrega. Se não houver nome de pessoa válido, retorne null.
+2. contato: O número de celular com DDD formatado como '(XX) 9XXXX-XXXX'.
+
+Texto OCR:
+"""
+${textoOCR}
+"""
+
+Responda ESTRITAMENTE em formato JSON:
+{"primeiro_nome": "...", "contato": "..."}
+`;
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: "application/json" }
+        })
+      });
+
+      const data = await response.json();
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!content) throw new Error("Resposta da IA vazia");
+      
+      const parsed = JSON.parse(content);
+      return { 
+        name: parsed.primeiro_nome || null, 
+        phone: parsed.contato || null 
+      };
+    } catch (err) {
+      console.error("Erro na extração Gemini:", err);
+      return null;
+    }
+  };
+
   const processOCR = async () => {
     const pendingImages = images.filter((img) => img.status === "pending" || img.status === "error");
     if (pendingImages.length === 0) return;
 
     setLoading(true);
-    setOverallStatus("Iniciando processamento com Tesseract.js...");
+    setOverallStatus("Iniciando processamento...");
 
     const currentImages = [...images];
     let currentIndexForClient = clientCounter;
+    const isGeminiKey = userApiKey.startsWith("AIzaSy");
 
     for (let i = 0; i < currentImages.length; i++) {
       const currentImage = currentImages[i];
@@ -243,7 +287,7 @@ function Index() {
       setImages((prev) =>
         prev.map((img) => (img.id === currentId ? { ...img, status: "processing", progress: 10 } : img))
       );
-      setOverallStatus(`Lendo imagem ${i + 1} de ${currentImages.length}...`);
+      setOverallStatus(`Processando imagem ${i + 1} de ${currentImages.length}...`);
 
       try {
         const fileToRecognize = currentImage.file;
@@ -251,13 +295,27 @@ function Index() {
           logger: m => {
             if (m.status === 'recognizing text') {
               setImages(prev => prev.map(img => 
-                img.id === currentId ? { ...img, progress: Math.round(m.progress * 100) } : img
+                img.id === currentId ? { ...img, progress: Math.round(m.progress * 80) } : img
               ));
             }
           }
         });
 
-        const extracted = extrairDadosComprovante(text, currentIndexForClient - 1);
+        let extracted;
+        
+        if (isGeminiKey && userApiKey) {
+          setOverallStatus(`IA extraindo dados da imagem ${i + 1}...`);
+          const aiResult = await extrairComGemini(text, userApiKey);
+          
+          if (aiResult && aiResult.name && aiResult.phone) {
+            extracted = aiResult;
+          } else {
+            // Fallback to local logic if AI fails or returns null
+            extracted = extrairDadosComprovante(text, currentIndexForClient - 1);
+          }
+        } else {
+          extracted = extrairDadosComprovante(text, currentIndexForClient - 1);
+        }
         
         if (extracted.name.startsWith("Cliente")) {
           currentIndexForClient++;
@@ -280,7 +338,7 @@ function Index() {
         console.error(err);
         setImages((prev) =>
           prev.map((img) =>
-            img.id === currentId ? { ...img, status: "error", error: "Erro no OCR" } : img
+            img.id === currentId ? { ...img, status: "error", error: "Erro no processamento" } : img
           )
         );
         toast.error(`Erro ao processar imagem ${i + 1}`);
@@ -406,10 +464,10 @@ function Index() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Configurações de IA</DialogTitle>
+                  <DialogTitle>Chave de API (Google Gemini / OpenAI / Groq)</DialogTitle>
                   <DialogDescription>
                     Insira sua chave de API para habilitar a extração inteligente de contatos. 
-                    A chave será salva apenas no seu navegador.
+                    Se usar uma chave do Google Gemini (AIzaSy...), a extração será feita via IA.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
