@@ -78,8 +78,8 @@ interface Contact {
   name: string;
   phone: string;
   extractionDate?: string;
-  lastContact?: string;
-  nextReminder?: string;
+  lastContact?: string | null;
+  nextReminder?: string | null;
 }
 
 interface OCRImage {
@@ -227,13 +227,13 @@ function Index() {
 
         const now = new Date();
         const extractionDate = now.toISOString();
-        const nextReminder = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
         const newContact = {
           ...extracted,
           id: Math.random().toString(36).substring(7),
           extractionDate,
-          nextReminder,
+          lastContact: null,
+          nextReminder: null,
         };
 
         setExtractedContacts(prev => [...prev, newContact]);
@@ -630,7 +630,9 @@ function Index() {
                                         </span>
                                       </div>
                                     ) : (
-                                      <span className="text-[10px] text-muted-foreground italic">-</span>
+                                      <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1">
+                                        <Clock className="size-2.5" /> Primeiro envio pendente
+                                      </Badge>
                                     )}
                                   </TableCell>
                                   <TableCell className="text-right">
@@ -646,8 +648,13 @@ function Index() {
                                         </Button>
                                         
                                         {(() => {
-                                          const isDisabled = contact.nextReminder ? new Date(contact.nextReminder) > new Date() : false;
-                                          const nextDateStr = contact.nextReminder ? new Date(contact.nextReminder).toLocaleDateString('pt-BR') : '';
+                                          const isDisabled = contact.lastContact && contact.nextReminder 
+                                            ? new Date(contact.nextReminder) > new Date() 
+                                            : false;
+                                          
+                                          const nextDateStr = contact.nextReminder 
+                                            ? new Date(contact.nextReminder).toLocaleDateString('pt-BR') 
+                                            : '';
                                           
                                           const button = (
                                             <Button 
