@@ -146,6 +146,16 @@ function Index() {
     // Load counter
     const savedCounter = localStorage.getItem("linkafiliado_client_counter");
     if (savedCounter) setClientCounter(parseInt(savedCounter, 10));
+
+    // Load templates
+    const savedTemplates = localStorage.getItem("linkafiliado_msg_templates");
+    if (savedTemplates) {
+      try {
+        setMsgTemplates(JSON.parse(savedTemplates));
+      } catch (e) {
+        console.error("Erro ao carregar templates", e);
+      }
+    }
   }, []);
 
   // Sync contacts to localStorage
