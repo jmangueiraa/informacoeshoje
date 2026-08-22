@@ -480,16 +480,11 @@ function Index() {
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                   <CheckCircle2 className="size-4 text-emerald-500" /> Resultados Extraídos
                 </h2>
-                {images.some(img => img.status === 'completed') && (
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => copyToClipboard(consolidatedText)}>
-                      <Copy className="size-3 mr-2" /> Copiar Tudo
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={downloadText}>
-                      <Download className="size-3 mr-2" /> Baixar .txt
-                    </Button>
-                  </div>
-                )}
+                <div className="flex gap-2">
+                  <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                    {allContacts.length} {allContacts.length === 1 ? "contato" : "contatos"}
+                  </Badge>
+                </div>
               </div>
               
               <div className="flex-1 flex flex-col p-6">
