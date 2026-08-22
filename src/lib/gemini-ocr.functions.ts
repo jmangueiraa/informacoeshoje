@@ -1,6 +1,50 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+export function extrairPrimeiroNomeReal(textoBruto: string, index: number): string {
+  const linhas = textoBruto
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0);
+
+  const blacklist = [
+    'br', 'bra', 'brg', 'bsb', 'bal', 'ball', 'bull', 'bem', 'bém', 'beaule', 'beaulé', 
+    'bragança', 'braganca', 'estrada', 'rua', 'avenida', 'av', 'entregue', 'detalhes', 
+    'informações', 'informacoes', 'recebedor', 'pedido', 'tempo', 'tel', 'screenshot', 
+    'hub', 'lm', 'spx', 'shopee', 'não', 'encontrado', 'cliente', 'destinatario', 'para'
+  ];
+
+  // Localiza a linha do telefone
+  const indexTel = linhas.findIndex(l => /tel|\+55|\b55\d{8,11}\b|\(\d{2}\)/i.test(l));
+
+  // 1. Procura especificamente na linha imediatamente anterior ao telefone
+  if (indexTel > 0) {
+    for (let i = indexTel - 1; i >= 0; i--) {
+      const linha = linhas[i];
+      // Pega as palavras da linha que tenham apenas letras
+      const palavras = linha.split(/[\s,.-]+/).map(p => p.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, '').trim()).filter(p => p.length >= 3);
+      
+      for (const palavra of palavras) {
+        if (!blacklist.includes(palavra.toLowerCase())) {
+          return palavra.charAt(0).toUpperCase() + palavra.slice(1).toLowerCase();
+        }
+      }
+    }
+  }
+
+  // 2. Se não achar antes do telefone, varre o texto completo ignorando a blacklist
+  for (const linha of linhas) {
+    const palavras = linha.split(/[\s,.-]+/).map(p => p.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, '').trim()).filter(p => p.length >= 3);
+    for (const palavra of palavras) {
+      if (!blacklist.includes(palavra.toLowerCase())) {
+        return palavra.charAt(0).toUpperCase() + palavra.slice(1).toLowerCase();
+      }
+    }
+  }
+
+  return `Cliente ${String(index + 1).padStart(5, '0')}`;
+}
+
 export const processarTextoComGemini = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({
     textoBruto: z.string(),
@@ -9,10 +53,14 @@ export const processarTextoComGemini = createServerFn({ method: "POST" })
   }).parse(data))
   .handler(async ({ data }) => {
     const { textoBruto, apiKey, index } = data;
-    const fallbackNome = `Cliente ${String(index + 1).padStart(5, '0')}`;
+    
+    // Log para depuração solicitado pelo usuário
+    console.log('TEXTO_BRUTO_OCR:', textoBruto);
+
+    const fallbackNome = extrairPrimeiroNomeReal(textoBruto, index);
     
     if (!apiKey) {
-      return extrairRegexLocal(textoBruto, fallbackNome);
+      return { primeiroNome: fallbackNome, contato: extrairTelefoneValido(textoBruto) };
     }
 
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
@@ -25,8 +73,8 @@ ${textoBruto}
 """
 
 Regras:
-1. primeiro_nome: Retorne apenas o primeiro nome próprio da pessoa recebedora (ex: Jessica, Marta, Antonia, Dario, Igor). Descarte termos como 'Beule', 'Ifroe', 'Br', 'Estrada', 'Entregue', 'Hub'. Se não houver nome claro, retorne null.
-2. contato: Retorne apenas os números brutos (apenas dígitos) que encontrar. O sistema validará se é um celular brasileiro válido (11 dígitos com o 9 na frente ou 13 dígitos começando com 55).
+1. primeiro_nome: Retorne apenas o primeiro nome próprio da pessoa recebedora. Use o texto bruto como referência.
+2. contato: Retorne apenas os números brutos (apenas dígitos).
 
 Formato de resposta JSON obrigatório:
 {"primeiro_nome": "NomeOuNull", "contato": "ApenasNumeros"}
@@ -55,13 +103,16 @@ Formato de resposta JSON obrigatório:
         }
       }
 
+      // Se a IA falhar no nome ou retornar algo genérico, usa a nova lógica local
+      const nomeIA = json.primeiro_nome && json.primeiro_nome !== 'null' ? json.primeiro_nome : null;
+      
       return {
-        primeiroNome: json.primeiro_nome && json.primeiro_nome !== 'null' ? json.primeiro_nome : fallbackNome,
+        primeiroNome: nomeIA || fallbackNome,
         contato
       };
     } catch (e) {
       console.error('Fallback acionado:', e);
-      return extrairRegexLocal(textoBruto, fallbackNome);
+      return { primeiroNome: fallbackNome, contato: extrairTelefoneValido(textoBruto) };
     }
   });
 
@@ -81,7 +132,7 @@ export function extrairTelefoneValido(textoBruto: string): string {
       }
       
       // Se tiver 11 dígitos direto (DDD + 9 dígitos)
-      if (apenasDigitos.length === 11 && apenasDigitos[2] === '9') {
+      if (apenasDigitos.length === 11 && (apenasDigitos[2] === '9' || apenasDigitos.length === 11)) {
         const ddd = apenasDigitos.substring(0, 2);
         const p1 = apenasDigitos.substring(2, 7);
         const p2 = apenasDigitos.substring(7, 11);
@@ -104,9 +155,4 @@ export function extrairTelefoneValido(textoBruto: string): string {
   }
 
   return 'Não encontrado';
-}
-
-function extrairRegexLocal(texto: string, fallbackNome: string) {
-  const contato = extrairTelefoneValido(texto);
-  return { primeiroNome: fallbackNome, contato };
 }
