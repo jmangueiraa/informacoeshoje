@@ -104,7 +104,7 @@ function Index() {
 
   
   const extractWithAI = useServerFn(extractContactsWithAI);
-  const extractWithVision = useServerFn(extractContactsWithVision);
+  const processarComGemini = useServerFn(processarComprovanteComGemini);
 
   const preprocessarImagem = (file: File): Promise<string> => {
     return new Promise((resolve) => {
@@ -342,33 +342,21 @@ Responda ESTRITAMENTE em formato JSON:
 
       try {
         const originalFile = currentImage.file;
-        const imagemTratada = await preprocessarImagem(originalFile);
+        const base64 = await fileToBase64(originalFile);
         
-        const { data: { text } } = await Tesseract.recognize(imagemTratada, 'por', {
-          logger: m => {
-            if (m.status === 'recognizing text') {
-              setImages(prev => prev.map(img => 
-                img.id === currentId ? { ...img, progress: Math.round(m.progress * 80) } : img
-              ));
-            }
-          }
+        setOverallStatus(`IA extraindo dados da imagem ${i + 1}...`);
+        
+        const aiResult = await processarComGemini({
+          base64,
+          mimeType: originalFile.type,
+          index: currentIndexForClient - 1,
+          apiKey: userApiKey
         });
-
-        let extracted;
         
-        if (isGeminiKey && userApiKey) {
-          setOverallStatus(`IA extraindo dados da imagem ${i + 1}...`);
-          const aiResult = await extrairComGemini(text, userApiKey);
-          
-          if (aiResult && aiResult.name && aiResult.phone) {
-            extracted = aiResult;
-          } else {
-            // Fallback to local logic if AI fails or returns null
-            extracted = extrairContatoShopee(text, currentIndexForClient - 1);
-          }
-        } else {
-          extracted = extrairContatoShopee(text, currentIndexForClient - 1);
-        }
+        const extracted = {
+          name: aiResult.primeiroNome,
+          phone: aiResult.contato
+        };
         
         if (extracted.name.startsWith("Cliente")) {
           currentIndexForClient++;
@@ -390,7 +378,7 @@ Responda ESTRITAMENTE em formato JSON:
 
         setImages((prev) =>
           prev.map((img) =>
-            img.id === currentId ? { ...img, status: "completed", text, contacts: [extracted], progress: 100 } : img
+            img.id === currentId ? { ...img, status: "completed", text: `Nome: ${extracted.name}, Contato: ${extracted.phone}`, contacts: [extracted], progress: 100 } : img
           )
         );
       } catch (err) {
@@ -573,7 +561,7 @@ Responda ESTRITAMENTE em formato JSON:
             </div>
             <h1 className="text-4xl font-extrabold tracking-tighter">Extrator de Contatos</h1>
           </div>
-          <p className="text-muted-foreground text-lg">Extração inteligente de contatos da Shopee via Tesseract.js (OCR Local)</p>
+          <p className="text-muted-foreground text-lg">Extração inteligente de contatos da Shopee via Google Gemini (Multimodal)</p>
         </header>
 
         <div className="grid lg:grid-cols-3 gap-8">
