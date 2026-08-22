@@ -225,7 +225,7 @@ function Index() {
             setClientCounter(prev => prev + 1);
           }
 
-          // Add to accumulated contacts
+          // Add to accumulated contacts (Append mode)
           setExtractedContacts(prev => [...prev, {
             ...contacts[0]!,
             id: Math.random().toString(36).substring(7),
@@ -238,7 +238,7 @@ function Index() {
           console.error("AI extraction failed, falling back to regex:", aiErr);
           contacts = extrairContatoShopee(text, i);
           
-          // Add to accumulated contacts (fallback case)
+          // Add to accumulated contacts (Append mode)
           setExtractedContacts(prev => [...prev, {
             ...contacts[0]!,
             id: Math.random().toString(36).substring(7),
