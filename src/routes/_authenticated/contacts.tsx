@@ -488,10 +488,10 @@ function Index() {
               </div>
               
               <div className="flex-1 flex flex-col p-6">
-                {!images.some(img => img.status === 'completed') ? (
+                {allContacts.length === 0 && !images.some(img => img.status === 'processing') ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground space-y-4 opacity-40">
                     <div className="size-16 rounded-2xl bg-muted flex items-center justify-center">
-                      <FileText className="size-8" />
+                      <TableIcon className="size-8" />
                     </div>
                     <p>O texto extraído aparecerá aqui após o processamento.</p>
                   </div>
