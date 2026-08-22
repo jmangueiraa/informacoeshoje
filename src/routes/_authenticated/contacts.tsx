@@ -156,10 +156,29 @@ function Index() {
       }
     }
 
-    // A extração de nome via regex local foi removida para priorizar a precisão da API do Gemini.
-    // Este fallback local agora apenas gera o identificador sequencial se necessário.
-    const numFormatado = String(index + 1).padStart(5, '0');
-    primeiroNome = `Cliente ${numFormatado}`;
+    const proibidas = ['br', 'bra', 'brg', 'estrada', 'rua', 'entregue', 'detalhes', 'informações', 'recebedor', 'pedido', 'tempo', 'tel', 'screenshot', 'hub', 'lm'];
+
+    // 2. Extração do Primeiro Nome (varre todas as linhas antes do telefone)
+    const limiteFim = indexTel !== -1 ? indexTel : linhas.length;
+    for (let i = 0; i < limiteFim; i++) {
+      const linha = linhas[i];
+      if (!linha) continue;
+      const palavras = linha.split(/\s+/);
+      for (const p of palavras) {
+        const limpa = p.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, '').trim();
+        if (limpa.length >= 3 && !proibidas.includes(limpa.toLowerCase())) {
+          primeiroNome = limpa.charAt(0).toUpperCase() + limpa.slice(1).toLowerCase();
+          break;
+        }
+      }
+      if (primeiroNome) break;
+    }
+
+    // Fallback se não encontrar
+    if (!primeiroNome || proibidas.includes(primeiroNome.toLowerCase())) {
+      const numFormatado = String(index + 1).padStart(5, '0');
+      primeiroNome = `Cliente ${numFormatado}`;
+    }
 
     return [{ name: primeiroNome, phone: contato || "Não encontrado" }];
   };
