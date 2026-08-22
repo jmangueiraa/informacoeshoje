@@ -314,6 +314,11 @@ function Index() {
     }));
   };
 
+  const deleteContact = (contactId: string) => {
+    setExtractedContacts(prev => prev.filter(c => c.id !== contactId));
+    toast.success("Contato removido");
+  };
+
   const allContacts = useMemo(() => {
     let filtered = extractedContacts;
     if (filterPending) {
