@@ -211,14 +211,14 @@ Acompanhe a rota atualizada pelo rastreamento:
   };
 
   const getFormattedMessage = (contact: Contact, isFirst: boolean) => {
-    const template = isFirst ? msgTemplates.first : msgTemplates.reminder;
+    const template = (isFirst ? msgTemplates.first : msgTemplates.reminder) || "";
     
     // Obter o primeiro nome real se possível
-    const nomeExibicao = contact.name.split(' ')[0];
+    const nomeExibicao = contact.name.split(' ')[0] || "Cliente";
 
     let message = template
       .replace(/{primeiroNome}/g, nomeExibicao)
-      .replace(/{contato}/g, contact.phone);
+      .replace(/{contato}/g, contact.phone || "");
 
     if (contact.trackingSlug) {
       const domain = userProfile?.custom_domain || PLATFORM_DOMAIN;
