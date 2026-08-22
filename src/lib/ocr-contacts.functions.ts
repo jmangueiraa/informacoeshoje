@@ -29,16 +29,19 @@ export const extractContactsWithAI = createServerFn({ method: "POST" })
         messages: [
           {
             role: "user",
-            content: `Você é um assistente de extração de dados de comprovantes de entrega da Shopee/SPX.
-Analise o texto do comprovante e extraia:
-1. primeiro_nome: Apenas o PRIMEIRO NOME do recebedor (ex: Jéssica, Marta, Carlos). Ignore termos como 'BR', 'Detalhes', 'Entregue', 'LM Hub', 'Rua', 'Pedido', etc. Se o nome não estiver presente ou for um termo técnico, retorne 'Cliente XXXXX'.
-2. contato: O número de telefone/celular com DDD no formato '(XX) 9XXXX-XXXX'.
+            content: `Você é um extrator de contatos de comprovantes de entrega da Shopee/SPX.
+O texto abaixo contém dados do recebedor e telefone:
+"""
+${data.text}
+"""
 
-Responda ESTRITAMENTE em formato JSON puro:
-{"primeiro_nome": "...", "contato": "..."}
+Regras obrigatórias:
+- primeiro_nome: Extraia APENAS o primeiro nome da pessoa recebedora (ex: se o texto tiver 'Jéssica De Araújo Dos Santos_', retorne 'Jéssica'; se tiver 'Marta Lúcia...', retorne 'Marta'; se tiver 'Dario...', retorne 'Dario'). Ignore underlines, pontos ou códigos.
+- contato: Formate o telefone como '(XX) 9XXXX-XXXX'.
+- Apenas use 'Cliente XXXXX' se absolutamente nenhum nome humano estiver legível.
 
-Texto para análise:
-${data.text}`
+Responda em formato JSON:
+{"primeiro_nome": "...", "contato": "..."}`
           }
         ],
         response_format: { type: "json_object" },
