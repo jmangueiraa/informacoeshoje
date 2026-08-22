@@ -26,10 +26,10 @@ ${textoBruto}
 
 Regras:
 1. primeiro_nome: Retorne apenas o primeiro nome próprio da pessoa recebedora (ex: Jessica, Marta, Antonia, Dario, Igor). Descarte termos como 'Beule', 'Ifroe', 'Br', 'Estrada', 'Entregue', 'Hub'. Se não houver nome claro, retorne null.
-2. contato: Retorne o celular formatado como '(XX) 9XXXX-XXXX'.
+2. contato: Retorne apenas os números brutos (apenas dígitos) que encontrar. O sistema validará se é um celular brasileiro válido (11 dígitos com o 9 na frente ou 13 dígitos começando com 55).
 
 Formato de resposta JSON obrigatório:
-{"primeiro_nome": "NomeOuNull", "contato": "(XX) 9XXXX-XXXX"}
+{"primeiro_nome": "NomeOuNull", "contato": "ApenasNumeros"}
 `;
 
     try {
