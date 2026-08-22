@@ -648,8 +648,13 @@ function Index() {
                                         </Button>
                                         
                                         {(() => {
-                                          const isDisabled = contact.nextReminder ? new Date(contact.nextReminder) > new Date() : false;
-                                          const nextDateStr = contact.nextReminder ? new Date(contact.nextReminder).toLocaleDateString('pt-BR') : '';
+                                          const isDisabled = contact.lastContact && contact.nextReminder 
+                                            ? new Date(contact.nextReminder) > new Date() 
+                                            : false;
+                                          
+                                          const nextDateStr = contact.nextReminder 
+                                            ? new Date(contact.nextReminder).toLocaleDateString('pt-BR') 
+                                            : '';
                                           
                                           const button = (
                                             <Button 
