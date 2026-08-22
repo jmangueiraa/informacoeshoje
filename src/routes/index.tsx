@@ -100,6 +100,7 @@ function gerarLinkWhatsApp(contato: string, primeiroNome: string, slugLink: stri
 3. Aplicação:
 
 Ao clicar no botão de WhatsApp da tabela ou da fila de envios, use gerarLinkWhatsApp para abrir a conversa já com a mensagem completa formatada."`}
+          nao esta contabilizando os cliques verificar e corrigir
         </pre>
       </div>
 
