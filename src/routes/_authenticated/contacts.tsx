@@ -579,7 +579,6 @@ function Index() {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead className="w-[60px]">Imagem</TableHead>
                               <TableHead>Primeiro Nome</TableHead>
                               <TableHead>Contato</TableHead>
                               <TableHead className="text-right w-[150px]">Ações</TableHead>
