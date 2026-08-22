@@ -89,10 +89,6 @@ function Index() {
   const [clientCounter, setClientCounter] = useState(1);
   const [extractedContacts, setExtractedContacts] = useState<(Contact & { 
     id: string; 
-    imgId?: string; 
-    fileName?: string; 
-    preview?: string;
-    contactIdx?: number;
   })[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
