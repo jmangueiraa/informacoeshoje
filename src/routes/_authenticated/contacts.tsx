@@ -112,7 +112,31 @@ function Index() {
   useEffect(() => {
     const savedKey = localStorage.getItem("fototext_api_key");
     if (savedKey) setUserApiKey(savedKey);
+    
+    // Load contacts from localStorage
+    const savedContacts = localStorage.getItem("linkafiliado_contacts_storage");
+    if (savedContacts) {
+      try {
+        setExtractedContacts(JSON.parse(savedContacts));
+      } catch (e) {
+        console.error("Erro ao carregar contatos do localStorage", e);
+      }
+    }
+    
+    // Load counter
+    const savedCounter = localStorage.getItem("linkafiliado_client_counter");
+    if (savedCounter) setClientCounter(parseInt(savedCounter, 10));
   }, []);
+
+  // Sync contacts to localStorage
+  useEffect(() => {
+    localStorage.setItem("linkafiliado_contacts_storage", JSON.stringify(extractedContacts));
+  }, [extractedContacts]);
+
+  // Sync counter to localStorage
+  useEffect(() => {
+    localStorage.setItem("linkafiliado_client_counter", clientCounter.toString());
+  }, [clientCounter]);
 
   const saveSettings = (key: string) => {
     localStorage.setItem("fototext_api_key", key);
