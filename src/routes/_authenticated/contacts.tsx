@@ -251,6 +251,8 @@ function Index() {
   const clearContacts = () => {
     setExtractedContacts([]);
     setClientCounter(1);
+    localStorage.removeItem("linkafiliado_contacts_storage");
+    localStorage.removeItem("linkafiliado_client_counter");
     toast.info("Lista de contatos limpa");
   };
 
