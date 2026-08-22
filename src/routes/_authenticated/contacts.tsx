@@ -347,10 +347,12 @@ Responda ESTRITAMENTE em formato JSON:
         setOverallStatus(`IA extraindo dados da imagem ${i + 1}...`);
         
         const aiResult = await processarComGemini({
-          base64,
-          mimeType: originalFile.type,
-          index: currentIndexForClient - 1,
-          apiKey: userApiKey
+          data: {
+            base64,
+            mimeType: originalFile.type,
+            index: currentIndexForClient - 1,
+            apiKey: userApiKey
+          }
         });
         
         const extracted = {
