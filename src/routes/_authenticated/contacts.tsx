@@ -597,7 +597,7 @@ function Index() {
                             {allContacts.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                                  Nenhum contato identificado. Comece processando imagens.
+                                  {filterPending ? "Nenhum lembrete pendente no momento." : "Nenhum contato identificado. Comece processando imagens."}
                                 </TableCell>
                               </TableRow>
                             ) : (
