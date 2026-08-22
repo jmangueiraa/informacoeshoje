@@ -355,6 +355,18 @@ function Index() {
   };
 
   const allContacts = extractedContacts;
+  const totalPages = Math.ceil(allContacts.length / itemsPerPage);
+  const paginatedContacts = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return allContacts.slice(start, start + itemsPerPage);
+  }, [allContacts, currentPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
 
   const exportToCSV = () => {
     if (allContacts.length === 0) return;
