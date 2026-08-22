@@ -286,6 +286,40 @@ if (link.urlDestino || link.url_destino) {
 
 Na listagem da tabela 'Meus Links', certifique-se de que a coluna Cliques leia a coluna cliques retornada da tabela do Supabase.
 
+Adicione um canal de supabase.channel('links-changes') (Realtime) para atualizar a tabela na tela automaticamente sempre que um novo clique for registrado."
+"O contador de cliques está zerado para usuários externos porque os cliques não estão sendo sincronizados no banco de dados (Supabase).
+
+1. Rota de Redirecionamento e Incremento Global (/:slug):
+
+Crie ou ajuste o componente de rota dinâmica [slug] (ex: pages/[slug].tsx ou app/[slug]/page.tsx ou componente de rota React Router correspondente).
+
+Ao carregar essa rota pelo slug público:
+
+Faça uma query direta no Supabase buscando o link pelo slug:
+
+TypeScript
+const { data: link, error } = await supabase
+  .from('links')
+  .select('*')
+  .eq('slug', slugSemBarra)
+  .single();
+Se encontrar o link, incremente imediatamente no Supabase usando RPC or update direto:
+
+TypeScript
+await supabase
+  .from('links')
+  .update({ cliques: (link.cliques || 0) + 1 })
+  .eq('id', link.id);
+Em seguida, execute o redirecionamento imediato para a URL de destino:
+
+TypeScript
+if (link.urlDestino || link.url_destino) {
+  window.location.replace(link.urlDestino || link.url_destino);
+}
+2. Tabela 'Meus Links' e Dashboard:
+
+Na listagem da tabela 'Meus Links', certifique-se de que a coluna Cliques leia a coluna cliques retornada da tabela do Supabase.
+
 Adicione um canal de supabase.channel('links-changes') (Realtime) para atualizar a tabela na tela automaticamente sempre que um novo clique for registrado."`}
         </pre>
       </div>
