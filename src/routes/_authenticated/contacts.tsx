@@ -222,11 +222,11 @@ function Index() {
           phone: aiResult.contato
         };
 
-        // Validação de Duplicidade
+        // Validação de Duplicidade Estrita
         const cleanPhone = extracted.phone.replace(/\D/g, "");
-        const isDuplicate = extractedContacts.some(c => c.phone.replace(/\D/g, "") === cleanPhone);
+        const isDuplicateInList = extractedContacts.some(c => c.phone.replace(/\D/g, "") === cleanPhone);
 
-        if (cleanPhone && cleanPhone.length >= 8 && isDuplicate) {
+        if (cleanPhone && cleanPhone.length >= 8 && isDuplicateInList) {
           duplicateCount++;
           setImages((prev) =>
             prev.map((img) =>
@@ -251,7 +251,8 @@ function Index() {
           nextReminder: null,
         };
 
-        setExtractedContacts(prev => [...prev, newContact]);
+        // Insere no início da lista (Ordenação: Mais recentes no topo)
+        setExtractedContacts(prev => [newContact, ...prev]);
         setClientCounter(currentIndexForClient);
         addedCount++;
 
