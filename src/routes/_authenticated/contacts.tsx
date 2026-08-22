@@ -472,7 +472,7 @@ Responda ESTRITAMENTE em formato JSON:
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="apiKey">Chave de API (Groq/OpenAI/Lovable)</Label>
+                    <Label htmlFor="apiKey">Chave de API (Google Gemini / OpenAI / Groq)</Label>
                     <Input 
                       id="apiKey" 
                       type="password" 
