@@ -314,6 +314,11 @@ function Index() {
     }));
   };
 
+  const deleteContact = (contactId: string) => {
+    setExtractedContacts(prev => prev.filter(c => c.id !== contactId));
+    toast.success("Contato removido");
+  };
+
   const allContacts = useMemo(() => {
     let filtered = extractedContacts;
     if (filterPending) {
@@ -551,15 +556,6 @@ function Index() {
                     <div className="flex flex-wrap justify-between items-center gap-4">
                       <div className="flex gap-2">
                         <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={clearContacts} 
-                          disabled={loading} 
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="size-3 mr-2" /> Limpar Contatos
-                        </Button>
-                        <Button 
                           variant={filterPending ? "default" : "outline"} 
                           size="sm" 
                           onClick={() => setFilterPending(!filterPending)}
@@ -638,72 +634,83 @@ function Index() {
                                     )}
                                   </TableCell>
                                   <TableCell className="text-right">
-                                    <div className="flex justify-end gap-1">
-                                      <Button 
-                                        variant="outline" 
-                                        size="icon" 
-                                        className="size-7"
-                                        title="Copiar Contato"
-                                        onClick={() => copyToClipboard(contact.phone)}
-                                      >
-                                        <Copy className="size-3" />
-                                      </Button>
-                                      {(() => {
-                                        const isDisabled = contact.nextReminder ? new Date(contact.nextReminder) > new Date() : false;
-                                        const nextDateStr = contact.nextReminder ? new Date(contact.nextReminder).toLocaleDateString('pt-BR') : '';
+                                      <div className="flex justify-end gap-1">
+                                        <Button 
+                                          variant="outline" 
+                                          size="icon" 
+                                          className="size-7"
+                                          title="Copiar Contato"
+                                          onClick={() => copyToClipboard(contact.phone)}
+                                        >
+                                          <Copy className="size-3" />
+                                        </Button>
                                         
-                                        const button = (
-                                          <Button 
-                                            variant="outline" 
-                                            size="icon" 
-                                            className={cn(
-                                              "size-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50",
-                                              isDisabled && "opacity-50 cursor-not-allowed pointer-events-auto"
-                                            )}
-                                            disabled={isDisabled}
-                                            onClick={() => {
-                                              if (isDisabled) return;
-                                              const cleanPhone = contact.phone.replace(/\D/g, "");
-                                              const phoneWithCountry = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
-                                              
-                                              const now = new Date();
-                                              const next = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-                                              
-                                              setExtractedContacts(prev => prev.map(c => 
-                                                c.id === contact.id ? {
-                                                  ...c,
-                                                  lastContact: now.toISOString(),
-                                                  nextReminder: next.toISOString()
-                                                } : c
-                                              ));
+                                        {(() => {
+                                          const isDisabled = contact.nextReminder ? new Date(contact.nextReminder) > new Date() : false;
+                                          const nextDateStr = contact.nextReminder ? new Date(contact.nextReminder).toLocaleDateString('pt-BR') : '';
+                                          
+                                          const button = (
+                                            <Button 
+                                              variant="outline" 
+                                              size="icon" 
+                                              className={cn(
+                                                "size-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50",
+                                                isDisabled && "opacity-50 cursor-not-allowed pointer-events-auto"
+                                              )}
+                                              disabled={isDisabled}
+                                              onClick={() => {
+                                                if (isDisabled) return;
+                                                const cleanPhone = contact.phone.replace(/\D/g, "");
+                                                const phoneWithCountry = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+                                                
+                                                const now = new Date();
+                                                const next = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                                                
+                                                setExtractedContacts(prev => prev.map(c => 
+                                                  c.id === contact.id ? {
+                                                    ...c,
+                                                    lastContact: now.toISOString(),
+                                                    nextReminder: next.toISOString()
+                                                  } : c
+                                                ));
 
-                                              const message = encodeURIComponent(`Olá ${contact.name}, tudo bem?`);
-                                              window.open(`https://wa.me/${phoneWithCountry}?text=${message}`, "_blank");
-                                              toast.success(`Lembrete para ${contact.name} reprogramado para +7 dias!`);
-                                            }}
-                                          >
-                                            <div className="size-3 flex items-center justify-center">
-                                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-                                            </div>
-                                          </Button>
-                                        );
-
-                                        if (isDisabled) {
-                                          return (
-                                            <Tooltip>
-                                              <TooltipTrigger asChild>
-                                                <span>{button}</span>
-                                              </TooltipTrigger>
-                                              <TooltipContent>
-                                                <p>Mensagem enviada recentemente. Disponível novamente em {nextDateStr}</p>
-                                              </TooltipContent>
-                                            </Tooltip>
+                                                const message = encodeURIComponent(`Olá ${contact.name}, tudo bem?`);
+                                                window.open(`https://wa.me/${phoneWithCountry}?text=${message}`, "_blank");
+                                                toast.success(`Lembrete para ${contact.name} reprogramado para +7 dias!`);
+                                              }}
+                                            >
+                                              <div className="size-3 flex items-center justify-center">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                                              </div>
+                                            </Button>
                                           );
-                                        }
 
-                                        return button;
-                                      })()}
-                                    </div>
+                                          if (isDisabled) {
+                                            return (
+                                              <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                  <span>{button}</span>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                  <p>Mensagem enviada recentemente. Disponível novamente em {nextDateStr}</p>
+                                                </TooltipContent>
+                                              </Tooltip>
+                                            );
+                                          }
+
+                                          return button;
+                                        })()}
+
+                                        <Button 
+                                          variant="outline" 
+                                          size="icon" 
+                                          className="size-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                          title="Excluir Contato"
+                                          onClick={() => deleteContact(contact.id)}
+                                        >
+                                          <Trash2 className="size-3" />
+                                        </Button>
+                                      </div>
                                   </TableCell>
                                 </TableRow>
                               ))
