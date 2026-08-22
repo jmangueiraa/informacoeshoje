@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import Tesseract from "tesseract.js";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -46,7 +46,7 @@ import {
   Settings
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { extractContactsWithAI } from "@/lib/ocr-contacts.functions";
+import { extractContactsWithAI, extractContactsWithVision } from "@/lib/ocr-contacts.functions";
 import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/_authenticated/contacts")({
@@ -82,7 +82,7 @@ interface OCRImage {
 function Index() {
   const [images, setImages] = useState<OCRImage[]>([]);
   const [loading, setLoading] = useState(false);
-  const [lang, setLang] = useState("por");
+  
   const [overallStatus, setOverallStatus] = useState("");
   const [userApiKey, setUserApiKey] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -96,6 +96,19 @@ function Index() {
   })[]>([]);
   
   const extractWithAI = useServerFn(extractContactsWithAI);
+  const extractWithVision = useServerFn(extractContactsWithVision);
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64String = (reader.result as string).split(',')[1] || "";
+        resolve(base64String);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
 
   useEffect(() => {
     const savedKey = localStorage.getItem("fototext_api_key");
@@ -128,63 +141,8 @@ function Index() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const extrairContatoShopee = (textoBruto: string, index: number) => {
-    let primeiroNome = '';
-    let contato = '';
-
-    const linhas = textoBruto
-      .split('\n')
-      .map(l => l.trim())
-      .filter(Boolean);
-
-    // 1. Extração do Telefone
-    let indexTel = -1;
-    for (let i = 0; i < linhas.length; i++) {
-      const linha = linhas[i];
-      if (linha && (linha.toLowerCase().includes('tel') || linha.includes('+55') || /\b55\d{8,11}\b/.test(linha))) {
-        indexTel = i;
-        const nums = linha.replace(/\D/g, '');
-        const sem55 = nums.startsWith('55') ? nums.substring(2) : nums;
-        if (sem55.length === 11) {
-          contato = `(${sem55.substring(0, 2)}) ${sem55.substring(2, 7)}-${sem55.substring(7)}`;
-        } else if (sem55.length === 10) {
-          contato = `(${sem55.substring(0, 2)}) ${sem55.substring(2, 6)}-${sem55.substring(6)}`;
-        } else if (nums.length > 0) {
-          contato = nums;
-        }
-        break;
-      }
-    }
-
-    const proibidas = ['br', 'bra', 'brg', 'estrada', 'rua', 'entregue', 'detalhes', 'informações', 'recebedor', 'pedido', 'tempo', 'tel', 'screenshot', 'hub', 'lm'];
-
-    // 2. Extração do Primeiro Nome (varre todas as linhas antes do telefone)
-    const limiteFim = indexTel !== -1 ? indexTel : linhas.length;
-    for (let i = 0; i < limiteFim; i++) {
-      const linha = linhas[i];
-      if (!linha) continue;
-      const palavras = linha.split(/\s+/);
-      for (const p of palavras) {
-        const limpa = p.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, '').trim();
-        if (limpa.length >= 3 && !proibidas.includes(limpa.toLowerCase())) {
-          primeiroNome = limpa.charAt(0).toUpperCase() + limpa.slice(1).toLowerCase();
-          break;
-        }
-      }
-      if (primeiroNome) break;
-    }
-
-    // Fallback se não encontrar
-    if (!primeiroNome || proibidas.includes(primeiroNome.toLowerCase())) {
-      const numFormatado = String(index + 1).padStart(5, '0');
-      primeiroNome = `Cliente ${numFormatado}`;
-    }
-
-    return [{ name: primeiroNome, phone: contato || "Não encontrado" }];
-  };
 
   const processOCR = async () => {
-    // We no longer reset clientCounter here to accumulate across batches
     const pendingImages = images.filter((img) => img.status === "pending" || img.status === "error");
     if (pendingImages.length === 0) return;
 
@@ -206,80 +164,52 @@ function Index() {
       setImages((prev) =>
         prev.map((img) => (img.id === currentId ? { ...img, status: "processing" } : img))
       );
-      setOverallStatus(`Processando ${i + 1} de ${imagesToProcess.length} imagens...`);
+      setOverallStatus(`Processando ${i + 1} de ${imagesToProcess.length} imagens com Vision...`);
 
       try {
-        const { data: { text } } = await Tesseract.recognize(currentImage.file, lang, {
-          logger: (m) => {
-            if (m.status === "recognizing text") {
-              setImages((prev) =>
-                prev.map((img) =>
-                  img.id === currentId ? { ...img, progress: Math.round(m.progress * 100) } : img
-                )
-              );
-            }
-          },
+        const base64 = await fileToBase64(currentImage.file);
+        
+        const result = await extractWithVision({ 
+          data: { 
+            base64Image: base64,
+            mimeType: currentImage.file.type || "image/png",
+            userApiKey,
+            clientIndex: clientCounter - 1
+          } 
         });
 
-        setOverallStatus(`Analisando contatos com IA (${i + 1}/${imagesToProcess.length})...`);
-        
-        let contacts: Contact[] = [];
-        try {
-          const aiContact = await extractWithAI({ data: { text, userApiKey } });
-          
-          let name = aiContact.primeiro_nome;
-          
-          // Se o Gemini retornou "Cliente XXXXX" ou algo inválido, garantimos o contador sequencial
-          if (!name || name === "null" || name.toLowerCase() === "não identificado" || name.toLowerCase().includes("cliente")) {
-             name = `Cliente ${String(clientCounter).padStart(5, '0')}`;
-          }
-          
-          contacts = [{
-            name,
-            phone: aiContact.contato || "Não encontrado"
-          }];
-          
-          // Incrementa o contador apenas se usamos um nome padrão "Cliente XXXXX"
-          if (name.startsWith("Cliente")) {
-            setClientCounter(prev => prev + 1);
-          }
+        const name = result.primeiro_nome || `Cliente ${String(clientCounter).padStart(5, '0')}`;
+        const contact = {
+          name,
+          phone: result.contato || "Não encontrado"
+        };
 
-          // Add to accumulated contacts (Append mode)
-          setExtractedContacts(prev => [...prev, {
-            ...contacts[0]!,
-            id: Math.random().toString(36).substring(7),
-            imgId: currentId,
-            fileName: currentImage.file.name,
-            preview: currentImage.preview,
-            contactIdx: 0
-          }]);
-        } catch (aiErr) {
-          console.error("AI extraction failed, falling back to regex:", aiErr);
-          contacts = extrairContatoShopee(text, i);
-          
-          // Add to accumulated contacts (Append mode)
-          setExtractedContacts(prev => [...prev, {
-            ...contacts[0]!,
-            id: Math.random().toString(36).substring(7),
-            imgId: currentId,
-            fileName: currentImage.file.name,
-            preview: currentImage.preview,
-            contactIdx: 0
-          }]);
+        if (name.startsWith("Cliente")) {
+          setClientCounter(prev => prev + 1);
         }
+
+        setExtractedContacts(prev => [...prev, {
+          ...contact,
+          id: Math.random().toString(36).substring(7),
+          imgId: currentId,
+          fileName: currentImage.file.name,
+          preview: currentImage.preview,
+          contactIdx: 0
+        }]);
 
         setImages((prev) =>
           prev.map((img) =>
-            img.id === currentId ? { ...img, status: "completed", text, contacts, progress: 100 } : img
+            img.id === currentId ? { ...img, status: "completed", text: `Extraído via Vision: ${name}`, contacts: [contact], progress: 100 } : img
           )
         );
       } catch (err) {
         console.error(err);
         setImages((prev) =>
           prev.map((img) =>
-            img.id === currentId ? { ...img, status: "error", error: "Erro no OCR" } : img
+            img.id === currentId ? { ...img, status: "error", error: "Erro na Vision API" } : img
           )
         );
+        toast.error(`Erro ao processar imagem ${i + 1}`);
       }
     }
 
@@ -500,15 +430,6 @@ function Index() {
               </ScrollArea>
 
               <div className="flex gap-3">
-                <Select value={lang} onValueChange={setLang} disabled={loading}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Idioma" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="por">Português</SelectItem>
-                    <SelectItem value="eng">Inglês</SelectItem>
-                  </SelectContent>
-                </Select>
                 <Button className="flex-1" onClick={processOCR} disabled={loading || images.length === 0 || images.every(i => i.status === 'completed')}>
                   {loading ? <Loader2 className="size-4 animate-spin mr-2" /> : "Iniciar Batch"}
                 </Button>
@@ -697,7 +618,7 @@ function Index() {
       </div>
       
       <footer className="max-w-5xl mx-auto mt-20 pt-8 border-t text-center text-xs text-muted-foreground">
-        <p>Fototext © 2024 • Processamento Local Privado • Baseado em Tesseract.js</p>
+        <p>Fototext © 2024 • Processamento Inteligente • Gemini Vision AI</p>
       </footer>
     </div>
   );
