@@ -78,8 +78,8 @@ interface Contact {
   name: string;
   phone: string;
   extractionDate?: string;
-  lastContact?: string;
-  nextReminder?: string;
+  lastContact?: string | null;
+  nextReminder?: string | null;
 }
 
 interface OCRImage {
