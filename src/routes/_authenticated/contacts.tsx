@@ -429,7 +429,7 @@ function Index() {
             </div>
             <h1 className="text-4xl font-extrabold tracking-tighter">Extrator de Contatos</h1>
           </div>
-          <p className="text-muted-foreground text-lg">Extração inteligente de contatos da Shopee via Google Gemini (Multimodal)</p>
+          <p className="text-muted-foreground text-lg">Extração inteligente de contatos da Shopee via Google Gemini (Processamento de Texto)</p>
         </header>
 
         <div className="grid lg:grid-cols-3 gap-8">
