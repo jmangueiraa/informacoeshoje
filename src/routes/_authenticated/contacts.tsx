@@ -266,10 +266,6 @@ function Index() {
         const newContact = {
           ...extracted,
           id: Math.random().toString(36).substring(7),
-          imgId: currentId,
-          fileName: currentImage.file.name,
-          preview: currentImage.preview,
-          contactIdx: 0
         };
 
         setExtractedContacts(prev => [...prev, newContact]);
