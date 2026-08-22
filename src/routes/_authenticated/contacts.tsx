@@ -113,6 +113,14 @@ function Index() {
   })[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [filterPending, setFilterPending] = useState(false);
+  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
+  const [isDispatcherOpen, setIsDispatcherOpen] = useState(false);
+  const [dispatcherQueue, setDispatcherQueue] = useState<(Contact & { id: string })[]>([]);
+  const [dispatcherIndex, setDispatcherIndex] = useState(0);
+  const [msgTemplates, setMsgTemplates] = useState({
+    first: "Olá {primeiroNome}, tudo bem? Aqui é da loja...",
+    reminder: "Olá {primeiroNome}, passando para saber se deu tudo certo com seu pedido!"
+  });
   const itemsPerPage = 10;
 
   
