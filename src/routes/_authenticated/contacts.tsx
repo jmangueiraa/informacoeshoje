@@ -49,8 +49,8 @@ import {
   XCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-import { processarComprovanteComGemini } from "@/lib/gemini-ocr.functions";
+import { processarTextoComGemini } from "@/lib/gemini-ocr.functions";
+import Tesseract from 'tesseract.js';
 
 import { useServerFn } from "@tanstack/react-start";
 
@@ -104,20 +104,9 @@ function Index() {
 
   
   
-  const processarComGemini = useServerFn(processarComprovanteComGemini);
+  const processarTexto = useServerFn(processarTextoComGemini);
 
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64String = (reader.result as string).split(',')[1] || "";
-        resolve(base64String);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
 
   useEffect(() => {
     const savedKey = localStorage.getItem("fototext_api_key");
@@ -199,16 +188,25 @@ function Index() {
 
       try {
         const originalFile = currentImage.file;
-        const base64 = await fileToBase64(originalFile);
         
+        setOverallStatus(`Executando OCR local na imagem ${i + 1}...`);
+        const { data: { text } } = await Tesseract.recognize(originalFile, 'por', {
+          logger: m => {
+            if (m.status === 'recognizing text') {
+              setImages(prev => prev.map(img => 
+                img.id === currentId ? { ...img, progress: Math.round(m.progress * 90) } : img
+              ));
+            }
+          }
+        });
+
         setOverallStatus(`IA extraindo dados da imagem ${i + 1}...`);
         
-        const aiResult = await processarComGemini({
+        const aiResult = await processarTexto({
           data: {
-            base64,
-            mimeType: originalFile.type,
-            index: currentIndexForClient - 1,
-            apiKey: userApiKey
+            textoBruto: text,
+            apiKey: userApiKey,
+            index: currentIndexForClient - 1
           }
         });
         
@@ -420,7 +418,7 @@ function Index() {
             </div>
             <h1 className="text-4xl font-extrabold tracking-tighter">Extrator de Contatos</h1>
           </div>
-          <p className="text-muted-foreground text-lg">Extração inteligente de contatos da Shopee via Google Gemini (Multimodal)</p>
+          <p className="text-muted-foreground text-lg">Extração inteligente de contatos da Shopee via Google Gemini (Processamento de Texto)</p>
         </header>
 
         <div className="grid lg:grid-cols-3 gap-8">
