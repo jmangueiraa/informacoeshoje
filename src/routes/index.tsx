@@ -100,10 +100,10 @@ function gerarLinkWhatsApp(contato: string, primeiroNome: string, slugLink: stri
 3. Aplicação:
 
 Ao clicar no botão de WhatsApp da tabela ou da fila de envios, use gerarLinkWhatsApp para abrir a conversa já com a mensagem completa formatada."`}
-          nao esta contabilizando os cliques verificar e corrigir
-          o contador de cliques nao esta funcionando
-          o contador de cliques nao esta funcionando
-          "Corrija a contabilização de cliques dos links encurtados/rastreio:
+{`nao esta contabilizando os cliques verificar e corrigir
+o contador de cliques nao esta funcionando
+o contador de cliques nao esta funcionando
+"Corrija a contabilização de cliques dos links encurtados/rastreio:
 
 1. Lógica de Incremento na Rota do Link (/rastreio/:slug ou /:slug):
 
@@ -143,7 +143,7 @@ useEffect(() => {
 }, [slug]);
 3. Atualização em Tempo Real nas Telas:
 
-Na tela 'Meus Links' e no 'Dashboard', adicione um listener para atualizar o estado e re-renderizar o número de cliques assim que um clique ocorrer."
+Na tela 'Meus Links' e no 'Dashboard', adicione um listener para atualizar o estado e re-renderizar o número de cliques assim que um clique ocorrer."`}
         </pre>
       </div>
 
