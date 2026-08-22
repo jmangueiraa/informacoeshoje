@@ -94,6 +94,9 @@ function Index() {
     preview?: string;
     contactIdx?: number;
   })[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   
   const extractWithAI = useServerFn(extractContactsWithAI);
   const extractWithVision = useServerFn(extractContactsWithVision);
