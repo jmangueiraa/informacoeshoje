@@ -31,7 +31,7 @@ export const extractContactsWithAI = createServerFn({ method: "POST" })
             role: "user",
             content: `Você é um assistente de extração de dados de comprovantes de entrega da Shopee/SPX.
 Analise o texto do comprovante e extraia:
-1. primeiro_nome: Apenas o PRIMEIRO NOME do recebedor (ex: Jéssica, Marta, Carlos). Ignore termos como 'BR', 'Detalhes', 'Entregue', 'LM Hub', etc. Se o nome não estiver presente, retorne 'Cliente XXXXX'.
+1. primeiro_nome: Apenas o PRIMEIRO NOME do recebedor (ex: Jéssica, Marta, Carlos). Ignore termos como 'BR', 'Detalhes', 'Entregue', 'LM Hub', 'Rua', 'Pedido', etc. Se o nome não estiver presente ou for um termo técnico, retorne 'Cliente XXXXX'.
 2. contato: O número de telefone/celular com DDD no formato '(XX) 9XXXX-XXXX'.
 
 Responda ESTRITAMENTE em formato JSON puro:
