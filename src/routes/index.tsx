@@ -143,6 +143,47 @@ useEffect(() => {
 }, [slug]);
 3. Atualização em Tempo Real nas Telas:
 
+Na tela 'Meus Links' e no 'Dashboard', adicione um listener para atualizar o estado e re-renderizar o número de cliques assim que um clique ocorrer."
+"Corrija a contabilização de cliques dos links encurtados/rastreio:
+
+1. Lógica de Incremento na Rota do Link (/rastreio/:slug ou /:slug):
+
+Quando o usuário acessar a URL com o slug, adicione um useEffect que executa imediatamente ao carregar a página:
+
+Localiza o link correspondente pelo slug nos links cadastrados.
+
+Incrementa a contagem de cliques em +1 (cliques: link.cliques + 1).
+
+Salva a atualização no banco de dados (ou no localStorage sob a chave de links).
+
+Se o link tiver uma URL de Destino externa (redirect) configurada, redirecione o usuário após registrar o clique (window.location.href = link.urlDestino). Se for a visualização da tela de rastreamento interna, mantenha o usuário na tela exibindo os dados normalmente.
+
+2. Exemplo de Implementação:
+
+TypeScript
+useEffect(() => {
+  if (!slug) return;
+
+  // 1. Busca lista de links
+  const linksSalvos = JSON.parse(localStorage.getItem('app_links') || '[]');
+  const linkIndex = linksSalvos.findIndex((l: any) => l.slug.replace('/', '') === slug.replace('/', ''));
+
+  if (linkIndex !== -1) {
+    // 2. Incrementa cliques
+    linksSalvos[linkIndex].cliques = (linksSalvos[linkIndex].cliques || 0) + 1;
+    localStorage.setItem('app_links', JSON.stringify(linksSalvos));
+    
+    // Dispara evento para atualizar o Dashboard/Meus Links em tempo real
+    window.dispatchEvent(new Event('links_updated'));
+
+    // 3. Se for link de redirecionamento puro:
+    if (linksSalvos[linkIndex].urlDestino && linksSalvos[linkIndex].tipo === 'redirect') {
+      window.location.href = linksSalvos[linkIndex].urlDestino;
+    }
+  }
+}, [slug]);
+3. Atualização em Tempo Real nas Telas:
+
 Na tela 'Meus Links' e no 'Dashboard', adicione um listener para atualizar o estado e re-renderizar o número de cliques assim que um clique ocorrer."`}
         </pre>
       </div>
