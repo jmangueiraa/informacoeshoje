@@ -604,7 +604,7 @@ function Index() {
       </div>
       
       <footer className="max-w-5xl mx-auto mt-20 pt-8 border-t text-center text-xs text-muted-foreground">
-        <p>Fototext © 2024 • Processamento Inteligente • Gemini Vision AI</p>
+        <p>Desenvolvido pela AJP Entretenimento • Gemini Vision AI</p>
       </footer>
     </div>
   );
