@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { extractContactsWithAI, extractContactsWithVision } from "@/lib/ocr-contacts.functions";
+import Tesseract from 'tesseract.js';
 import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/_authenticated/contacts")({
@@ -165,71 +166,123 @@ function Index() {
   };
 
 
+  const extrairDadosComprovante = (textoBruto: string, index: number) => {
+    let primeiroNome = '';
+    let contato = '';
+
+    const linhas = textoBruto
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+
+    // 1. Extração e formatação do telefone
+    let indexTel = -1;
+    for (let i = 0; i < linhas.length; i++) {
+      const linha = linhas[i];
+      if (/tel|\+55|\b55\d{8,11}\b/i.test(linha)) {
+        indexTel = i;
+        const nums = linha.replace(/\D/g, '');
+        const sem55 = nums.startsWith('55') ? nums.substring(2) : nums;
+        if (sem55.length === 11) {
+          contato = `(${sem55.substring(0, 2)}) ${sem55.substring(2, 7)}-${sem55.substring(7)}`;
+        } else if (sem55.length === 10) {
+          contato = `(${sem55.substring(0, 2)}) ${sem55.substring(2, 6)}-${sem55.substring(6)}`;
+        } else if (nums.length >= 8) {
+          contato = nums;
+        }
+        break;
+      }
+    }
+
+    const proibidas = ['br', 'bra', 'brg', 'bsb', 'bal', 'estrada', 'rua', 'entregue', 'detalhes', 'informações', 'recebedor', 'pedido', 'tempo', 'tel', 'screenshot', 'hub', 'lm', 'não', 'encontrado'];
+
+    // 2. Extração do primeiro nome (varredura do bloco anterior ao telefone)
+    const limiteFim = indexTel !== -1 ? indexTel : linhas.length;
+    for (let i = 0; i < limiteFim; i++) {
+      const linha = linhas[i];
+      const palavras = linha.split(/\s+/);
+      for (const p of palavras) {
+        const limpa = p.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, '').trim();
+        if (limpa.length >= 3 && !proibidas.includes(limpa.toLowerCase())) {
+          primeiroNome = limpa.charAt(0).toUpperCase() + limpa.slice(1).toLowerCase();
+          break;
+        }
+      }
+      if (primeiroNome) break;
+    }
+
+    // Fallback sequencial correto usando o índice incremental
+    if (!primeiroNome || proibidas.includes(primeiroNome.toLowerCase())) {
+      const numFormatado = String(index + 1).padStart(5, '0');
+      primeiroNome = `Cliente ${numFormatado}`;
+    }
+
+    if (!contato) {
+      contato = 'Não encontrado';
+    }
+
+    return { name: primeiroNome, phone: contato };
+  };
+
   const processOCR = async () => {
     const pendingImages = images.filter((img) => img.status === "pending" || img.status === "error");
     if (pendingImages.length === 0) return;
 
-    if (!userApiKey) {
-      toast.error("API Key não configurada! Vá em configurações.");
-      setIsSettingsOpen(true);
-      return;
-    }
-
     setLoading(true);
-    setOverallStatus("Iniciando processamento...");
+    setOverallStatus("Iniciando processamento com Tesseract.js...");
 
-    const imagesToProcess = [...images];
-    for (let i = 0; i < imagesToProcess.length; i++) {
-      const currentImage = imagesToProcess[i];
+    const currentImages = [...images];
+    let currentIndexForClient = clientCounter;
+
+    for (let i = 0; i < currentImages.length; i++) {
+      const currentImage = currentImages[i];
       if (!currentImage || (currentImage.status !== "pending" && currentImage.status !== "error")) continue;
 
       const currentId = currentImage.id;
       setImages((prev) =>
-        prev.map((img) => (img.id === currentId ? { ...img, status: "processing" } : img))
+        prev.map((img) => (img.id === currentId ? { ...img, status: "processing", progress: 10 } : img))
       );
-      setOverallStatus(`Processando ${i + 1} de ${imagesToProcess.length} imagens com Vision...`);
+      setOverallStatus(`Lendo imagem ${i + 1} de ${currentImages.length}...`);
 
       try {
-        const base64 = await fileToBase64(currentImage.file);
-        
-        const result = await extractWithVision({ 
-          data: { 
-            base64Image: base64,
-            mimeType: currentImage.file.type || "image/png",
-            userApiKey,
-            clientIndex: clientCounter - 1
-          } 
+        const { data: { text } } = await Tesseract.recognize(currentImage.file, 'por', {
+          logger: m => {
+            if (m.status === 'recognizing text') {
+              setImages(prev => prev.map(img => 
+                img.id === currentId ? { ...img, progress: Math.round(m.progress * 100) } : img
+              ));
+            }
+          }
         });
 
-        const name = result.primeiro_nome || `Cliente ${String(clientCounter).padStart(5, '0')}`;
-        const contact = {
-          name,
-          phone: result.contato || "Não encontrado"
-        };
-
-        if (name.startsWith("Cliente")) {
-          setClientCounter(prev => prev + 1);
+        const extracted = extrairDadosComprovante(text, currentIndexForClient - 1);
+        
+        if (extracted.name.startsWith("Cliente")) {
+          currentIndexForClient++;
         }
 
-        setExtractedContacts(prev => [...prev, {
-          ...contact,
+        const newContact = {
+          ...extracted,
           id: Math.random().toString(36).substring(7),
           imgId: currentId,
           fileName: currentImage.file.name,
           preview: currentImage.preview,
           contactIdx: 0
-        }]);
+        };
+
+        setExtractedContacts(prev => [...prev, newContact]);
+        setClientCounter(currentIndexForClient);
 
         setImages((prev) =>
           prev.map((img) =>
-            img.id === currentId ? { ...img, status: "completed", text: `Extraído via Vision: ${name}`, contacts: [contact], progress: 100 } : img
+            img.id === currentId ? { ...img, status: "completed", text, contacts: [extracted], progress: 100 } : img
           )
         );
       } catch (err) {
         console.error(err);
         setImages((prev) =>
           prev.map((img) =>
-            img.id === currentId ? { ...img, status: "error", error: "Erro na Vision API" } : img
+            img.id === currentId ? { ...img, status: "error", error: "Erro no OCR" } : img
           )
         );
         toast.error(`Erro ao processar imagem ${i + 1}`);
@@ -374,7 +427,7 @@ function Index() {
             </div>
             <h1 className="text-4xl font-extrabold tracking-tighter">Extrator de Contatos</h1>
           </div>
-          <p className="text-muted-foreground text-lg">Extração inteligente de contatos da Shopee via Gemini Vision AI</p>
+          <p className="text-muted-foreground text-lg">Extração inteligente de contatos da Shopee via Tesseract.js (OCR Local)</p>
         </header>
 
         <div className="grid lg:grid-cols-3 gap-8">
