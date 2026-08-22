@@ -601,7 +601,7 @@ function Index() {
                                 </TableCell>
                               </TableRow>
                             ) : (
-                              allContacts.map((contact) => (
+                              paginatedContacts.map((contact) => (
                                 <TableRow key={contact.id}>
                                   <TableCell>
                                     <div className="size-10 rounded overflow-hidden border bg-muted">
