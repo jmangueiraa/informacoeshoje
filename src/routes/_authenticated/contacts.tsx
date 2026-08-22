@@ -105,6 +105,40 @@ function Index() {
   const extractWithAI = useServerFn(extractContactsWithAI);
   const extractWithVision = useServerFn(extractContactsWithVision);
 
+  const preprocessarImagem = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d')!;
+        
+        // Upscale 2x para aumentar a nitidez das fontes pequenas
+        canvas.width = img.width * 2;
+        canvas.height = img.height * 2;
+        
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const d = imgData.data;
+        
+        // Aumenta o contraste e binariza o texto
+        for (let i = 0; i < d.length; i += 4) {
+          const media = (d[i] + d[i + 1] + d[i + 2]) / 3;
+          // Se for cinza ou escuro vira preto puro (0), fundo claro vira branco puro (255)
+          const v = media < 185 ? 0 : 255;
+          d[i] = v;
+          d[i + 1] = v;
+          d[i + 2] = v;
+        }
+        
+        ctx.putImageData(imgData, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
