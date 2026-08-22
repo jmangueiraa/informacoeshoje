@@ -199,16 +199,25 @@ function Index() {
 
       try {
         const originalFile = currentImage.file;
-        const base64 = await fileToBase64(originalFile);
         
+        setOverallStatus(`Executando OCR local na imagem ${i + 1}...`);
+        const { data: { text } } = await Tesseract.recognize(originalFile, 'por', {
+          logger: m => {
+            if (m.status === 'recognizing text') {
+              setImages(prev => prev.map(img => 
+                img.id === currentId ? { ...img, progress: Math.round(m.progress * 90) } : img
+              ));
+            }
+          }
+        });
+
         setOverallStatus(`IA extraindo dados da imagem ${i + 1}...`);
         
-        const aiResult = await processarComGemini({
+        const aiResult = await processarTexto({
           data: {
-            base64,
-            mimeType: originalFile.type,
-            index: currentIndexForClient - 1,
-            apiKey: userApiKey
+            textoBruto: text,
+            apiKey: userApiKey,
+            index: currentIndexForClient - 1
           }
         });
         
