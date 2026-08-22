@@ -645,7 +645,25 @@ function Index() {
               </div>
               
               <ScrollArea className="h-[300px] rounded-md border p-4 bg-muted/30">
-...
+                {images.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-8">Nenhum arquivo na fila.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {images.map((img) => (
+                      <div key={img.id} className="flex items-center gap-3 rounded-md border bg-background p-2">
+                        <img src={img.preview} alt={img.file.name} className="size-10 rounded object-cover" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{img.file.name}</p>
+                          <Progress value={img.progress} className="h-1 mt-1" />
+                        </div>
+                        {img.status === "processing" && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
+                        {img.status === "completed" && <CheckCircle2 className="size-4 text-emerald-500" />}
+                        {img.status === "error" && <Trash2 className="size-4 text-destructive" />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
               <div className="space-y-3 pt-2">
                 <div className="space-y-1">
                   <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">URL de Destino (SSA) da Loja</Label>
