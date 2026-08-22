@@ -104,7 +104,7 @@ function Index() {
 
   
   
-  const processarComGemini = useServerFn(processarComprovanteComGemini);
+  const processarTexto = useServerFn(processarTextoComGemini);
 
 
   const fileToBase64 = (file: File): Promise<string> => {
