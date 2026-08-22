@@ -64,6 +64,8 @@ import {
 import { cn } from "@/lib/utils";
 import { processarTextoComGemini } from "@/lib/gemini-ocr.functions";
 import Tesseract from 'tesseract.js';
+import { createTrackingLink, getUserProfile } from "@/lib/links.functions";
+import { PLATFORM_DOMAIN } from "@/lib/constants";
 
 import { useServerFn } from "@tanstack/react-start";
 
@@ -87,6 +89,7 @@ interface Contact {
   extractionDate?: string;
   lastContact?: string | null;
   nextReminder?: string | null;
+  trackingSlug?: string | null;
 }
 
 interface OCRImage {
@@ -117,15 +120,20 @@ function Index() {
   const [isDispatcherOpen, setIsDispatcherOpen] = useState(false);
   const [dispatcherQueue, setDispatcherQueue] = useState<(Contact & { id: string })[]>([]);
   const [dispatcherIndex, setDispatcherIndex] = useState(0);
+  const [affiliateUrl, setAffiliateUrl] = useState("");
+  const [userProfile, setUserProfileData] = useState<any>(null);
   const [msgTemplates, setMsgTemplates] = useState({
     first: "Olá {primeiroNome}, tudo bem? Aqui é da loja...",
-    reminder: "Olá {primeiroNome}, passando para saber se deu tudo certo com seu pedido!"
+    reminder: "Olá {primeiroNome}, passando para saber se deu tudo certo com seu pedido! {linkRastreamento}",
+    tracking: "Olá {primeiroNome}, aqui está seu link de rastreio: {linkRastreamento}"
   });
   const itemsPerPage = 10;
 
   
   
   const processarTexto = useServerFn(processarTextoComGemini);
+  const createLink = useServerFn(createTrackingLink);
+  const getProfile = useServerFn(getUserProfile);
 
 
 
@@ -156,6 +164,16 @@ function Index() {
         console.error("Erro ao carregar templates", e);
       }
     }
+
+    // Load profile
+    getProfile().then(data => {
+      if (data && !('error' in data)) {
+        setUserProfileData(data);
+      }
+    });
+
+    const savedAffiliateUrl = localStorage.getItem("linkafiliado_batch_url");
+    if (savedAffiliateUrl) setAffiliateUrl(savedAffiliateUrl);
   }, []);
 
   // Sync contacts to localStorage
@@ -167,6 +185,10 @@ function Index() {
   useEffect(() => {
     localStorage.setItem("linkafiliado_client_counter", clientCounter.toString());
   }, [clientCounter]);
+
+  useEffect(() => {
+    localStorage.setItem("linkafiliado_batch_url", affiliateUrl);
+  }, [affiliateUrl]);
 
   const saveSettings = (key: string) => {
     localStorage.setItem("fototext_api_key", key);
@@ -184,9 +206,20 @@ function Index() {
 
   const getFormattedMessage = (contact: Contact, isFirst: boolean) => {
     const template = isFirst ? msgTemplates.first : msgTemplates.reminder;
-    return template
+    
+    let message = template
       .replace(/{primeiroNome}/g, contact.name)
       .replace(/{contato}/g, contact.phone);
+
+    if (contact.trackingSlug) {
+      const domain = userProfile?.custom_domain || PLATFORM_DOMAIN;
+      const trackingUrl = `https://${domain}/${contact.trackingSlug}`;
+      message = message.replace(/{linkRastreamento}/g, trackingUrl);
+    } else {
+      message = message.replace(/{linkRastreamento}/g, "");
+    }
+
+    return message;
   };
 
   const handleDispatch = (contact: Contact & { id: string }) => {
@@ -277,6 +310,12 @@ function Index() {
     let addedCount = 0;
     let duplicateCount = 0;
 
+    if (!affiliateUrl) {
+      toast.error("Por favor, informe a URL de Destino (SSA) da loja antes de iniciar.");
+      setLoading(false);
+      return;
+    }
+
     for (let i = 0; i < currentImages.length; i++) {
       const currentImage = currentImages[i];
       if (!currentImage || (currentImage.status !== "pending" && currentImage.status !== "error")) continue;
@@ -337,12 +376,28 @@ function Index() {
         const now = new Date();
         const extractionDate = now.toISOString();
 
+        setOverallStatus(`Gerando link de rastreio para ${extracted.name}...`);
+        let trackingSlug = null;
+        try {
+          const link = await createLink({
+            data: {
+              name: extracted.name,
+              phone: extracted.phone,
+              affiliateUrl: affiliateUrl
+            }
+          });
+          trackingSlug = link.slug;
+        } catch (linkErr) {
+          console.error("Erro ao criar link automático:", linkErr);
+        }
+
         const newContact = {
           ...extracted,
           id: Math.random().toString(36).substring(7),
           extractionDate,
           lastContact: null,
           nextReminder: null,
+          trackingSlug,
         };
 
         // Insere no início da lista (Ordenação: Mais recentes no topo)
@@ -589,52 +644,20 @@ function Index() {
                 )}
               </div>
               
-              <ScrollArea className="h-[400px] rounded-md border p-4 bg-muted/30">
-                {images.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground space-y-2 opacity-50">
-                    <Clock className="size-8" />
-                    <p className="text-sm">Nenhuma imagem na fila</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {images.map((img) => (
-                      <div key={img.id} className="bg-background rounded-lg border p-3 flex gap-3 relative group">
-                        <div className="size-12 rounded bg-muted overflow-hidden shrink-0 border">
-                          <img src={img.preview} alt="Preview" className="size-full object-cover" />
-                        </div>
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <p className="text-xs font-medium truncate pr-6">{img.file.name}</p>
-                          <div className="flex items-center gap-2">
-                            {img.status === 'pending' && <Badge variant="secondary" className="text-[10px] py-0">Pendente</Badge>}
-                            {img.status === 'processing' && (
-                              <div className="flex-1 space-y-1">
-                                <Badge className="text-[10px] py-0 bg-blue-500 hover:bg-blue-500 flex items-center gap-1">
-                                  {overallStatus.includes("Analisando") ? <Sparkles className="size-2 animate-pulse" /> : null}
-                                  {overallStatus.includes("Analisando") ? "Analisando" : "Processando"}
-                                </Badge>
-                                <Progress value={img.progress} className="h-1" />
-                              </div>
-                            )}
-                            {img.status === 'completed' && <Badge className="text-[10px] py-0 bg-emerald-500 hover:bg-emerald-500">Concluído</Badge>}
-                            {img.status === 'error' && <Badge variant="destructive" className="text-[10px] py-0">Erro</Badge>}
-                          </div>
-                        </div>
-                        <button 
-                          onClick={() => removeImage(img.id)}
-                          disabled={loading}
-                          className="absolute top-2 right-2 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Trash2 className="size-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
-
-              <div className="flex gap-3">
-                <Button className="flex-1" onClick={processOCR} disabled={loading || images.length === 0 || images.every(i => i.status === 'completed')}>
-                  {loading ? <Loader2 className="size-4 animate-spin mr-2" /> : "Iniciar Batch"}
+              <ScrollArea className="h-[300px] rounded-md border p-4 bg-muted/30">
+...
+              <div className="space-y-3 pt-2">
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">URL de Destino (SSA) da Loja</Label>
+                  <Input 
+                    placeholder="https://shope.ee/..." 
+                    value={affiliateUrl}
+                    onChange={(e) => setAffiliateUrl(e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <Button className="w-full" onClick={processOCR} disabled={loading || images.length === 0 || images.every(i => i.status === 'completed')}>
+                  {loading ? <Loader2 className="size-4 animate-spin mr-2" /> : "Iniciar Batch e Criar Links"}
                 </Button>
               </div>
 
@@ -728,14 +751,15 @@ function Index() {
                             <TableRow>
                               <TableHead>Primeiro Nome</TableHead>
                               <TableHead>Contato</TableHead>
-                              <TableHead>Próximo Lembrete</TableHead>
+                               <TableHead>Próximo Lembrete</TableHead>
+                              <TableHead>Link</TableHead>
                               <TableHead className="text-right w-[150px]">Ações</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {allContacts.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                                   {filterPending ? "Nenhum lembrete pendente no momento." : "Nenhum contato identificado. Comece processando imagens."}
                                 </TableCell>
                               </TableRow>
@@ -778,7 +802,23 @@ function Index() {
                                     ) : (
                                       <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1">
                                         <Clock className="size-2.5" /> Primeiro envio pendente
-                                      </Badge>
+                                       </Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {contact.trackingSlug ? (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20 cursor-help">
+                                            /{contact.trackingSlug}
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>Link de rastreio ativo</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    ) : (
+                                      <span className="text-[10px] text-muted-foreground">-</span>
                                     )}
                                   </TableCell>
                                   <TableCell className="text-right">
@@ -911,7 +951,7 @@ function Index() {
           <DialogHeader>
             <DialogTitle>Configurar Modelos de Mensagem</DialogTitle>
             <DialogDescription>
-              Personalize as mensagens disparadas pelo WhatsApp. Use {"{primeiroNome}"} e {"{contato}"} como tags dinâmicas.
+              Personalize as mensagens disparadas pelo WhatsApp. Use {"{primeiroNome}"}, {"{contato}"} e {"{linkRastreamento}"} como tags dinâmicas.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-6 py-4">

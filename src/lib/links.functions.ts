@@ -182,3 +182,40 @@ export const updateProfileSettings = createServerFn({ method: "POST" })
     if (error) return { error: error.message };
     return { success: true };
   });
+
+export const createTrackingLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => z.object({
+    name: z.string(),
+    phone: z.string(),
+    affiliateUrl: z.string().url(),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { userId, supabase: authenticatedSupabase } = context;
+
+    const nomeLimpo = data.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+    const cleanPhone = data.phone.replace(/\D/g, "");
+    const lastDigits = cleanPhone.slice(-4);
+    const slug = `rastreio-${nomeLimpo}-${lastDigits}`;
+
+    const insertData = {
+      user_id: userId,
+      slug,
+      affiliate_url: data.affiliateUrl,
+      title: `Rastreio - ${data.name} (${data.phone})`,
+      status: 'active'
+    };
+
+    const { data: link, error } = await authenticatedSupabase
+      .from("links")
+      .upsert(insertData as any, { onConflict: 'slug' })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Erro ao criar link de rastreio:", error);
+      throw error;
+    }
+
+    return link;
+  });
