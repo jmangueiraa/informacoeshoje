@@ -556,15 +556,6 @@ function Index() {
                     <div className="flex flex-wrap justify-between items-center gap-4">
                       <div className="flex gap-2">
                         <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={clearContacts} 
-                          disabled={loading} 
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="size-3 mr-2" /> Limpar Contatos
-                        </Button>
-                        <Button 
                           variant={filterPending ? "default" : "outline"} 
                           size="sm" 
                           onClick={() => setFilterPending(!filterPending)}
