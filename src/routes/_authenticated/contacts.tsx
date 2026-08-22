@@ -212,10 +212,7 @@ function Index() {
           
           // Se o Gemini retornou "Cliente XXXXX" ou algo inválido, garantimos o contador sequencial
           if (!name || name === "null" || name.toLowerCase() === "não identificado" || name.toLowerCase().includes("cliente")) {
-             // Se já for "Cliente XXXXX", mantemos o que a IA mandou, senão geramos um
-             if (!name || !name.startsWith("Cliente")) {
-               name = `Cliente ${String(clientCounter).padStart(5, '0')}`;
-             }
+             name = `Cliente ${String(clientCounter).padStart(5, '0')}`;
           }
           
           contacts = [{
