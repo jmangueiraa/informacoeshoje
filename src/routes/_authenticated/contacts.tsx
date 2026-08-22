@@ -340,8 +340,10 @@ Responda ESTRITAMENTE em formato JSON:
       setOverallStatus(`Processando imagem ${i + 1} de ${currentImages.length}...`);
 
       try {
-        const fileToRecognize = currentImage.file;
-        const { data: { text } } = await Tesseract.recognize(fileToRecognize, 'por', {
+        const originalFile = currentImage.file;
+        const imagemTratada = await preprocessarImagem(originalFile);
+        
+        const { data: { text } } = await Tesseract.recognize(imagemTratada, 'por', {
           logger: m => {
             if (m.status === 'recognizing text') {
               setImages(prev => prev.map(img => 
