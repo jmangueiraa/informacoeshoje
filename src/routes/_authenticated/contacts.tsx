@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { extractContactsWithAI, extractContactsWithVision } from "@/lib/ocr-contacts.functions";
+import { processarComprovanteComGemini } from "@/lib/gemini-ocr.functions";
 import Tesseract from 'tesseract.js';
 import { useServerFn } from "@tanstack/react-start";
 
