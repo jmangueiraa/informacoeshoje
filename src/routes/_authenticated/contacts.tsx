@@ -49,8 +49,8 @@ import {
   XCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-import { processarComprovanteComGemini } from "@/lib/gemini-ocr.functions";
+import { processarTextoComGemini } from "@/lib/gemini-ocr.functions";
+import Tesseract from 'tesseract.js';
 
 import { useServerFn } from "@tanstack/react-start";
 
