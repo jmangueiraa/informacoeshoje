@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { registerClick } from '@/lib/analytics.functions'
+import { supabase } from '@/integrations/supabase/client'
 
 export const Route = createFileRoute('/$slug')({
   component: RedirectPage,
@@ -13,31 +14,62 @@ function RedirectPage() {
 
   useEffect(() => {
     const performRedirect = async () => {
-      try {
-        const result = await registerClick({
-          data: {
-            slug,
-            host: window.location.host,
-            userAgent: navigator.userAgent,
-            referrer: document.referrer,
-          }
-        })
+      if (!slug) return
+      const slugLimpo = slug.replace(/^\/+|\/+$/g, '')
 
-        if (result.url) {
-          window.location.href = result.url
-        } else if (result.error) {
-          setError(result.error)
-          setStatus(result.status || 500)
+      // 1) Registra o clique (analytics completo) sem travar o redirecionamento
+      const analytics = registerClick({
+        data: {
+          slug: slugLimpo,
+          host: window.location.host,
+          userAgent: navigator.userAgent,
+          referrer: document.referrer,
+        },
+      }).catch((err) => {
+        console.error('Erro no analytics do clique:', err)
+        return null
+      })
+
+      // 2) Incremento seguro direto no banco (funciona para visitantes anônimos)
+      try {
+        const { data: urlDestino, error: rpcError } = await supabase.rpc('incrementar_clique', {
+          link_slug: slugLimpo,
+        })
+        if (rpcError) throw rpcError
+        if (urlDestino) {
+          window.location.replace(urlDestino as string)
+          return
         }
-      } catch (err: any) {
-        console.error('Redirect error:', err)
-        setError("Ocorreu um erro ao processar o link.")
-        setStatus(500)
+      } catch (err) {
+        console.error('Erro ao registrar clique:', err)
       }
+
+      // 3) Fallback: usa o resultado do analytics ou busca direta
+      const result = await analytics
+      if (result?.url) {
+        window.location.replace(result.url)
+        return
+      }
+
+      const { data: link } = await supabase
+        .from('links')
+        .select('affiliate_url')
+        .eq('slug', slugLimpo)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      if (link?.affiliate_url) {
+        window.location.replace(link.affiliate_url)
+        return
+      }
+
+      setError(result?.error ?? 'Link não encontrado')
+      setStatus(result?.status ?? 404)
     }
 
     performRedirect()
   }, [slug])
+
 
   if (error) {
     return (
