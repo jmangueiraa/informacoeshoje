@@ -2,13 +2,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { PlusCircle, Link2, BarChart3, MousePointer2, Activity, Copy, ExternalLink, TrendingUp } from "lucide-react"
 import { Link } from "@tanstack/react-router"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useEffect } from "react"
+import { supabase } from "@/integrations/supabase/client"
 import { getDashboardStats } from "@/lib/analytics.functions"
 import { getUserLinks, getUserProfile } from "@/lib/links.functions"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 
 export function DashboardHome() {
+  const queryClient = useQueryClient()
+
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: () => getDashboardStats(),
@@ -18,7 +22,26 @@ export function DashboardHome() {
   const { data: links, isLoading: linksLoading } = useQuery({
     queryKey: ['user-links'],
     queryFn: () => getUserLinks(),
+    refetchOnWindowFocus: true,
   })
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('links-changes-dashboard')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'links' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['user-links'] })
+        queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clicks' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [queryClient])
+
 
   const copyToClipboard = (link: any) => {
     const profileDomain = profile && !('error' in profile) ? profile.custom_domain : null;
