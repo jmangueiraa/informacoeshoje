@@ -485,6 +485,7 @@ export type Database = {
         Args: { link_id: string; visitor_ip: string }
         Returns: undefined
       }
+      incrementar_clique: { Args: { link_slug: string }; Returns: string }
       sync_all_link_clicks: { Args: never; Returns: undefined }
     }
     Enums: {
