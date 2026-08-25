@@ -1,12 +1,13 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { normalizeContactPhone } from "./phone";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 export function normalizePhone(phone: string): string {
-  return phone.replace(/\D/g, "");
+  return normalizeContactPhone(phone);
 }
 
 export function formatPhone(phone: string): string {
