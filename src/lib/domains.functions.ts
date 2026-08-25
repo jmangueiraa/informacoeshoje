@@ -35,6 +35,16 @@ export const addUserDomain = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { userId, supabase: authenticatedSupabase } = context;
 
+    // Apenas administradores podem cadastrar novos domínios
+    const { data: isAdmin } = await authenticatedSupabase.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin'
+    });
+    if (!isAdmin) {
+      throw new Error("Apenas administradores podem adicionar domínios.");
+    }
+
+
     let finalDomain = data.domain;
     if (data.type === 'subdomain') {
       if (!finalDomain.includes('.')) {
