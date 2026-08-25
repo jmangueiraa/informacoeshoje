@@ -25,6 +25,7 @@ export type Database = {
           link_id: string
           operating_system: string | null
           referrer: string | null
+          slug: string | null
           user_agent: string | null
         }
         Insert: {
@@ -37,6 +38,7 @@ export type Database = {
           link_id: string
           operating_system?: string | null
           referrer?: string | null
+          slug?: string | null
           user_agent?: string | null
         }
         Update: {
@@ -49,6 +51,7 @@ export type Database = {
           link_id?: string
           operating_system?: string | null
           referrer?: string | null
+          slug?: string | null
           user_agent?: string | null
         }
         Relationships: [
