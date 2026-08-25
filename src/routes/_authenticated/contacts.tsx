@@ -58,10 +58,10 @@ import {
   SkipForward,
   Pause,
   StopCircle,
-  ChevronRight,
-  ChevronLeft
+  ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { normalizeContactPhone } from "@/lib/phone";
 import { processarTextoComGemini } from "@/lib/gemini-ocr.functions";
 import Tesseract from 'tesseract.js';
 import { createTrackingLink, ensureTrackingLink, getUserProfile } from "@/lib/links.functions";
@@ -101,6 +101,20 @@ interface OCRImage {
   text: string;
   contacts: Contact[];
   error?: string;
+}
+
+function dedupeContactsByPhone<T extends Contact & { id?: string }>(contacts: T[]): T[] {
+  const seenPhones = new Set<string>();
+  const uniqueContacts: T[] = [];
+
+  for (const contact of contacts) {
+    const phone = normalizeContactPhone(contact.phone);
+    if (!phone || seenPhones.has(phone)) continue;
+    seenPhones.add(phone);
+    uniqueContacts.push({ ...contact, phone });
+  }
+
+  return uniqueContacts;
 }
 
 function Index() {
@@ -152,7 +166,10 @@ Acompanhe a rota atualizada pelo rastreamento:
     const savedContacts = localStorage.getItem("linkafiliado_contacts_storage");
     if (savedContacts) {
       try {
-        setExtractedContacts(JSON.parse(savedContacts));
+        const parsedContacts = JSON.parse(savedContacts);
+        if (Array.isArray(parsedContacts)) {
+          setExtractedContacts(dedupeContactsByPhone(parsedContacts));
+        }
       } catch (e) {
         console.error("Erro ao carregar contatos do localStorage", e);
       }
@@ -246,7 +263,11 @@ Acompanhe a rota atualizada pelo rastreamento:
 
   const handleDispatch = async (contact: Contact & { id: string }) => {
     const isFirst = !contact.lastContact;
-    const cleanPhone = contact.phone.replace(/\D/g, "");
+    const cleanPhone = normalizeContactPhone(contact.phone);
+    if (cleanPhone.length !== 10 && cleanPhone.length !== 11) {
+      toast.error("Contato sem telefone válido.");
+      return;
+    }
     const phoneWithCountry = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
 
     // 1. Garante o link de rastreio (reutiliza se já existir)
@@ -259,7 +280,7 @@ Acompanhe a rota atualizada pelo rastreamento:
       try {
         const normalizedUrl = affiliateUrl.startsWith("http") ? affiliateUrl : `https://${affiliateUrl}`;
         const result = await ensureLink({
-          data: { name: contact.name, phone: contact.phone, affiliateUrl: normalizedUrl }
+          data: { name: contact.name, phone: cleanPhone, affiliateUrl: normalizedUrl }
         });
         slug = result.slug;
         setExtractedContacts(prev => prev.map(c =>
@@ -283,7 +304,8 @@ Acompanhe a rota atualizada pelo rastreamento:
       } : c
     ));
 
-    const message = encodeURIComponent(getFormattedMessage(contact, isFirst, slug));
+    const normalizedContact = { ...contact, phone: cleanPhone };
+    const message = encodeURIComponent(getFormattedMessage(normalizedContact, isFirst, slug));
     window.open(`https://wa.me/${phoneWithCountry}?text=${message}`, "_blank");
   };
 
@@ -299,7 +321,7 @@ Acompanhe a rota atualizada pelo rastreamento:
       return;
     }
 
-    setDispatcherQueue(queue);
+    setDispatcherQueue(dedupeContactsByPhone(queue));
     setDispatcherIndex(0);
     setIsDispatcherOpen(true);
   };
@@ -354,6 +376,7 @@ Acompanhe a rota atualizada pelo rastreamento:
     let currentIndexForClient = clientCounter;
     let addedCount = 0;
     let duplicateCount = 0;
+    const seenPhones = new Set(extractedContacts.map((contact) => normalizeContactPhone(contact.phone)).filter(Boolean));
 
     if (!affiliateUrl) {
       toast.error("Por favor, informe a URL de Destino (SSA) da loja antes de iniciar.");
@@ -395,16 +418,16 @@ Acompanhe a rota atualizada pelo rastreamento:
           }
         });
         
+        const cleanPhone = normalizeContactPhone(aiResult.contato);
         const extracted = {
           name: aiResult.primeiroNome,
-          phone: aiResult.contato
+          phone: cleanPhone
         };
 
-        // Validação de Duplicidade Estrita
-        const cleanPhone = extracted.phone.replace(/\D/g, "");
-        const isDuplicateInList = extractedContacts.some(c => c.phone.replace(/\D/g, "") === cleanPhone);
+        // Validação de Duplicidade Estrita no lote e na lista atual
+        const isDuplicateInList = cleanPhone ? seenPhones.has(cleanPhone) : false;
 
-        if (cleanPhone && cleanPhone.length >= 8 && isDuplicateInList) {
+        if (cleanPhone && isDuplicateInList) {
           duplicateCount++;
           setImages((prev) =>
             prev.map((img) =>
@@ -413,6 +436,17 @@ Acompanhe a rota atualizada pelo rastreamento:
           );
           continue;
         }
+
+        if (!cleanPhone || (cleanPhone.length !== 10 && cleanPhone.length !== 11)) {
+          setImages((prev) =>
+            prev.map((img) =>
+              img.id === currentId ? { ...img, status: "completed", text: `Telefone inválido ignorado: ${aiResult.contato}`, contacts: [], progress: 100 } : img
+            )
+          );
+          continue;
+        }
+
+        seenPhones.add(cleanPhone);
         
         if (extracted.name.startsWith("Cliente")) {
           currentIndexForClient++;
@@ -427,7 +461,7 @@ Acompanhe a rota atualizada pelo rastreamento:
           const link = await createLink({
             data: {
               name: extracted.name,
-              phone: extracted.phone,
+              phone: cleanPhone,
               affiliateUrl: affiliateUrl
             }
           });
@@ -522,12 +556,20 @@ Acompanhe a rota atualizada pelo rastreamento:
   };
 
   const updateContact = (contactId: string, field: keyof Contact, value: string) => {
-    setExtractedContacts(prev => prev.map(c => {
-      if (c.id === contactId) {
-        return { ...c, [field]: value };
+    setExtractedContacts(prev => {
+      if (field !== 'phone') {
+        return prev.map(c => (c.id === contactId ? { ...c, [field]: value } : c));
       }
-      return c;
-    }));
+
+      const normalizedPhone = normalizeContactPhone(value);
+      const exists = prev.some(c => c.id !== contactId && normalizeContactPhone(c.phone) === normalizedPhone);
+      if (normalizedPhone && exists) {
+        toast.error("Este número já existe na lista.");
+        return prev;
+      }
+
+      return prev.map(c => (c.id === contactId ? { ...c, phone: normalizedPhone } : c));
+    });
   };
 
   const deleteContact = (contactId: string) => {
@@ -537,7 +579,7 @@ Acompanhe a rota atualizada pelo rastreamento:
 
   const allContacts = useMemo(() => {
     // Ordenação: Mais recentes no topo (createdAt/extractionDate decrescente)
-    let sorted = [...extractedContacts].sort((a, b) => {
+    let sorted = dedupeContactsByPhone(extractedContacts).sort((a, b) => {
       const dateA = a.extractionDate ? new Date(a.extractionDate).getTime() : 0;
       const dateB = b.extractionDate ? new Date(b.extractionDate).getTime() : 0;
       return dateB - dateA;

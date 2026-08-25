@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { analyzeImageForContacts } from "./contacts.server";
+import { normalizeContactPhone } from "./phone";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const getContacts = createServerFn({ method: "GET" })
@@ -102,10 +103,13 @@ export const saveContact = createServerFn({ method: "POST" })
       }
     }
     
-    const phoneDigits = data.phone.replace(/\D/g, '');
+    const phoneDigits = normalizeContactPhone(data.phone);
     
     // Se o telefone for válido (10 ou 11 dígitos), aprovamos o registro mesmo com nome substituto
-    const isPhoneValid = phoneDigits.length >= 10 && phoneDigits.length <= 11;
+    const isPhoneValid = phoneDigits.length === 10 || phoneDigits.length === 11;
+    if (!isPhoneValid) {
+      throw new Error("INVALID_PHONE");
+    }
     const finalNeedsReview = data.needsReview === true && !isPhoneValid;
 
     console.log(`[CAPTURA] saveContact - Processando:`, { 
@@ -115,24 +119,7 @@ export const saveContact = createServerFn({ method: "POST" })
       userId: userId
     });
 
-    // 1. Verificar se já existe (Duplicado)
-    const { data: existing, error: checkError } = await supabase
-      .from('contacts')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('phone_normalized', phoneDigits)
-      .maybeSingle();
-
-    if (checkError) {
-      console.error(`[CAPTURA] Erro na verificação de duplicidade:`, checkError);
-    }
-
-    if (existing) {
-      console.log(`[CAPTURA] saveContact - DUPLICADO detectado para ${phoneDigits}`);
-      throw new Error('DUPLICATE_CONTACT');
-    }
-
-    // 2. Montagem do Payload Exato
+    // 1. Montagem do Payload Exato
     const payload = {
       name: cleanName,
       phone_normalized: phoneDigits,
@@ -145,20 +132,21 @@ export const saveContact = createServerFn({ method: "POST" })
 
     console.log(`[CAPTURA] saveContact - Payload Enviado ao Supabase:`, payload);
 
-    // 3. Inserção
+    // 2. Inserção idempotente: se já existir, ignora sem criar duplicado
     const { data: contact, error: insertError } = await supabase
       .from('contacts')
-      .insert([payload])
+      .upsert([payload], { onConflict: 'user_id,phone_normalized', ignoreDuplicates: true })
       .select()
-      .single();
+      .maybeSingle();
       
     if (insertError) {
-      if (insertError.code === '23505') {
-        console.log(`[CAPTURA] saveContact - DUPLICADO detectado via constraint para ${phoneDigits}`);
-        throw new Error('DUPLICATE_CONTACT');
-      }
       console.error(`[IMPORT_ERROR] Supabase insert failure:`, insertError);
       throw new Error(`DB_INSERT_ERROR: ${insertError.code} - ${insertError.message}`);
+    }
+
+    if (!contact) {
+      console.log(`[CAPTURA] saveContact - DUPLICADO ignorado para ${phoneDigits}`);
+      return { duplicate: true, phone_normalized: phoneDigits };
     }
 
     console.log(`[IMPORT] Sucesso ao salvar contato no banco:`, contact);

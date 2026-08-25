@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { normalizeContactPhone } from "./phone";
 
 export const importContactsFromExcel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -29,47 +30,44 @@ export const importContactsFromExcel = createServerFn({ method: "POST" })
       errors: 0
     };
 
+    const uniqueContacts = new Map<string, { name: string; phone_normalized: string; user_id: string; needs_review: boolean }>();
+
     for (const contact of data.contacts) {
-      try {
-        const phoneDigits = contact.phone.replace(/\D/g, '');
-        if (phoneDigits.length < 10 || phoneDigits.length > 11) {
-          results.errors++;
-          continue;
-        }
-
-        const name = cleanAndValidateName(contact.name);
-
-        // Check duplicate
-        const { data: existing } = await supabase
-          .from('contacts')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('phone_normalized', phoneDigits)
-          .maybeSingle();
-
-        if (existing) {
-          results.duplicates++;
-          continue;
-        }
-
-        const { error: insertError } = await supabase
-          .from('contacts')
-          .insert([{
-            name,
-            phone_normalized: phoneDigits,
-            user_id: userId,
-            needs_review: false
-          }]);
-
-        if (insertError) {
-          results.errors++;
-        } else {
-          results.imported++;
-        }
-      } catch (err) {
+      const phoneDigits = normalizeContactPhone(contact.phone);
+      if (phoneDigits.length !== 10 && phoneDigits.length !== 11) {
         results.errors++;
+        continue;
       }
+
+      if (uniqueContacts.has(phoneDigits)) {
+        results.duplicates++;
+        continue;
+      }
+
+      uniqueContacts.set(phoneDigits, {
+        name: cleanAndValidateName(contact.name),
+        phone_normalized: phoneDigits,
+        user_id: userId,
+        needs_review: false
+      });
     }
 
+    if (uniqueContacts.size === 0) {
+      return results;
+    }
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('contacts')
+      .upsert(Array.from(uniqueContacts.values()), { onConflict: 'user_id,phone_normalized', ignoreDuplicates: true })
+      .select('id');
+
+    if (insertError) {
+      console.error('[IMPORT_ERROR] Falha ao importar contatos:', insertError);
+      results.errors += uniqueContacts.size;
+      return results;
+    }
+
+    results.imported = inserted?.length || 0;
+    results.duplicates += uniqueContacts.size - results.imported;
     return results;
   });

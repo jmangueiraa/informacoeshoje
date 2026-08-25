@@ -486,6 +486,7 @@ export type Database = {
         Returns: undefined
       }
       incrementar_clique: { Args: { link_slug: string }; Returns: string }
+      normalize_contact_phone: { Args: { raw_phone: string }; Returns: string }
       sync_all_link_clicks: { Args: never; Returns: undefined }
     }
     Enums: {
