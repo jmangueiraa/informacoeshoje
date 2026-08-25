@@ -116,29 +116,29 @@ export const getDashboardStats = createServerFn({ method: "GET" })
     // Isso acontece porque estamos usando o contador de cliques ÚNICOS no total, mas Cliques Hoje conta tudo.
     // Vamos padronizar: Cliques Totais = Soma de todos os registros na tabela clicks para os links do usuário.
     
-    const linkIds = links?.map(l => l.id) || [];
+    // Contabilização por SLUG clicado (não por id do link)
+    const slugs = (links?.map(l => l.slug).filter(Boolean) as string[]) || [];
     let totalClicks = 0;
     let clicksToday = 0;
 
-    if (linkIds.length > 0) {
-      // Total de cliques brutos (registros na tabela clicks)
+    if (slugs.length > 0) {
       const { count: totalRaw } = await authenticatedSupabase
         .from("clicks")
         .select("*", { count: 'exact', head: true })
-        .in("link_id", linkIds);
-      
+        .in("slug", slugs);
+
       totalClicks = totalRaw || 0;
 
-      // Cliques nas últimas 24h (brutos)
+      // Cliques nas últimas 24h
       const today = new Date();
       today.setHours(today.getHours() - 24);
 
       const { count: rawToday } = await authenticatedSupabase
         .from("clicks")
         .select("*", { count: 'exact', head: true })
-        .in("link_id", linkIds)
+        .in("slug", slugs)
         .gte("clicked_at", today.toISOString());
-      
+
       clicksToday = rawToday || 0;
     }
 
