@@ -379,6 +379,8 @@ function SettingsPage() {
             )}
           </CardContent>
         </Card>
+        )}
+
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <Card>
