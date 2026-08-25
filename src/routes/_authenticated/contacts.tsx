@@ -264,6 +264,11 @@ Equipe Shopee!`
       message = message.replace(/{linkRastreamento}/g, "").replace(/{link}/g, "");
     }
 
+    // Rodapé obrigatório
+    if (!/Equipe Shopee!\s*$/.test(message.trim())) {
+      message = `${message.trimEnd()}\n\nEquipe Shopee!`;
+    }
+
     return message;
   };
 
