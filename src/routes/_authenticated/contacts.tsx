@@ -65,7 +65,7 @@ import { cn } from "@/lib/utils";
 import { processarTextoComGemini } from "@/lib/gemini-ocr.functions";
 import Tesseract from 'tesseract.js';
 import { createTrackingLink, ensureTrackingLink, getUserProfile } from "@/lib/links.functions";
-import { PLATFORM_DOMAIN } from "@/lib/constants";
+import { LINK_DOMAIN } from "@/lib/constants";
 
 import { useServerFn } from "@tanstack/react-start";
 
@@ -213,7 +213,7 @@ Acompanhe a rota atualizada pelo rastreamento:
 
   // Domínio base do link de rastreio: sempre o domínio da plataforma (ou domínio personalizado do usuário).
   // Nunca o host da URL de afiliado (ex.: s.shopee.com.br), senão o link não é rastreado.
-  const getTrackingDomain = () => userProfile?.custom_domain || PLATFORM_DOMAIN;
+  const getTrackingDomain = () => userProfile?.custom_domain || LINK_DOMAIN;
 
 
   const buildTrackingUrl = (slug: string) => `https://${getTrackingDomain()}/${slug}`;

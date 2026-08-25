@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { PLATFORM_DOMAIN } from "@/lib/constants";
+import { PLATFORM_DOMAIN, LINK_DOMAIN } from "@/lib/constants";
 
 export interface ResolvedDomain {
   userId: string;
@@ -14,6 +14,7 @@ export async function resolveDomain(hostname: string): Promise<ResolvedDomain | 
   // 1. Se for o domínio principal da plataforma ou ambiente de desenvolvimento
   if (
     normalizedHost === platformDomainNormalized || 
+    normalizedHost === LINK_DOMAIN || 
     normalizedHost.includes('lovable.app') || 
     normalizedHost.includes('localhost') ||
     normalizedHost.includes('127.0.0.1')
