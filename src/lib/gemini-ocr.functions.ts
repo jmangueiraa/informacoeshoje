@@ -120,8 +120,7 @@ Formato de resposta JSON obrigatório:
 
 export function extrairTelefoneValido(textoBruto: string): string {
   const candidates: string[] = [];
-  const linhas = textoBruto.split('
-');
+  const linhas = textoBruto.split('\n');
 
   for (const linha of linhas) {
     if (/tel|telefone|contato|cel|whats|\+55/i.test(linha)) {
