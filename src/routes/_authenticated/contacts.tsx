@@ -880,12 +880,16 @@ Acompanhe a rota atualizada pelo rastreamento:
                                     {contact.trackingSlug ? (
                                       <Tooltip>
                                         <TooltipTrigger asChild>
-                                          <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20 cursor-help">
+                                          <Badge
+                                            variant="outline"
+                                            className="text-[10px] bg-primary/5 text-primary border-primary/20 cursor-pointer"
+                                            onClick={() => copyToClipboard(buildTrackingUrl(contact.trackingSlug!))}
+                                          >
                                             /{contact.trackingSlug}
                                           </Badge>
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                          <p>Link de rastreio ativo</p>
+                                          <p>{buildTrackingUrl(contact.trackingSlug)} (clique para copiar)</p>
                                         </TooltipContent>
                                       </Tooltip>
                                     ) : (
