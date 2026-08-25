@@ -4,6 +4,60 @@ import { registerClick } from '@/lib/analytics.functions'
 import { supabase } from '@/integrations/supabase/client'
 
 export const Route = createFileRoute('/$slug')({
+  server: {
+    handlers: {
+      GET: async ({ params }) => {
+        const slug = String(params.slug ?? '').replace(/^\/+|\/+$/g, '')
+        if (!slug || slug.includes('.')) {
+          return new Response('Not found', { status: 404 })
+        }
+
+        const { createClient } = await import('@supabase/supabase-js')
+        const url = process.env['SUPABASE_URL']
+        const key = process.env['SUPABASE_PUBLISHABLE_KEY']
+        if (!url || !key) return new Response('Not found', { status: 404 })
+
+        const client = createClient(url, key, {
+          auth: { persistSession: false, autoRefreshToken: false },
+          global: {
+            fetch: (input, init) => {
+              const h = new Headers(init?.headers)
+              if (key.startsWith('sb_') && h.get('Authorization') === `Bearer ${key}`) {
+                h.delete('Authorization')
+              }
+              h.set('apikey', key)
+              return fetch(input, { ...init, headers: h })
+            },
+          },
+        })
+
+        const { data: destino } = await client.rpc('incrementar_clique', { link_slug: slug })
+
+        if (typeof destino === 'string' && destino) {
+          return new Response(null, {
+            status: 302,
+            headers: { Location: destino, 'Cache-Control': 'no-store' },
+          })
+        }
+
+        const { data: link } = await client
+          .from('links')
+          .select('affiliate_url')
+          .eq('slug', slug)
+          .eq('status', 'active')
+          .maybeSingle()
+
+        if (link?.affiliate_url) {
+          return new Response(null, {
+            status: 302,
+            headers: { Location: link.affiliate_url, 'Cache-Control': 'no-store' },
+          })
+        }
+
+        return new Response('Link não encontrado', { status: 404 })
+      },
+    },
+  },
   component: RedirectPage,
 })
 
