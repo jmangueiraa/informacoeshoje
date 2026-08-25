@@ -64,7 +64,7 @@ import {
 import { cn } from "@/lib/utils";
 import { processarTextoComGemini } from "@/lib/gemini-ocr.functions";
 import Tesseract from 'tesseract.js';
-import { createTrackingLink, getUserProfile } from "@/lib/links.functions";
+import { createTrackingLink, ensureTrackingLink, getUserProfile } from "@/lib/links.functions";
 import { PLATFORM_DOMAIN } from "@/lib/constants";
 
 import { useServerFn } from "@tanstack/react-start";
@@ -139,6 +139,7 @@ Acompanhe a rota atualizada pelo rastreamento:
   
   const processarTexto = useServerFn(processarTextoComGemini);
   const createLink = useServerFn(createTrackingLink);
+  const ensureLink = useServerFn(ensureTrackingLink);
   const getProfile = useServerFn(getUserProfile);
 
 
@@ -210,7 +211,22 @@ Acompanhe a rota atualizada pelo rastreamento:
     toast.success("Templates de mensagem salvos!");
   };
 
-  const getFormattedMessage = (contact: Contact, isFirst: boolean) => {
+  // Domínio base do link de rastreio: usa o host da URL de Destino (SSA) da loja
+  const getTrackingDomain = () => {
+    try {
+      if (affiliateUrl) {
+        const host = new URL(affiliateUrl.startsWith("http") ? affiliateUrl : `https://${affiliateUrl}`).hostname;
+        if (host) return host;
+      }
+    } catch {
+      // ignora URL inválida
+    }
+    return userProfile?.custom_domain || PLATFORM_DOMAIN;
+  };
+
+  const buildTrackingUrl = (slug: string) => `https://${getTrackingDomain()}/${slug}`;
+
+  const getFormattedMessage = (contact: Contact, isFirst: boolean, slugOverride?: string | null) => {
     const template = (isFirst ? msgTemplates.first : msgTemplates.reminder) || "";
     
     // Obter o primeiro nome real se possível
@@ -220,23 +236,50 @@ Acompanhe a rota atualizada pelo rastreamento:
       .replace(/{primeiroNome}/g, nomeExibicao)
       .replace(/{contato}/g, contact.phone || "");
 
-    if (contact.trackingSlug) {
-      const domain = userProfile?.custom_domain || PLATFORM_DOMAIN;
-      const trackingUrl = `https://${domain}/${contact.trackingSlug}`;
-      message = message.replace(/{linkRastreamento}/g, trackingUrl);
+    const slug = slugOverride ?? contact.trackingSlug;
+
+    if (slug) {
+      const trackingUrl = buildTrackingUrl(slug);
+      message = message.replace(/{linkRastreamento}/g, trackingUrl).replace(/{link}/g, trackingUrl);
+      if (!/{linkRastreamento}|{link}/.test(template) && !message.includes(trackingUrl)) {
+        message = `${message}\n\n🔗 ${trackingUrl}`;
+      }
     } else {
       // Se não houver slug de rastreio, remove a tag para não enviar o texto literal
-      message = message.replace(/{linkRastreamento}/g, "");
+      message = message.replace(/{linkRastreamento}/g, "").replace(/{link}/g, "");
     }
 
     return message;
   };
 
-  const handleDispatch = (contact: Contact & { id: string }) => {
+  const handleDispatch = async (contact: Contact & { id: string }) => {
     const isFirst = !contact.lastContact;
     const cleanPhone = contact.phone.replace(/\D/g, "");
     const phoneWithCountry = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
-    
+
+    // 1. Garante o link de rastreio (reutiliza se já existir)
+    let slug = contact.trackingSlug || null;
+    if (!slug) {
+      if (!affiliateUrl) {
+        toast.error("Informe a URL de Destino (SSA) da Loja para gerar o link.");
+        return;
+      }
+      try {
+        const normalizedUrl = affiliateUrl.startsWith("http") ? affiliateUrl : `https://${affiliateUrl}`;
+        const result = await ensureLink({
+          data: { name: contact.name, phone: contact.phone, affiliateUrl: normalizedUrl }
+        });
+        slug = result.slug;
+        setExtractedContacts(prev => prev.map(c =>
+          c.id === contact.id ? { ...c, trackingSlug: slug } : c
+        ));
+      } catch (err) {
+        console.error("Erro ao gerar link de rastreio:", err);
+        toast.error("Não foi possível gerar o link de rastreio.");
+        return;
+      }
+    }
+
     const now = new Date();
     const next = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     
@@ -248,7 +291,7 @@ Acompanhe a rota atualizada pelo rastreamento:
       } : c
     ));
 
-    const message = encodeURIComponent(getFormattedMessage(contact, isFirst));
+    const message = encodeURIComponent(getFormattedMessage(contact, isFirst, slug));
     window.open(`https://wa.me/${phoneWithCountry}?text=${message}`, "_blank");
   };
 
@@ -837,12 +880,16 @@ Acompanhe a rota atualizada pelo rastreamento:
                                     {contact.trackingSlug ? (
                                       <Tooltip>
                                         <TooltipTrigger asChild>
-                                          <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20 cursor-help">
+                                          <Badge
+                                            variant="outline"
+                                            className="text-[10px] bg-primary/5 text-primary border-primary/20 cursor-pointer"
+                                            onClick={() => copyToClipboard(buildTrackingUrl(contact.trackingSlug!))}
+                                          >
                                             /{contact.trackingSlug}
                                           </Badge>
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                          <p>Link de rastreio ativo</p>
+                                          <p>{buildTrackingUrl(contact.trackingSlug)} (clique para copiar)</p>
                                         </TooltipContent>
                                       </Tooltip>
                                     ) : (

@@ -219,3 +219,77 @@ export const createTrackingLink = createServerFn({ method: "POST" })
 
     return link;
   });
+
+/**
+ * Garante um link de rastreio para um contato, gerando slug a partir do primeiro nome.
+ * Reutiliza o link existente do mesmo contato (mesmo telefone) e aplica sufixo numérico
+ * quando o slug já pertence a outro contato.
+ */
+export const ensureTrackingLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => z.object({
+    name: z.string(),
+    phone: z.string(),
+    affiliateUrl: z.string().url(),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { userId, supabase: db } = context;
+
+    const cleanPhone = data.phone.replace(/\D/g, "");
+    const firstName = (data.name.trim().split(/\s+/)[0] || "cliente")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]/g, "");
+    const base = firstName.length >= 2 ? firstName : "cliente";
+
+    // 1. Reutiliza link já existente para este contato (telefone no título)
+    const { data: existing } = await db
+      .from("links")
+      .select("id, slug, affiliate_url")
+      .eq("user_id", userId)
+      .like("title", `%${cleanPhone}%`)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    const found = existing?.[0];
+    if (found) {
+      if (found.affiliate_url !== data.affiliateUrl) {
+        await db.from("links").update({ affiliate_url: data.affiliateUrl }).eq("id", found.id);
+      }
+      return { slug: found.slug, reused: true };
+    }
+
+    // 2. Encontra slug livre (base, base-1, base-2 ...)
+    const { data: taken } = await db
+      .from("links")
+      .select("slug")
+      .or(`slug.eq.${base},slug.like.${base}-%`);
+
+    const takenSet = new Set((taken || []).map((l: any) => l.slug));
+    let slug = base;
+    let i = 1;
+    while (takenSet.has(slug)) {
+      slug = `${base}-${i}`;
+      i++;
+    }
+
+    const { data: link, error } = await db
+      .from("links")
+      .insert({
+        user_id: userId,
+        slug,
+        affiliate_url: data.affiliateUrl,
+        title: `Rastreio - ${data.name} (${cleanPhone})`,
+        status: "active",
+      } as any)
+      .select("slug")
+      .single();
+
+    if (error) {
+      console.error("Erro ao garantir link de rastreio:", error);
+      throw error;
+    }
+
+    return { slug: link.slug, reused: false };
+  });
