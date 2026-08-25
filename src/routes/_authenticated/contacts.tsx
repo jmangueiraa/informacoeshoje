@@ -143,9 +143,15 @@ Tivemos uma instabilidade no fluxo de envio do seu pacote.
 Acompanhe a rota atualizada pelo rastreamento:
 🔗 {linkRastreamento}
 
-(Caso já tenha recebido a sua encomenda, favor nos responder apenas com um OK por aqui).`,
-    reminder: "Olá {primeiroNome}, passando para saber se deu tudo certo com seu pedido! {linkRastreamento}",
-    tracking: "Olá {primeiroNome}, aqui está seu link de rastreio: {linkRastreamento}"
+(Caso já tenha recebido a sua encomenda, favor nos responder apenas com um OK por aqui).
+
+Equipe Shopee!`,
+    reminder: `Olá {primeiroNome}, passando para saber se deu tudo certo com seu pedido! {linkRastreamento}
+
+Equipe Shopee!`,
+    tracking: `Olá {primeiroNome}, aqui está seu link de rastreio: {linkRastreamento}
+
+Equipe Shopee!`
   });
   const itemsPerPage = 10;
 
@@ -256,6 +262,11 @@ Acompanhe a rota atualizada pelo rastreamento:
     } else {
       // Se não houver slug de rastreio, remove a tag para não enviar o texto literal
       message = message.replace(/{linkRastreamento}/g, "").replace(/{link}/g, "");
+    }
+
+    // Rodapé obrigatório
+    if (!/Equipe Shopee!\s*$/.test(message.trim())) {
+      message = `${message.trimEnd()}\n\nEquipe Shopee!`;
     }
 
     return message;
