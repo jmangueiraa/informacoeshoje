@@ -211,18 +211,10 @@ Acompanhe a rota atualizada pelo rastreamento:
     toast.success("Templates de mensagem salvos!");
   };
 
-  // Domínio base do link de rastreio: usa o host da URL de Destino (SSA) da loja
-  const getTrackingDomain = () => {
-    try {
-      if (affiliateUrl) {
-        const host = new URL(affiliateUrl.startsWith("http") ? affiliateUrl : `https://${affiliateUrl}`).hostname;
-        if (host) return host;
-      }
-    } catch {
-      // ignora URL inválida
-    }
-    return userProfile?.custom_domain || PLATFORM_DOMAIN;
-  };
+  // Domínio base do link de rastreio: sempre o domínio da plataforma (ou domínio personalizado do usuário).
+  // Nunca o host da URL de afiliado (ex.: s.shopee.com.br), senão o link não é rastreado.
+  const getTrackingDomain = () => userProfile?.custom_domain || PLATFORM_DOMAIN;
+
 
   const buildTrackingUrl = (slug: string) => `https://${getTrackingDomain()}/${slug}`;
 
