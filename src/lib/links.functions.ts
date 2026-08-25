@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { normalizeContactPhone } from "./phone";
 
 const createLinkSchema = z.object({
   affiliateUrl: z.string().url().refine(url => url.includes('shopee.com.br') || url.includes('shope.ee'), {
@@ -194,7 +195,7 @@ export const createTrackingLink = createServerFn({ method: "POST" })
     const { userId, supabase: authenticatedSupabase } = context;
 
     const nomeLimpo = data.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
-    const cleanPhone = data.phone.replace(/\D/g, "");
+    const cleanPhone = normalizeContactPhone(data.phone);
     const lastDigits = cleanPhone.slice(-4);
     const slug = `rastreio-${nomeLimpo}-${lastDigits}`;
 
@@ -235,7 +236,7 @@ export const ensureTrackingLink = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { userId, supabase: db } = context;
 
-    const cleanPhone = data.phone.replace(/\D/g, "");
+    const cleanPhone = normalizeContactPhone(data.phone);
     const firstName = (data.name.trim().split(/\s+/)[0] || "cliente")
       .toLowerCase()
       .normalize("NFD")
