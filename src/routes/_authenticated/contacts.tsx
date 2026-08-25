@@ -213,7 +213,7 @@ Acompanhe a rota atualizada pelo rastreamento:
 
   // Domínio base do link de rastreio: sempre o domínio da plataforma (ou domínio personalizado do usuário).
   // Nunca o host da URL de afiliado (ex.: s.shopee.com.br), senão o link não é rastreado.
-  const getTrackingDomain = () => userProfile?.custom_domain || PLATFORM_DOMAIN;
+  const getTrackingDomain = () => userProfile?.custom_domain || LINK_DOMAIN;
 
 
   const buildTrackingUrl = (slug: string) => `https://${getTrackingDomain()}/${slug}`;
