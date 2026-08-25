@@ -65,6 +65,7 @@ export const registerClick = createServerFn({ method: "POST" })
     // 4. Registrar o clique na tabela clicks
     await supabase.from("clicks").insert({
       link_id: link.id,
+      slug: data.slug,
       user_agent: data.userAgent ?? null,
       device_type: deviceType,
       browser: browser,
