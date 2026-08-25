@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { normalizeContactPhone } from "./phone";
 
 /**
  * Normaliza números brasileiros.
@@ -10,19 +10,7 @@ export function normalizeBrazilianPhone(phone: string | null | undefined): { nor
     return { normalized: "", isValid: false, reason: "Telefone vazio ou não identificado" };
   }
 
-  // Remove tudo que não é dígito
-  let digits = phone.replace(/\D/g, "");
-  
-  // LOGICA AGRESSIVA DE EXTRAÇÃO DE DDD/NÚMERO
-  // Se tiver de 12 a 13 dígitos e começar com 55, remove o 55 (DDI Brasil)
-  if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
-    digits = digits.substring(2);
-  }
-
-  // Se o número começar com 0 e tiver 11 ou 12 dígitos, remove o 0 inicial
-  if (digits.startsWith("0") && (digits.length === 11 || digits.length === 12)) {
-    digits = digits.substring(1);
-  }
+  const digits = normalizeContactPhone(phone);
 
   // Validação: No Brasil, números válidos com DDD tem 10 ou 11 dígitos.
   const isValid = digits.length >= 10 && digits.length <= 11;
