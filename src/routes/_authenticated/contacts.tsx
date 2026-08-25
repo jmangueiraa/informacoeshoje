@@ -280,7 +280,7 @@ Acompanhe a rota atualizada pelo rastreamento:
       try {
         const normalizedUrl = affiliateUrl.startsWith("http") ? affiliateUrl : `https://${affiliateUrl}`;
         const result = await ensureLink({
-          data: { name: contact.name, phone: contact.phone, affiliateUrl: normalizedUrl }
+          data: { name: contact.name, phone: cleanPhone, affiliateUrl: normalizedUrl }
         });
         slug = result.slug;
         setExtractedContacts(prev => prev.map(c =>
@@ -304,7 +304,8 @@ Acompanhe a rota atualizada pelo rastreamento:
       } : c
     ));
 
-    const message = encodeURIComponent(getFormattedMessage(contact, isFirst, slug));
+    const normalizedContact = { ...contact, phone: cleanPhone };
+    const message = encodeURIComponent(getFormattedMessage(normalizedContact, isFirst, slug));
     window.open(`https://wa.me/${phoneWithCountry}?text=${message}`, "_blank");
   };
 
@@ -320,7 +321,7 @@ Acompanhe a rota atualizada pelo rastreamento:
       return;
     }
 
-    setDispatcherQueue(queue);
+    setDispatcherQueue(dedupeContactsByPhone(queue));
     setDispatcherIndex(0);
     setIsDispatcherOpen(true);
   };
@@ -578,7 +579,7 @@ Acompanhe a rota atualizada pelo rastreamento:
 
   const allContacts = useMemo(() => {
     // Ordenação: Mais recentes no topo (createdAt/extractionDate decrescente)
-    let sorted = [...extractedContacts].sort((a, b) => {
+    let sorted = dedupeContactsByPhone(extractedContacts).sort((a, b) => {
       const dateA = a.extractionDate ? new Date(a.extractionDate).getTime() : 0;
       const dateB = b.extractionDate ? new Date(b.extractionDate).getTime() : 0;
       return dateB - dateA;
