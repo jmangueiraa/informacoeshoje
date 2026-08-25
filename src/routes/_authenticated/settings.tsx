@@ -10,6 +10,8 @@ import {
   verifyDomainDNS 
 } from '@/lib/domains.functions'
 import { PLATFORM_DOMAIN } from '@/lib/constants'
+import { checkIsAdmin } from '@/lib/admin.functions'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
@@ -43,11 +45,19 @@ function SettingsPage() {
     queryFn: () => getUserProfile(),
   })
 
+  // Verifica se o usuário é administrador
+  const { data: isAdmin } = useQuery({
+    queryKey: ['is-admin'],
+    queryFn: () => checkIsAdmin(),
+  })
+
   // Domains Data
   const { data: domains, isLoading: domainsLoading } = useQuery({
     queryKey: ['user-domains'],
     queryFn: () => getUserDomains(),
+    enabled: !!isAdmin,
   })
+
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -159,8 +169,10 @@ function SettingsPage() {
       </div>
 
       <div className="space-y-6">
-        {/* DOMÍNIO DO USUÁRIO SECTION */}
+        {/* DOMÍNIO DO USUÁRIO SECTION — apenas administradores */}
+        {isAdmin && (
         <Card className="overflow-hidden">
+
           <CardHeader className="bg-primary/5">
             <CardTitle className="flex items-center gap-2">
               <Globe className="h-5 w-5 text-primary" />
@@ -367,6 +379,8 @@ function SettingsPage() {
             )}
           </CardContent>
         </Card>
+        )}
+
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <Card>
