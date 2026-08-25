@@ -107,7 +107,7 @@ export const getDashboardStats = createServerFn({ method: "GET" })
     // Total de cliques acumulados nos links do usuário
     const { data: links } = await authenticatedSupabase
       .from("links")
-      .select("id, clicks_count, status")
+      .select("id, slug, clicks_count, status")
       .eq("user_id", userId);
 
     // Total de cliques únicos acumulados nos links do usuário
