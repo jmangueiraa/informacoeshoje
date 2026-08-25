@@ -169,8 +169,10 @@ function SettingsPage() {
       </div>
 
       <div className="space-y-6">
-        {/* DOMÍNIO DO USUÁRIO SECTION */}
+        {/* DOMÍNIO DO USUÁRIO SECTION — apenas administradores */}
+        {isAdmin && (
         <Card className="overflow-hidden">
+
           <CardHeader className="bg-primary/5">
             <CardTitle className="flex items-center gap-2">
               <Globe className="h-5 w-5 text-primary" />
