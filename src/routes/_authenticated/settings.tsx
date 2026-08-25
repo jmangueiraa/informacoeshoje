@@ -10,6 +10,8 @@ import {
   verifyDomainDNS 
 } from '@/lib/domains.functions'
 import { PLATFORM_DOMAIN } from '@/lib/constants'
+import { checkIsAdmin } from '@/lib/admin.functions'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
