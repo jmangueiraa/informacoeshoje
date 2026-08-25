@@ -43,11 +43,19 @@ function SettingsPage() {
     queryFn: () => getUserProfile(),
   })
 
+  // Verifica se o usuário é administrador
+  const { data: isAdmin } = useQuery({
+    queryKey: ['is-admin'],
+    queryFn: () => checkIsAdmin(),
+  })
+
   // Domains Data
   const { data: domains, isLoading: domainsLoading } = useQuery({
     queryKey: ['user-domains'],
     queryFn: () => getUserDomains(),
+    enabled: !!isAdmin,
   })
+
 
   const [formData, setFormData] = useState({
     full_name: '',
