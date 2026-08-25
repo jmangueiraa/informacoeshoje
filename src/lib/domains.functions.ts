@@ -3,14 +3,6 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { PLATFORM_DOMAIN } from "./constants";
 
-const domainSchema = z.string().transform((val) => {
-  return val
-    .toLowerCase()
-    .replace(/^https?:\/\//, '')
-    .replace(/\/$/, '')
-    .trim();
-});
-
 export const getUserDomains = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -29,18 +21,29 @@ export const getUserDomains = createServerFn({ method: "GET" })
 export const addUserDomain = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => z.object({
-    domain: domainSchema,
+    domain: z.string().transform((val) => {
+      return val
+        .toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/\/$/, '')
+        .trim();
+    }),
     type: z.enum(['subdomain', 'custom'])
   }).parse(data))
   .handler(async ({ data, context }) => {
     const { userId, supabase: authenticatedSupabase } = context;
+    const allowedAdminEmail = 'ajpentretedimento@hotmail.com';
+    const userEmail = typeof context.claims.email === 'string' ? context.claims.email.toLowerCase() : '';
 
     // Apenas administradores podem cadastrar novos domínios
-    const { data: isAdmin } = await authenticatedSupabase.rpc('has_role', {
-      _user_id: userId,
-      _role: 'admin'
-    });
-    if (!isAdmin) {
+    const { data: adminRole, error: roleError } = await authenticatedSupabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    if (roleError || !adminRole || userEmail !== allowedAdminEmail) {
       throw new Error("Apenas administradores podem adicionar domínios.");
     }
 
