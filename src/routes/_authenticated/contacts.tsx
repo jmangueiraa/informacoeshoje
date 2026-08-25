@@ -139,6 +139,7 @@ Acompanhe a rota atualizada pelo rastreamento:
   
   const processarTexto = useServerFn(processarTextoComGemini);
   const createLink = useServerFn(createTrackingLink);
+  const ensureLink = useServerFn(ensureTrackingLink);
   const getProfile = useServerFn(getUserProfile);
 
 
