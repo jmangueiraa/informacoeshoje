@@ -485,7 +485,7 @@ export type Database = {
         Returns: boolean
       }
       increment_link_clicks: {
-        Args: { link_id: string; visitor_ip: string }
+        Args: { link_id: string; visitor_ip?: string }
         Returns: undefined
       }
       incrementar_clique: { Args: { link_slug: string }; Returns: string }
