@@ -65,9 +65,18 @@ import { normalizeContactPhone } from "@/lib/phone";
 import { processarTextoComGemini } from "@/lib/gemini-ocr.functions";
 import Tesseract from 'tesseract.js';
 import { createTrackingLink, ensureTrackingLink, getUserProfile } from "@/lib/links.functions";
+import {
+  getContacts,
+  upsertExtractedContacts,
+  updateContactRecord,
+  deleteContactRecord,
+  deleteAllContacts,
+} from "@/lib/contacts.functions";
 import { LINK_DOMAIN } from "@/lib/constants";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useServerFn } from "@tanstack/react-start";
+
 
 export const Route = createFileRoute("/_authenticated/contacts")({
   head: () => ({
