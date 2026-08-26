@@ -47,7 +47,8 @@ export const createCustomLink = createServerFn({ method: "POST" })
       title: data.title || null,
       expires_at: data.expiresAt || null,
       domain_id: data.domainId || null,
-      status: 'active'
+      status: 'active',
+      clicks_count: 0
     };
 
     console.log("Dados de inserção:", insertData);
@@ -204,7 +205,8 @@ export const createTrackingLink = createServerFn({ method: "POST" })
       slug,
       affiliate_url: data.affiliateUrl,
       title: `Rastreio - ${data.name} (${data.phone})`,
-      status: 'active'
+      status: 'active',
+      clicks_count: 0
     };
 
     const { data: link, error } = await authenticatedSupabase
@@ -283,6 +285,7 @@ export const ensureTrackingLink = createServerFn({ method: "POST" })
         affiliate_url: data.affiliateUrl,
         title: `Rastreio - ${data.name} (${cleanPhone})`,
         status: "active",
+        clicks_count: 0,
       } as any)
       .select("slug")
       .single();
