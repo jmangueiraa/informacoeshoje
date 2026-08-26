@@ -1,7 +1,4 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
-import { registerClick } from '@/lib/analytics.functions'
-import { supabase } from '@/integrations/supabase/client'
 
 export const Route = createFileRoute('/$slug')({
   server: {
@@ -12,35 +9,19 @@ export const Route = createFileRoute('/$slug')({
           return new Response('Not found', { status: 404 })
         }
 
-        const { createClient } = await import('@supabase/supabase-js')
-        const url = process.env['SUPABASE_URL']
-        const key = process.env['SUPABASE_PUBLISHABLE_KEY']
-        if (!url || !key) return new Response('Not found', { status: 404 })
-
-        const client = createClient(url, key, {
-          auth: { persistSession: false, autoRefreshToken: false },
-          global: {
-            fetch: (input, init) => {
-              const h = new Headers(init?.headers)
-              if (key.startsWith('sb_') && h.get('Authorization') === `Bearer ${key}`) {
-                h.delete('Authorization')
-              }
-              h.set('apikey', key)
-              return fetch(input, { ...init, headers: h })
-            },
-          },
+        const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
+        const { data: destino, error } = await supabaseAdmin.rpc('incrementar_clique', {
+          link_slug: slug,
         })
 
-        const { data: destino } = await client.rpc('incrementar_clique', { link_slug: slug })
-
-        if (typeof destino === 'string' && destino) {
+        if (!error && typeof destino === 'string' && destino) {
           return new Response(null, {
             status: 302,
             headers: { Location: destino, 'Cache-Control': 'no-store' },
           })
         }
 
-        const { data: link } = await client
+        const { data: link } = await supabaseAdmin
           .from('links')
           .select('affiliate_url')
           .eq('slug', slug)
@@ -62,92 +43,6 @@ export const Route = createFileRoute('/$slug')({
 })
 
 function RedirectPage() {
-  const { slug } = Route.useParams()
-  const [error, setError] = useState<string | null>(null)
-  const [status, setStatus] = useState<number | null>(null)
-
-  useEffect(() => {
-    const performRedirect = async () => {
-      if (!slug) return
-      const slugLimpo = slug.replace(/^\/+|\/+$/g, '')
-
-      // 1) Registra o clique (analytics completo) sem travar o redirecionamento
-      const analytics = registerClick({
-        data: {
-          slug: slugLimpo,
-          host: window.location.host,
-          userAgent: navigator.userAgent,
-          referrer: document.referrer,
-        },
-      }).catch((err) => {
-        console.error('Erro no analytics do clique:', err)
-        return null
-      })
-
-      // 2) Incremento seguro direto no banco (funciona para visitantes anônimos)
-      try {
-        const { data: urlDestino, error: rpcError } = await supabase.rpc('incrementar_clique', {
-          link_slug: slugLimpo,
-        })
-        if (rpcError) throw rpcError
-        if (urlDestino) {
-          window.location.replace(urlDestino as string)
-          return
-        }
-      } catch (err) {
-        console.error('Erro ao registrar clique:', err)
-      }
-
-      // 3) Fallback: usa o resultado do analytics ou busca direta
-      const result = await analytics
-      if (result?.url) {
-        window.location.replace(result.url)
-        return
-      }
-
-      const { data: link } = await supabase
-        .from('links')
-        .select('affiliate_url')
-        .eq('slug', slugLimpo)
-        .eq('status', 'active')
-        .maybeSingle()
-
-      if (link?.affiliate_url) {
-        window.location.replace(link.affiliate_url)
-        return
-      }
-
-      setError(result?.error ?? 'Link não encontrado')
-      setStatus(result?.status ?? 404)
-    }
-
-    performRedirect()
-  }, [slug])
-
-
-  if (error) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 text-center">
-        <div className="max-w-md space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight text-foreground">
-            {status === 404 ? "Link não encontrado" : "Link indisponível"}
-          </h1>
-          <p className="text-muted-foreground text-lg">
-            {error}
-          </p>
-          <div className="pt-6">
-            <a 
-              href="https://shopee.com.br" 
-              className="inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-              Ir para Shopee
-            </a>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 text-center">
       <div className="space-y-6">
