@@ -249,3 +249,127 @@ export const runControlledTest = createServerFn({ method: "POST" })
     console.log(`[TESTE-SERVER] Resultado calculado:`, testResult);
     return testResult;
   });
+// ===== Persistência da lista de "Resultados Extraídos" (fonte única: banco) =====
+
+const extractedContactSchema = z.object({
+  name: z.string(),
+  phone: z.string(),
+  trackingSlug: z.string().nullish(),
+  extractionDate: z.string().nullish(),
+  lastContact: z.string().nullish(),
+  nextReminder: z.string().nullish(),
+});
+
+export const upsertExtractedContacts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: any) => z.object({
+    contacts: z.array(extractedContactSchema)
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as any;
+
+    const unique = new Map<string, any>();
+    for (const c of data.contacts) {
+      const phone = normalizeContactPhone(c.phone);
+      if (phone.length !== 10 && phone.length !== 11) continue;
+      if (unique.has(phone)) continue;
+      unique.set(phone, {
+        user_id: userId,
+        name: (c.name || "Cliente").trim() || "Cliente",
+        phone_normalized: phone,
+        needs_review: false,
+        last_send: c.lastContact || null,
+        raw_data: {
+          trackingSlug: c.trackingSlug || null,
+          extractionDate: c.extractionDate || new Date().toISOString(),
+          nextReminder: c.nextReminder || null,
+        },
+      });
+    }
+
+    if (unique.size === 0) return { inserted: 0 };
+
+    const { error } = await supabase
+      .from('contacts')
+      .upsert(Array.from(unique.values()), { onConflict: 'user_id,phone_normalized', ignoreDuplicates: true });
+
+    if (error) {
+      console.error("[CONTACTS] Erro no upsert:", error);
+      throw error;
+    }
+
+    return { inserted: unique.size };
+  });
+
+export const updateContactRecord = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: any) => z.object({
+    id: z.string(),
+    name: z.string().optional(),
+    phone: z.string().optional(),
+    lastContact: z.string().nullish(),
+    nextReminder: z.string().nullish(),
+    trackingSlug: z.string().nullish(),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as any;
+
+    const { data: existing, error: fetchError } = await supabase
+      .from('contacts')
+      .select('*')
+      .eq('id', data.id)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
+    if (!existing) throw new Error("CONTACT_NOT_FOUND");
+
+    const raw = (existing.raw_data && typeof existing.raw_data === 'object') ? existing.raw_data : {};
+    const patch: any = {};
+
+    if (data.name !== undefined) patch.name = data.name.trim() || "Cliente";
+    if (data.phone !== undefined) {
+      const phone = normalizeContactPhone(data.phone);
+      if (phone.length !== 10 && phone.length !== 11) throw new Error("INVALID_PHONE");
+      patch.phone_normalized = phone;
+    }
+    if (data.lastContact !== undefined) patch.last_send = data.lastContact;
+
+    if (data.nextReminder !== undefined || data.trackingSlug !== undefined) {
+      patch.raw_data = {
+        ...raw,
+        ...(data.nextReminder !== undefined ? { nextReminder: data.nextReminder } : {}),
+        ...(data.trackingSlug !== undefined ? { trackingSlug: data.trackingSlug } : {}),
+      };
+    }
+
+    const { data: updated, error } = await supabase
+      .from('contacts')
+      .update(patch)
+      .eq('id', data.id)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return updated;
+  });
+
+export const deleteContactRecord = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: any) => z.object({ id: z.string() }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as any;
+    const { error } = await supabase.from('contacts').delete().eq('id', data.id).eq('user_id', userId);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+export const deleteAllContacts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const { error } = await supabase.from('contacts').delete().eq('user_id', userId);
+    if (error) throw error;
+    return { ok: true };
+  });
