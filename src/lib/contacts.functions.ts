@@ -7,20 +7,31 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export const getContacts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase } = context as any;
-    
+    const { supabase, userId } = context as any;
+
     const { data, error } = await supabase
       .from('contacts')
       .select('*')
+      .eq('user_id', userId)
       .order('created_at', { ascending: false });
-      
+
     if (error) {
       console.error("[CAPTURA] Erro ao buscar contatos:", error);
       throw error;
     }
-    
-    console.log(`[CAPTURA] getContacts - Total retornados: ${data?.length || 0}`);
-    return data;
+
+    return (data ?? []).map((row: any) => {
+      const raw = (row.raw_data && typeof row.raw_data === 'object') ? row.raw_data : {};
+      return {
+        id: row.id as string,
+        name: row.name as string,
+        phone: row.phone_normalized as string,
+        lastContact: (row.last_send ?? null) as string | null,
+        nextReminder: (raw.nextReminder ?? null) as string | null,
+        trackingSlug: (raw.trackingSlug ?? null) as string | null,
+        extractionDate: (raw.extractionDate ?? row.created_at) as string,
+      };
+    });
   });
 
 export const processImageOCR = createServerFn({ method: "POST" })
@@ -287,18 +298,20 @@ export const upsertExtractedContacts = createServerFn({ method: "POST" })
       });
     }
 
-    if (unique.size === 0) return { inserted: 0 };
+    if (unique.size === 0) return { inserted: 0, skipped: 0, rows: [] as any[] };
 
-    const { error } = await supabase
+    const { data: rows, error } = await supabase
       .from('contacts')
-      .upsert(Array.from(unique.values()), { onConflict: 'user_id,phone_normalized', ignoreDuplicates: true });
+      .upsert(Array.from(unique.values()), { onConflict: 'user_id,phone_normalized', ignoreDuplicates: true })
+      .select();
 
     if (error) {
       console.error("[CONTACTS] Erro no upsert:", error);
       throw error;
     }
 
-    return { inserted: unique.size };
+    const inserted = rows?.length ?? 0;
+    return { inserted, skipped: unique.size - inserted, rows: rows ?? [] };
   });
 
 export const updateContactRecord = createServerFn({ method: "POST" })

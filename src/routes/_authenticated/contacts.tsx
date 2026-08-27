@@ -134,9 +134,6 @@ function Index() {
   const [userApiKey, setUserApiKey] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [clientCounter, setClientCounter] = useState(1);
-  const [extractedContacts, setExtractedContacts] = useState<(Contact & { 
-    id: string; 
-  })[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [filterPending, setFilterPending] = useState(false);
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
@@ -164,32 +161,49 @@ Equipe Shopee!`
   });
   const itemsPerPage = 10;
 
-  
-  
+  const editTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const queryClient = useQueryClient();
   const processarTexto = useServerFn(processarTextoComGemini);
   const createLink = useServerFn(createTrackingLink);
   const ensureLink = useServerFn(ensureTrackingLink);
   const getProfile = useServerFn(getUserProfile);
+  const fetchContacts = useServerFn(getContacts);
+  const upsertContacts = useServerFn(upsertExtractedContacts);
+  const updateContactFn = useServerFn(updateContactRecord);
+  const deleteContactFn = useServerFn(deleteContactRecord);
+  const deleteAllContactsFn = useServerFn(deleteAllContacts);
 
+  // ===== Fonte única de verdade: banco de dados (sincroniza entre dispositivos) =====
+  const {
+    data: contactsData,
+    isLoading: contactsLoading,
+    isFetching: contactsFetching,
+    isError: contactsError,
+    error: contactsErrorObj,
+    refetch: refetchContacts,
+    dataUpdatedAt,
+  } = useQuery({
+    queryKey: ["contacts"],
+    queryFn: () => fetchContacts(),
+    staleTime: 10_000,
+    refetchOnWindowFocus: true,
+  });
 
+  const extractedContacts = useMemo(
+    () => (contactsData ?? []) as (Contact & { id: string })[],
+    [contactsData]
+  );
+
+  const invalidateContacts = () => queryClient.invalidateQueries({ queryKey: ["contacts"] });
+
+  const [migrationState, setMigrationState] = useState<
+    { status: "idle" | "running" | "done" | "error"; migrated: number; message: string }
+  >({ status: "idle", migrated: 0, message: "" });
 
   useEffect(() => {
     const savedKey = localStorage.getItem("fototext_api_key");
     if (savedKey) setUserApiKey(savedKey);
-    
-    // Load contacts from localStorage
-    const savedContacts = localStorage.getItem("linkafiliado_contacts_storage");
-    if (savedContacts) {
-      try {
-        const parsedContacts = JSON.parse(savedContacts);
-        if (Array.isArray(parsedContacts)) {
-          setExtractedContacts(dedupeContactsByPhone(parsedContacts));
-        }
-      } catch (e) {
-        console.error("Erro ao carregar contatos do localStorage", e);
-      }
-    }
-    
+
     // Load counter
     const savedCounter = localStorage.getItem("linkafiliado_client_counter");
     if (savedCounter) setClientCounter(parseInt(savedCounter, 10));
@@ -215,10 +229,58 @@ Equipe Shopee!`
     if (savedAffiliateUrl) setAffiliateUrl(savedAffiliateUrl);
   }, []);
 
-  // Sync contacts to localStorage
+  // Migração única: envia contatos presos no localStorage deste navegador para o banco
   useEffect(() => {
-    localStorage.setItem("linkafiliado_contacts_storage", JSON.stringify(extractedContacts));
-  }, [extractedContacts]);
+    if (contactsLoading || contactsError) return;
+    const saved = localStorage.getItem("linkafiliado_contacts_storage");
+    if (!saved) return;
+
+    let parsed: any[] = [];
+    try {
+      parsed = JSON.parse(saved);
+    } catch {
+      localStorage.removeItem("linkafiliado_contacts_storage");
+      return;
+    }
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      localStorage.removeItem("linkafiliado_contacts_storage");
+      return;
+    }
+
+    const legacy = dedupeContactsByPhone(parsed as (Contact & { id?: string })[])
+      .filter(c => !!normalizeContactPhone(c.phone))
+      .map(c => ({
+        name: c.name || "Cliente",
+        phone: normalizeContactPhone(c.phone),
+        trackingSlug: c.trackingSlug ?? null,
+        extractionDate: c.extractionDate ?? null,
+        lastContact: c.lastContact ?? null,
+        nextReminder: c.nextReminder ?? null,
+      }));
+
+    if (legacy.length === 0) {
+      localStorage.removeItem("linkafiliado_contacts_storage");
+      return;
+    }
+
+    setMigrationState({ status: "running", migrated: 0, message: `Enviando ${legacy.length} contatos locais para o banco...` });
+    upsertContacts({ data: { contacts: legacy } })
+      .then(async (res: any) => {
+        localStorage.removeItem("linkafiliado_contacts_storage");
+        await invalidateContacts();
+        setMigrationState({
+          status: "done",
+          migrated: res?.inserted ?? 0,
+          message: `Sincronizou contatos com o banco: ${res?.inserted ?? 0} novos, ${res?.skipped ?? 0} já existiam.`,
+        });
+        toast.success(`Contatos locais sincronizados com o banco (${res?.inserted ?? 0} novos).`);
+      })
+      .catch((err: any) => {
+        console.error("[CONTATOS] Falha na migração local:", err);
+        setMigrationState({ status: "error", migrated: 0, message: "Falha ao sincronizar os contatos locais. Tente novamente." });
+        toast.error("Não foi possível sincronizar os contatos locais com o banco.");
+      });
+  }, [contactsLoading, contactsError]);
 
   // Sync counter to localStorage
   useEffect(() => {
@@ -303,9 +365,6 @@ Equipe Shopee!`
           data: { name: contact.name, phone: cleanPhone, affiliateUrl: normalizedUrl }
         });
         slug = result.slug;
-        setExtractedContacts(prev => prev.map(c =>
-          c.id === contact.id ? { ...c, trackingSlug: slug } : c
-        ));
       } catch (err) {
         console.error("Erro ao gerar link de rastreio:", err);
         toast.error("Não foi possível gerar o link de rastreio.");
@@ -315,14 +374,21 @@ Equipe Shopee!`
 
     const now = new Date();
     const next = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    
-    setExtractedContacts(prev => prev.map(c => 
-      c.id === contact.id ? {
-        ...c,
-        lastContact: now.toISOString(),
-        nextReminder: next.toISOString()
-      } : c
-    ));
+
+    try {
+      await updateContactFn({
+        data: {
+          id: contact.id,
+          lastContact: now.toISOString(),
+          nextReminder: next.toISOString(),
+          trackingSlug: slug,
+        },
+      });
+      await invalidateContacts();
+    } catch (err) {
+      console.error("Erro ao registrar o envio no banco:", err);
+      toast.error("Envio aberto, mas não foi possível registrar no banco.");
+    }
 
     const normalizedContact = { ...contact, phone: cleanPhone };
     const message = encodeURIComponent(getFormattedMessage(normalizedContact, isFirst, slug));
@@ -490,19 +556,27 @@ Equipe Shopee!`
           console.error("Erro ao criar link automático:", linkErr);
         }
 
-        const newContact = {
-          ...extracted,
-          id: Math.random().toString(36).substring(7),
-          extractionDate,
-          lastContact: null,
-          nextReminder: null,
-          trackingSlug,
-        };
+        // Persiste imediatamente no banco (fonte única de verdade)
+        try {
+          await upsertContacts({
+            data: {
+              contacts: [{
+                name: extracted.name,
+                phone: cleanPhone,
+                trackingSlug,
+                extractionDate,
+                lastContact: null,
+                nextReminder: null,
+              }],
+            },
+          });
+          addedCount++;
+        } catch (saveErr) {
+          console.error("[CONTATOS] Erro ao salvar no banco:", saveErr);
+          toast.error(`Não foi possível salvar ${extracted.name} no banco.`);
+        }
 
-        // Insere no início da lista (Ordenação: Mais recentes no topo)
-        setExtractedContacts(prev => [newContact, ...prev]);
         setClientCounter(currentIndexForClient);
-        addedCount++;
 
         setImages((prev) =>
           prev.map((img) =>
@@ -537,12 +611,18 @@ Equipe Shopee!`
     toast.info("Fila de arquivos limpa");
   };
 
-  const clearContacts = () => {
-    setExtractedContacts([]);
-    setClientCounter(1);
-    localStorage.removeItem("linkafiliado_contacts_storage");
-    localStorage.removeItem("linkafiliado_client_counter");
-    toast.info("Lista de contatos limpa");
+  const clearContacts = async () => {
+    try {
+      await deleteAllContactsFn({});
+      await invalidateContacts();
+      setClientCounter(1);
+      localStorage.removeItem("linkafiliado_contacts_storage");
+      localStorage.removeItem("linkafiliado_client_counter");
+      toast.info("Lista de contatos limpa");
+    } catch (err) {
+      console.error("[CONTATOS] Erro ao limpar contatos:", err);
+      toast.error("Não foi possível limpar os contatos no banco.");
+    }
   };
 
   const removeImage = (id: string) => {
@@ -576,25 +656,57 @@ Equipe Shopee!`
   };
 
   const updateContact = (contactId: string, field: keyof Contact, value: string) => {
-    setExtractedContacts(prev => {
-      if (field !== 'phone') {
-        return prev.map(c => (c.id === contactId ? { ...c, [field]: value } : c));
-      }
+    const current = extractedContacts;
+    let nextValue = value;
 
-      const normalizedPhone = normalizeContactPhone(value);
-      const exists = prev.some(c => c.id !== contactId && normalizeContactPhone(c.phone) === normalizedPhone);
-      if (normalizedPhone && exists) {
+    if (field === 'phone') {
+      nextValue = normalizeContactPhone(value);
+      const exists = current.some(
+        c => c.id !== contactId && normalizeContactPhone(c.phone) === nextValue
+      );
+      if (nextValue && exists) {
         toast.error("Este número já existe na lista.");
-        return prev;
+        return;
       }
+    }
 
-      return prev.map(c => (c.id === contactId ? { ...c, phone: normalizedPhone } : c));
-    });
+    // Atualização otimista no cache (UI responsiva)
+    queryClient.setQueryData<(Contact & { id: string })[]>(["contacts"], (prev) =>
+      (prev ?? []).map(c => (c.id === contactId ? { ...c, [field]: nextValue } : c))
+    );
+
+    // Persistência no banco (debounce por contato/campo)
+    const key = `${contactId}:${field}`;
+    const timers = editTimers.current;
+    if (timers[key]) clearTimeout(timers[key]);
+    timers[key] = setTimeout(async () => {
+      try {
+        if (field === 'phone' && nextValue.length !== 10 && nextValue.length !== 11) return;
+        await updateContactFn({
+          data: {
+            id: contactId,
+            ...(field === 'name' ? { name: nextValue || "Cliente" } : {}),
+            ...(field === 'phone' ? { phone: nextValue } : {}),
+          },
+        });
+        await invalidateContacts();
+      } catch (err) {
+        console.error("[CONTATOS] Erro ao salvar edição:", err);
+        toast.error("Não foi possível salvar a alteração no banco.");
+        await invalidateContacts();
+      }
+    }, 700);
   };
 
-  const deleteContact = (contactId: string) => {
-    setExtractedContacts(prev => prev.filter(c => c.id !== contactId));
-    toast.success("Contato removido");
+  const deleteContact = async (contactId: string) => {
+    try {
+      await deleteContactFn({ data: { id: contactId } });
+      await invalidateContacts();
+      toast.success("Contato removido");
+    } catch (err) {
+      console.error("[CONTATOS] Erro ao remover contato:", err);
+      toast.error("Não foi possível remover o contato.");
+    }
   };
 
   const allContacts = useMemo(() => {
