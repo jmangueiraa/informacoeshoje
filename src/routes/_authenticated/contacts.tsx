@@ -555,19 +555,27 @@ Equipe Shopee!`
           console.error("Erro ao criar link automático:", linkErr);
         }
 
-        const newContact = {
-          ...extracted,
-          id: Math.random().toString(36).substring(7),
-          extractionDate,
-          lastContact: null,
-          nextReminder: null,
-          trackingSlug,
-        };
+        // Persiste imediatamente no banco (fonte única de verdade)
+        try {
+          await upsertContacts({
+            data: {
+              contacts: [{
+                name: extracted.name,
+                phone: cleanPhone,
+                trackingSlug,
+                extractionDate,
+                lastContact: null,
+                nextReminder: null,
+              }],
+            },
+          });
+          addedCount++;
+        } catch (saveErr) {
+          console.error("[CONTATOS] Erro ao salvar no banco:", saveErr);
+          toast.error(`Não foi possível salvar ${extracted.name} no banco.`);
+        }
 
-        // Insere no início da lista (Ordenação: Mais recentes no topo)
-        setExtractedContacts(prev => [newContact, ...prev]);
         setClientCounter(currentIndexForClient);
-        addedCount++;
 
         setImages((prev) =>
           prev.map((img) =>
