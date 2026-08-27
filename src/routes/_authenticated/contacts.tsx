@@ -161,6 +161,7 @@ Equipe Shopee!`
   });
   const itemsPerPage = 10;
 
+  const editTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const queryClient = useQueryClient();
   const processarTexto = useServerFn(processarTextoComGemini);
   const createLink = useServerFn(createTrackingLink);
