@@ -340,7 +340,7 @@ Adicione um canal de supabase.channel('links-changes') (Realtime) para atualizar
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
             <Button className="w-full" onClick={() => handleEmailAuth('login')} disabled={loading}>
-              {loading ? 'Entrando...' : 'VAMOS  COMECAR'}
+              {loading ? 'Entrando...' : 'ENTRAR'}
             </Button>
           </div>
         </CardContent>
