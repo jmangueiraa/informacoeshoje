@@ -134,9 +134,6 @@ function Index() {
   const [userApiKey, setUserApiKey] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [clientCounter, setClientCounter] = useState(1);
-  const [extractedContacts, setExtractedContacts] = useState<(Contact & { 
-    id: string; 
-  })[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [filterPending, setFilterPending] = useState(false);
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
