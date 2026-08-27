@@ -287,18 +287,20 @@ export const upsertExtractedContacts = createServerFn({ method: "POST" })
       });
     }
 
-    if (unique.size === 0) return { inserted: 0 };
+    if (unique.size === 0) return { inserted: 0, skipped: 0, rows: [] as any[] };
 
-    const { error } = await supabase
+    const { data: rows, error } = await supabase
       .from('contacts')
-      .upsert(Array.from(unique.values()), { onConflict: 'user_id,phone_normalized', ignoreDuplicates: true });
+      .upsert(Array.from(unique.values()), { onConflict: 'user_id,phone_normalized', ignoreDuplicates: true })
+      .select();
 
     if (error) {
       console.error("[CONTACTS] Erro no upsert:", error);
       throw error;
     }
 
-    return { inserted: unique.size };
+    const inserted = rows?.length ?? 0;
+    return { inserted, skipped: unique.size - inserted, rows: rows ?? [] };
   });
 
 export const updateContactRecord = createServerFn({ method: "POST" })
