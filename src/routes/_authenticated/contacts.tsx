@@ -161,32 +161,48 @@ Equipe Shopee!`
   });
   const itemsPerPage = 10;
 
-  
-  
+  const queryClient = useQueryClient();
   const processarTexto = useServerFn(processarTextoComGemini);
   const createLink = useServerFn(createTrackingLink);
   const ensureLink = useServerFn(ensureTrackingLink);
   const getProfile = useServerFn(getUserProfile);
+  const fetchContacts = useServerFn(getContacts);
+  const upsertContacts = useServerFn(upsertExtractedContacts);
+  const updateContactFn = useServerFn(updateContactRecord);
+  const deleteContactFn = useServerFn(deleteContactRecord);
+  const deleteAllContactsFn = useServerFn(deleteAllContacts);
 
+  // ===== Fonte única de verdade: banco de dados (sincroniza entre dispositivos) =====
+  const {
+    data: contactsData,
+    isLoading: contactsLoading,
+    isFetching: contactsFetching,
+    isError: contactsError,
+    error: contactsErrorObj,
+    refetch: refetchContacts,
+    dataUpdatedAt,
+  } = useQuery({
+    queryKey: ["contacts"],
+    queryFn: () => fetchContacts(),
+    staleTime: 10_000,
+    refetchOnWindowFocus: true,
+  });
 
+  const extractedContacts = useMemo(
+    () => (contactsData ?? []) as (Contact & { id: string })[],
+    [contactsData]
+  );
+
+  const invalidateContacts = () => queryClient.invalidateQueries({ queryKey: ["contacts"] });
+
+  const [migrationState, setMigrationState] = useState<
+    { status: "idle" | "running" | "done" | "error"; migrated: number; message: string }
+  >({ status: "idle", migrated: 0, message: "" });
 
   useEffect(() => {
     const savedKey = localStorage.getItem("fototext_api_key");
     if (savedKey) setUserApiKey(savedKey);
-    
-    // Load contacts from localStorage
-    const savedContacts = localStorage.getItem("linkafiliado_contacts_storage");
-    if (savedContacts) {
-      try {
-        const parsedContacts = JSON.parse(savedContacts);
-        if (Array.isArray(parsedContacts)) {
-          setExtractedContacts(dedupeContactsByPhone(parsedContacts));
-        }
-      } catch (e) {
-        console.error("Erro ao carregar contatos do localStorage", e);
-      }
-    }
-    
+
     // Load counter
     const savedCounter = localStorage.getItem("linkafiliado_client_counter");
     if (savedCounter) setClientCounter(parseInt(savedCounter, 10));
@@ -212,10 +228,58 @@ Equipe Shopee!`
     if (savedAffiliateUrl) setAffiliateUrl(savedAffiliateUrl);
   }, []);
 
-  // Sync contacts to localStorage
+  // Migração única: envia contatos presos no localStorage deste navegador para o banco
   useEffect(() => {
-    localStorage.setItem("linkafiliado_contacts_storage", JSON.stringify(extractedContacts));
-  }, [extractedContacts]);
+    if (contactsLoading || contactsError) return;
+    const saved = localStorage.getItem("linkafiliado_contacts_storage");
+    if (!saved) return;
+
+    let parsed: any[] = [];
+    try {
+      parsed = JSON.parse(saved);
+    } catch {
+      localStorage.removeItem("linkafiliado_contacts_storage");
+      return;
+    }
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      localStorage.removeItem("linkafiliado_contacts_storage");
+      return;
+    }
+
+    const legacy = dedupeContactsByPhone(parsed as (Contact & { id?: string })[])
+      .filter(c => !!normalizeContactPhone(c.phone))
+      .map(c => ({
+        name: c.name || "Cliente",
+        phone: normalizeContactPhone(c.phone),
+        trackingSlug: c.trackingSlug ?? null,
+        extractionDate: c.extractionDate ?? null,
+        lastContact: c.lastContact ?? null,
+        nextReminder: c.nextReminder ?? null,
+      }));
+
+    if (legacy.length === 0) {
+      localStorage.removeItem("linkafiliado_contacts_storage");
+      return;
+    }
+
+    setMigrationState({ status: "running", migrated: 0, message: `Enviando ${legacy.length} contatos locais para o banco...` });
+    upsertContacts({ data: { contacts: legacy } })
+      .then(async (res: any) => {
+        localStorage.removeItem("linkafiliado_contacts_storage");
+        await invalidateContacts();
+        setMigrationState({
+          status: "done",
+          migrated: res?.inserted ?? 0,
+          message: `Sincronizou contatos com o banco: ${res?.inserted ?? 0} novos, ${res?.skipped ?? 0} já existiam.`,
+        });
+        toast.success(`Contatos locais sincronizados com o banco (${res?.inserted ?? 0} novos).`);
+      })
+      .catch((err: any) => {
+        console.error("[CONTATOS] Falha na migração local:", err);
+        setMigrationState({ status: "error", migrated: 0, message: "Falha ao sincronizar os contatos locais. Tente novamente." });
+        toast.error("Não foi possível sincronizar os contatos locais com o banco.");
+      });
+  }, [contactsLoading, contactsError]);
 
   // Sync counter to localStorage
   useEffect(() => {
