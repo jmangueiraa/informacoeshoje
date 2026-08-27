@@ -649,25 +649,57 @@ Equipe Shopee!`
   };
 
   const updateContact = (contactId: string, field: keyof Contact, value: string) => {
-    setExtractedContacts(prev => {
-      if (field !== 'phone') {
-        return prev.map(c => (c.id === contactId ? { ...c, [field]: value } : c));
-      }
+    const current = extractedContacts;
+    let nextValue = value;
 
-      const normalizedPhone = normalizeContactPhone(value);
-      const exists = prev.some(c => c.id !== contactId && normalizeContactPhone(c.phone) === normalizedPhone);
-      if (normalizedPhone && exists) {
+    if (field === 'phone') {
+      nextValue = normalizeContactPhone(value);
+      const exists = current.some(
+        c => c.id !== contactId && normalizeContactPhone(c.phone) === nextValue
+      );
+      if (nextValue && exists) {
         toast.error("Este número já existe na lista.");
-        return prev;
+        return;
       }
+    }
 
-      return prev.map(c => (c.id === contactId ? { ...c, phone: normalizedPhone } : c));
-    });
+    // Atualização otimista no cache (UI responsiva)
+    queryClient.setQueryData<(Contact & { id: string })[]>(["contacts"], (prev) =>
+      (prev ?? []).map(c => (c.id === contactId ? { ...c, [field]: nextValue } : c))
+    );
+
+    // Persistência no banco (debounce por contato/campo)
+    const key = `${contactId}:${field}`;
+    const timers = editTimers.current;
+    if (timers[key]) clearTimeout(timers[key]);
+    timers[key] = setTimeout(async () => {
+      try {
+        if (field === 'phone' && nextValue.length !== 10 && nextValue.length !== 11) return;
+        await updateContactFn({
+          data: {
+            id: contactId,
+            ...(field === 'name' ? { name: nextValue || "Cliente" } : {}),
+            ...(field === 'phone' ? { phone: nextValue } : {}),
+          },
+        });
+        await invalidateContacts();
+      } catch (err) {
+        console.error("[CONTATOS] Erro ao salvar edição:", err);
+        toast.error("Não foi possível salvar a alteração no banco.");
+        await invalidateContacts();
+      }
+    }, 700);
   };
 
-  const deleteContact = (contactId: string) => {
-    setExtractedContacts(prev => prev.filter(c => c.id !== contactId));
-    toast.success("Contato removido");
+  const deleteContact = async (contactId: string) => {
+    try {
+      await deleteContactFn({ data: { id: contactId } });
+      await invalidateContacts();
+      toast.success("Contato removido");
+    } catch (err) {
+      console.error("[CONTATOS] Erro ao remover contato:", err);
+      toast.error("Não foi possível remover o contato.");
+    }
   };
 
   const allContacts = useMemo(() => {
