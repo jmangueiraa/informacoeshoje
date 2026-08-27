@@ -364,9 +364,6 @@ Equipe Shopee!`
           data: { name: contact.name, phone: cleanPhone, affiliateUrl: normalizedUrl }
         });
         slug = result.slug;
-        setExtractedContacts(prev => prev.map(c =>
-          c.id === contact.id ? { ...c, trackingSlug: slug } : c
-        ));
       } catch (err) {
         console.error("Erro ao gerar link de rastreio:", err);
         toast.error("Não foi possível gerar o link de rastreio.");
@@ -376,14 +373,21 @@ Equipe Shopee!`
 
     const now = new Date();
     const next = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    
-    setExtractedContacts(prev => prev.map(c => 
-      c.id === contact.id ? {
-        ...c,
-        lastContact: now.toISOString(),
-        nextReminder: next.toISOString()
-      } : c
-    ));
+
+    try {
+      await updateContactFn({
+        data: {
+          id: contact.id,
+          lastContact: now.toISOString(),
+          nextReminder: next.toISOString(),
+          trackingSlug: slug,
+        },
+      });
+      await invalidateContacts();
+    } catch (err) {
+      console.error("Erro ao registrar o envio no banco:", err);
+      toast.error("Envio aberto, mas não foi possível registrar no banco.");
+    }
 
     const normalizedContact = { ...contact, phone: cleanPhone };
     const message = encodeURIComponent(getFormattedMessage(normalizedContact, isFirst, slug));
