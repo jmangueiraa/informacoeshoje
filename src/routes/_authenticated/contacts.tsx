@@ -610,12 +610,18 @@ Equipe Shopee!`
     toast.info("Fila de arquivos limpa");
   };
 
-  const clearContacts = () => {
-    setExtractedContacts([]);
-    setClientCounter(1);
-    localStorage.removeItem("linkafiliado_contacts_storage");
-    localStorage.removeItem("linkafiliado_client_counter");
-    toast.info("Lista de contatos limpa");
+  const clearContacts = async () => {
+    try {
+      await deleteAllContactsFn({});
+      await invalidateContacts();
+      setClientCounter(1);
+      localStorage.removeItem("linkafiliado_contacts_storage");
+      localStorage.removeItem("linkafiliado_client_counter");
+      toast.info("Lista de contatos limpa");
+    } catch (err) {
+      console.error("[CONTATOS] Erro ao limpar contatos:", err);
+      toast.error("Não foi possível limpar os contatos no banco.");
+    }
   };
 
   const removeImage = (id: string) => {
