@@ -325,13 +325,7 @@ function LinksPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Ações</DropdownMenuLabel>
                           <DropdownMenuItem onClick={() => {
-                            const userPrimaryDomain = domains?.find((d: any) => d.is_primary && d.verification_status === 'verified')
-                            let baseUrl = window.location.origin
-                            if (userPrimaryDomain) {
-                              const domainName = userPrimaryDomain.domain
-                              baseUrl = domainName.startsWith('http') ? domainName : `https://${domainName}`
-                            }
-                            const url = `${baseUrl}/${link.slug}`
+                            const url = `${getLinkBaseUrl(link)}/${link.slug}`
                             window.open(url, '_blank', 'noopener,noreferrer')
                           }} className="gap-2">
                             <ExternalLink className="h-4 w-4" /> Abrir Link
