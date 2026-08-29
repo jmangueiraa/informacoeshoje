@@ -145,22 +145,20 @@ function LinksPage() {
     }
   })
 
-  const copyToClipboard = (link: any) => {
-    // Usar a URL atual como base para links sem domínio customizado específico
-    const currentOrigin = window.location.origin
-    
-    // Priorizar o domínio associado ao link ou o domínio principal do usuário
+  // Resolve a URL base do link: domínio escolhido na criação > domínio principal do usuário > origem atual
+  const getLinkBaseUrl = (link: any) => {
+    const linkDomain = link.domain_id ? domains?.find((d: any) => d.id === link.domain_id) : null
     const userPrimaryDomain = domains?.find((d: any) => d.is_primary && d.verification_status === 'verified')
-    
-    let baseUrl = currentOrigin
-    
-    if (userPrimaryDomain) {
-      // Garantir que o domínio tenha protocolo
-      const domainName = userPrimaryDomain.domain
-      baseUrl = domainName.startsWith('http') ? domainName : `https://${domainName}`
-    }
+    const domainName = linkDomain?.domain || userPrimaryDomain?.domain
 
-    const url = `${baseUrl}/${link.slug}`
+    if (domainName) {
+      return domainName.startsWith('http') ? domainName : `https://${domainName}`
+    }
+    return window.location.origin
+  }
+
+  const copyToClipboard = (link: any) => {
+    const url = `${getLinkBaseUrl(link)}/${link.slug}`
     navigator.clipboard.writeText(url)
     toast.success("Link copiado!")
   }
