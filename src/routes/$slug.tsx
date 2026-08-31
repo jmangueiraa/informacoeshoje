@@ -94,30 +94,39 @@ export const Route = createFileRoute('/$slug')({
 function redirectToShopee(destinationUrl: string) {
   if (typeof window === 'undefined' || !destinationUrl) return
 
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-  const isAndroid = /Android/i.test(navigator.userAgent)
-  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+  const userAgent = navigator.userAgent || ''
+  const isAndroid = /Android/i.test(userAgent)
+  const isIOS = /iPhone|iPad|iPod/i.test(userAgent)
 
-  if (isMobile) {
-    if (isAndroid) {
-      // Intent Scheme nativo do Android para o app da Shopee
-      const cleanUrl = destinationUrl.replace(/^https?:\/\//, '')
-      const intentUrl = `intent://${cleanUrl}#Intent;scheme=https;package=com.shopee.br;end;`
-      window.location.href = intentUrl
-    } else if (isIOS) {
-      // Custom URL scheme para o app da Shopee no iOS
-      const iosUrl = destinationUrl.replace(/^https?:\/\//, 'shopee://')
-      window.location.href = iosUrl
-    }
+  if (isAndroid) {
+    // Tenta o Custom Scheme direto do app Shopee BR primeiro
+    const appUrl = destinationUrl.replace(/^https?:\/\//, 'shopee://')
+    const cleanUrl = destinationUrl.replace(/^https?:\/\//, '')
+    const fallbackIntent = `intent://${cleanUrl}#Intent;scheme=https;package=com.shopee.br;S.browser_fallback_url=${encodeURIComponent(destinationUrl)};end;`
 
-    // Fallback: se o app não estiver instalado, abre a URL web em 1.5s
+    // Dispara a tentativa direta
+    window.location.href = appUrl
+
+    // Se falhar em abrir o app direto em 500ms, usa o Intent com fallback automático
+    setTimeout(() => {
+      window.location.href = fallbackIntent
+    }, 500)
+    return
+  }
+
+  if (isIOS) {
+    // No iOS, shopee:// abre o app sem confirmação de página web
+    const iosAppUrl = destinationUrl.replace(/^https?:\/\//, 'shopee://')
+    window.location.href = iosAppUrl
+
     setTimeout(() => {
       window.location.replace(destinationUrl)
-    }, 1500)
-  } else {
-    // Computador / Desktop
-    window.location.replace(destinationUrl)
+    }, 1000)
+    return
   }
+
+  // Desktop (PC)
+  window.location.replace(destinationUrl)
 }
 
 function RedirectPage() {
