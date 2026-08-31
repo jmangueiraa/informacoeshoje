@@ -134,7 +134,6 @@ function RedirectPage() {
   const targetUrl = loaderData?.targetUrl || null
   const { slug } = Route.useParams()
   const hasExecuted = useRef(false)
-  const [destUrl, setDestUrl] = useState<string>(targetUrl || '')
 
   useEffect(() => {
     // Remove qualquer elemento ou badge do Lovable do DOM
@@ -161,7 +160,6 @@ function RedirectPage() {
 
     // Se o loader no servidor já obteve o destino com clique somado:
     if (targetUrl) {
-      setDestUrl(targetUrl)
       redirectToShopee(targetUrl)
       return
     }
@@ -181,7 +179,6 @@ function RedirectPage() {
       .maybeSingle()
       .then(({ data: link }) => {
         if (link?.affiliate_url) {
-          setDestUrl(link.affiliate_url)
           redirectToShopee(link.affiliate_url)
         } else {
           window.location.replace('/')
@@ -196,23 +193,6 @@ function RedirectPage() {
     }
   }, [targetUrl, slug])
 
-  return (
-    <div className="fixed inset-0 z-[99999] flex min-h-screen flex-col items-center justify-center bg-background p-6 text-center">
-      <div className="max-w-xs w-full space-y-6">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#EE4D2D] border-t-transparent mx-auto"></div>
-        <div className="space-y-2">
-          <h2 className="text-xl font-bold tracking-tight text-foreground">Abrindo no App Shopee...</h2>
-          <p className="text-xs text-muted-foreground">Você está sendo redirecionado para a oferta.</p>
-        </div>
-        {destUrl && (
-          <button
-            onClick={() => redirectToShopee(destUrl)}
-            className="w-full py-3 px-4 rounded-xl bg-[#EE4D2D] hover:bg-[#d43f20] text-white font-semibold text-sm shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
-          >
-            Toque aqui para abrir no App
-          </button>
-        )}
-      </div>
-    </div>
-  )
+  // Retorna tela em branco limpa durante a fração de segundo da requisição
+  return null
 }
