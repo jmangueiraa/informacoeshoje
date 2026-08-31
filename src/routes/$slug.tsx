@@ -90,43 +90,20 @@ export const Route = createFileRoute('/$slug')({
 
         const isBot = isBotOrPrefetchRequest(request)
 
-        // 2. Se não for bot, valida IP único nas últimas 24 horas antes de incrementar
+        // 2. Se for humano, registra o clique por IP com controle de 24h via RPC seguro
         if (!isBot) {
           try {
             const clientIp = getClientIp(request)
-            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-
-            // Verifica se o mesmo IP já clicou neste link nas últimas 24 horas
-            const { data: existingClick } = await supabaseAdmin
-              .from('link_clicks')
-              .select('id')
-              .eq('link_id', link.id)
-              .eq('ip_address', clientIp)
-              .gte('created_at', twentyFourHoursAgo)
-              .maybeSingle()
-
-            if (!existingClick) {
-              // Registra o IP na tabela link_clicks
-              await supabaseAdmin.from('link_clicks').insert({
-                link_id: link.id,
-                ip_address: clientIp,
-              })
-
-              // Registra na tabela clicks para gráficos
-              await supabaseAdmin.from('clicks').insert({
-                link_id: link.id,
-                ip_address: clientIp,
-              })
-
-              // Incrementa atomicamente o contador
-              await supabaseAdmin.rpc('increment_clicks', { row_id: link.id })
-            }
+            await supabaseAdmin.rpc('register_link_click', {
+              p_link_id: link.id,
+              p_ip: clientIp,
+            })
           } catch (trackError) {
             console.error('Erro ao registrar clique seguro:', trackError)
           }
         }
 
-        // Redireciona imediatamente para a URL de afiliado
+        // 3. Redireciona imediatamente para a URL de afiliado
         return new Response(null, {
           status: 302,
           headers: {
@@ -153,18 +130,47 @@ function RedirectPage() {
       if (!cleanSlug || cleanSlug.includes('.')) return
 
       try {
-        const { data: link } = await supabase
+        const { data: link, error } = await supabase
           .from('links')
-          .select('id, affiliate_url, clicks_count')
+          .select('id, affiliate_url, status')
           .eq('slug', cleanSlug)
-          .eq('status', 'active')
           .maybeSingle()
 
-        if (link?.affiliate_url) {
-          window.location.replace(link.affiliate_url)
+        if (error || !link) {
+          window.location.replace('/')
+          return
         }
+
+        if (link.status !== 'active') {
+          alert('Este link está inativo.')
+          return
+        }
+
+        // Filtra User-Agents de bots / crawlers
+        const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent.toLowerCase() : ''
+        const isBot = BOT_USER_AGENTS.some((bot) => userAgent.includes(bot.toLowerCase()))
+
+        // Se for humano, busca IP e registra clique no Supabase
+        if (!isBot) {
+          try {
+            const ipRes = await fetch('https://api.ipify.org?format=json')
+            const ipData = await ipRes.json()
+            const clientIp = ipData.ip || 'unknown'
+
+            await supabase.rpc('register_link_click', {
+              p_link_id: link.id,
+              p_ip: clientIp,
+            })
+          } catch (e) {
+            console.error('Falha ao registrar IP do clique no cliente:', e)
+          }
+        }
+
+        // Redireciona para o destino
+        window.location.replace(link.affiliate_url)
       } catch (err) {
-        console.error('Erro ao redirecionar link:', err)
+        console.error('Erro geral no redirecionamento:', err)
+        window.location.replace('/')
       }
     }
 
@@ -176,7 +182,7 @@ function RedirectPage() {
       <div className="space-y-6">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
         <div className="space-y-2">
-          <h2 className="text-2xl font-semibold tracking-tight">Redirecionando...</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">Redirecionando com segurança...</h2>
           <p className="text-muted-foreground animate-pulse">
             Você está sendo levado para a oferta na Shopee.
           </p>
