@@ -1,5 +1,5 @@
 import { createFileRoute, redirect, notFound } from '@tanstack/react-router'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 
 // 1. Lista de User-Agents de bots e crawlers conhecidos
@@ -61,38 +61,6 @@ export const Route = createFileRoute('/$slug')({
     if (!slug || slug.includes('.')) {
       throw notFound()
     }
-
-    try {
-      const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
-      const { data: destino, error } = await supabaseAdmin.rpc('incrementar_clique', {
-        link_slug: slug,
-      })
-
-      if (!error && typeof destino === 'string' && destino) {
-        throw redirect({
-          href: destino,
-          statusCode: 302,
-        })
-      }
-
-      const { data: link } = await supabaseAdmin
-        .from('links')
-        .select('affiliate_url')
-        .eq('slug', slug)
-        .eq('status', 'active')
-        .maybeSingle()
-
-      if (link?.affiliate_url) {
-        throw redirect({
-          href: link.affiliate_url,
-          statusCode: 302,
-        })
-      }
-    } catch (e: any) {
-      if (e?.status === 302 || e?.isRedirect || e?.headers?.has?.('Location')) {
-        throw e
-      }
-    }
   },
   server: {
     handlers: {
@@ -105,7 +73,7 @@ export const Route = createFileRoute('/$slug')({
         const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
         const isBot = isBotOrPrefetchRequest(request)
 
-        // Se for bot/crawler/preview, redireciona SEM incrementar
+        // Se for bot/crawler/preview, redireciona diretamente sem incrementar
         if (isBot) {
           const { data: link } = await supabaseAdmin
             .from('links')
@@ -123,46 +91,28 @@ export const Route = createFileRoute('/$slug')({
           return new Response('Link não encontrado', { status: 404 })
         }
 
-        // Para usuário humano: incrementa e redireciona instantaneamente
-        const { data: destino, error } = await supabaseAdmin.rpc('incrementar_clique', {
-          link_slug: slug,
-        })
+        const userAgent = request.headers.get('user-agent') || ''
+        const isMobile = /android|iphone|ipad|ipod|mobile/i.test(userAgent)
 
-        if (!error && typeof destino === 'string' && destino) {
-          return new Response(null, {
-            status: 302,
-            headers: {
-              Location: destino,
-              'Cache-Control': 'no-store, no-cache, must-revalidate',
-            },
+        // Para computadores Desktop, pode fazer o redirect 302 direto
+        if (!isMobile) {
+          const { data: destino, error } = await supabaseAdmin.rpc('incrementar_clique', {
+            link_slug: slug,
           })
+
+          if (!error && typeof destino === 'string' && destino) {
+            return new Response(null, {
+              status: 302,
+              headers: {
+                Location: destino,
+                'Cache-Control': 'no-store, no-cache, must-revalidate',
+              },
+            })
+          }
         }
 
-        // Fallback: se a RPC falhar, busca o link e redireciona
-        const { data: link } = await supabaseAdmin
-          .from('links')
-          .select('id, affiliate_url, clicks_count')
-          .eq('slug', slug)
-          .eq('status', 'active')
-          .maybeSingle()
-
-        if (link?.affiliate_url) {
-          await supabaseAdmin.from('clicks').insert({ link_id: link.id })
-          await supabaseAdmin
-            .from('links')
-            .update({ clicks_count: (link.clicks_count || 0) + 1 })
-            .eq('id', link.id)
-
-          return new Response(null, {
-            status: 302,
-            headers: {
-              Location: link.affiliate_url,
-              'Cache-Control': 'no-store, no-cache, must-revalidate',
-            },
-          })
-        }
-
-        return new Response('Link não encontrado', { status: 404 })
+        // Para celulares (Mobile), permite que a página carregue para acionar o App da Shopee via Deep Link
+        return undefined
       },
     },
   },
@@ -172,30 +122,39 @@ export const Route = createFileRoute('/$slug')({
 function triggerSmartRedirect(destinationUrl: string) {
   if (typeof window === 'undefined') return
 
-  const userAgent = navigator.userAgent || ''
-  const isAndroid = /android/i.test(userAgent)
-  const isShopee = /shopee\.com/i.test(destinationUrl)
+  const userAgent = (navigator.userAgent || '').toLowerCase()
+  const isAndroid = userAgent.includes('android')
+  const isIOS = /iphone|ipad|ipod/.test(userAgent)
+  const isShopee = destinationUrl.includes('shopee.com')
 
-  // Se for celular Android e o destino for Shopee, força a abertura do app nativo (com.shopee.br)
-  if (isAndroid && isShopee) {
-    try {
+  if (isShopee) {
+    if (isAndroid) {
+      // Intent nativo para abrir o App Shopee Brasil no Android
       const cleanPath = destinationUrl.replace(/^https?:\/\//, '')
       const androidIntent = `intent://${cleanPath}#Intent;scheme=https;package=com.shopee.br;S.browser_fallback_url=${encodeURIComponent(destinationUrl)};end`
       window.location.href = androidIntent
       return
-    } catch (_) {
-      window.location.replace(destinationUrl)
+    }
+
+    if (isIOS) {
+      // URL Scheme para abrir o App Shopee no iOS
+      const iosScheme = `shopee://open?url=${encodeURIComponent(destinationUrl)}`
+      window.location.href = iosScheme
+      setTimeout(() => {
+        window.location.href = destinationUrl
+      }, 700)
       return
     }
   }
 
-  // Para iOS e Desktop, redireciona diretamente
+  // Fallback padrão
   window.location.replace(destinationUrl)
 }
 
 function RedirectPage() {
   const { slug } = Route.useParams()
   const hasExecuted = useRef(false)
+  const [destUrl, setDestUrl] = useState<string>('')
 
   useEffect(() => {
     // Remove qualquer elemento ou badge do Lovable do DOM
@@ -235,6 +194,7 @@ function RedirectPage() {
           })
 
           if (!error && typeof destino === 'string' && destino) {
+            setDestUrl(destino)
             triggerSmartRedirect(destino)
             return
           }
@@ -253,6 +213,7 @@ function RedirectPage() {
           .maybeSingle()
 
         if (link?.affiliate_url) {
+          setDestUrl(link.affiliate_url)
           triggerSmartRedirect(link.affiliate_url)
         } else {
           window.location.replace('/')
@@ -270,13 +231,21 @@ function RedirectPage() {
   }, [slug])
 
   return (
-    <div className="fixed inset-0 z-[99999] flex min-h-screen flex-col items-center justify-center bg-background p-4 text-center">
-      <div className="space-y-4">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
-        <div className="space-y-1">
-          <h2 className="text-xl font-semibold tracking-tight">Redirecionando...</h2>
-          <p className="text-sm text-muted-foreground">Aguarde um instante.</p>
+    <div className="fixed inset-0 z-[99999] flex min-h-screen flex-col items-center justify-center bg-background p-6 text-center">
+      <div className="max-w-xs w-full space-y-6">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#EE4D2D] border-t-transparent mx-auto"></div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-bold tracking-tight text-foreground">Abrindo no App Shopee...</h2>
+          <p className="text-xs text-muted-foreground">Você está sendo redirecionado para a oferta.</p>
         </div>
+        {destUrl && (
+          <button
+            onClick={() => triggerSmartRedirect(destUrl)}
+            className="w-full py-3 px-4 rounded-xl bg-[#EE4D2D] hover:bg-[#d43f20] text-white font-semibold text-sm shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
+          >
+            Toque aqui para abrir no App
+          </button>
+        )}
       </div>
     </div>
   )
