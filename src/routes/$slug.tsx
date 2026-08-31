@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect, notFound } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 
@@ -55,17 +55,45 @@ function isBotOrPrefetchRequest(request?: Request): boolean {
   )
 }
 
-function getClientIp(request?: Request): string {
-  if (!request) return '0.0.0.0'
-  return (
-    request.headers.get('cf-connecting-ip') ||
-    request.headers.get('x-real-ip') ||
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    '0.0.0.0'
-  )
-}
-
 export const Route = createFileRoute('/$slug')({
+  loader: async ({ params }) => {
+    const slug = String(params.slug ?? '').replace(/^\/+|\/+$/g, '')
+    if (!slug || slug.includes('.')) {
+      throw notFound()
+    }
+
+    try {
+      const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
+      const { data: destino, error } = await supabaseAdmin.rpc('incrementar_clique', {
+        link_slug: slug,
+      })
+
+      if (!error && typeof destino === 'string' && destino) {
+        throw redirect({
+          href: destino,
+          statusCode: 302,
+        })
+      }
+
+      const { data: link } = await supabaseAdmin
+        .from('links')
+        .select('affiliate_url')
+        .eq('slug', slug)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      if (link?.affiliate_url) {
+        throw redirect({
+          href: link.affiliate_url,
+          statusCode: 302,
+        })
+      }
+    } catch (e: any) {
+      if (e?.status === 302 || e?.isRedirect || e?.headers?.has?.('Location')) {
+        throw e
+      }
+    }
+  },
   server: {
     handlers: {
       GET: async ({ params, request }) => {
@@ -95,7 +123,7 @@ export const Route = createFileRoute('/$slug')({
           return new Response('Link não encontrado', { status: 404 })
         }
 
-        // Para usuário humano: incrementa exatamente 1 clique via RPC única
+        // Para usuário humano: incrementa e redireciona instantaneamente
         const { data: destino, error } = await supabaseAdmin.rpc('incrementar_clique', {
           link_slug: slug,
         })
@@ -110,7 +138,7 @@ export const Route = createFileRoute('/$slug')({
           })
         }
 
-        // Fallback: se a RPC falhar, busca o link e adiciona exatamente 1 clique
+        // Fallback: se a RPC falhar, busca o link e redireciona
         const { data: link } = await supabaseAdmin
           .from('links')
           .select('id, affiliate_url, clicks_count')
