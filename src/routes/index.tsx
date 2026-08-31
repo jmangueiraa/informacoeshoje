@@ -82,7 +82,7 @@ function AuthPage() {
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
             <Button className="w-full" onClick={() => handleEmailAuth('login')} disabled={loading}>
-              {loading ? 'Entrando...' : 'SEGUIR'}
+              {loading ? 'Entrando...' : 'ENTRAR'}
             </Button>
           </div>
         </CardContent>
