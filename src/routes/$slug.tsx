@@ -169,11 +169,54 @@ export const Route = createFileRoute('/$slug')({
   component: RedirectPage,
 })
 
+function triggerSmartRedirect(destinationUrl: string) {
+  if (typeof window === 'undefined') return
+
+  const userAgent = navigator.userAgent || ''
+  const isAndroid = /android/i.test(userAgent)
+  const isShopee = /shopee\.com/i.test(destinationUrl)
+
+  // Se for celular Android e o destino for Shopee, força a abertura do app nativo (com.shopee.br)
+  if (isAndroid && isShopee) {
+    try {
+      const cleanPath = destinationUrl.replace(/^https?:\/\//, '')
+      const androidIntent = `intent://${cleanPath}#Intent;scheme=https;package=com.shopee.br;S.browser_fallback_url=${encodeURIComponent(destinationUrl)};end`
+      window.location.href = androidIntent
+      return
+    } catch (_) {
+      window.location.replace(destinationUrl)
+      return
+    }
+  }
+
+  // Para iOS e Desktop, redireciona diretamente
+  window.location.replace(destinationUrl)
+}
+
 function RedirectPage() {
   const { slug } = Route.useParams()
   const hasExecuted = useRef(false)
 
   useEffect(() => {
+    // Remove qualquer elemento ou badge do Lovable do DOM
+    const removeLovableBadges = () => {
+      document
+        .querySelectorAll(
+          '#lovable-badge, aside#lovable-badge, [id*="lovable"], [class*="lovable"], [data-lovable], a[href*="lovable.app"], a[href*="lovable.dev"], iframe[src*="lovable"]'
+        )
+        .forEach((el) => {
+          try {
+            el.remove()
+          } catch (_) {}
+        })
+    }
+
+    removeLovableBadges()
+    const observer = new MutationObserver(removeLovableBadges)
+    if (document.body) {
+      observer.observe(document.body, { childList: true, subtree: true })
+    }
+
     if (!slug || hasExecuted.current) return
     hasExecuted.current = true // Trava estrita para executar exatamente 1 vez no cliente
 
@@ -192,7 +235,7 @@ function RedirectPage() {
           })
 
           if (!error && typeof destino === 'string' && destino) {
-            window.location.replace(destino)
+            triggerSmartRedirect(destino)
             return
           }
         } catch (err) {
@@ -210,7 +253,7 @@ function RedirectPage() {
           .maybeSingle()
 
         if (link?.affiliate_url) {
-          window.location.replace(link.affiliate_url)
+          triggerSmartRedirect(link.affiliate_url)
         } else {
           window.location.replace('/')
         }
@@ -220,17 +263,19 @@ function RedirectPage() {
     }
 
     processRedirect()
+
+    return () => {
+      observer.disconnect()
+    }
   }, [slug])
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 text-center">
-      <div className="space-y-6">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-semibold tracking-tight">Redirecionando com segurança...</h2>
-          <p className="text-muted-foreground animate-pulse">
-            Você está sendo levado para a oferta na Shopee.
-          </p>
+    <div className="fixed inset-0 z-[99999] flex min-h-screen flex-col items-center justify-center bg-background p-4 text-center">
+      <div className="space-y-4">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
+        <div className="space-y-1">
+          <h2 className="text-xl font-semibold tracking-tight">Redirecionando...</h2>
+          <p className="text-sm text-muted-foreground">Aguarde um instante.</p>
         </div>
       </div>
     </div>
