@@ -61,66 +61,38 @@ export const Route = createFileRoute('/$slug')({
     if (!slug || slug.includes('.')) {
       throw notFound()
     }
-  },
-  server: {
-    handlers: {
-      GET: async ({ params, request }) => {
-        const slug = String(params.slug ?? '').replace(/^\/+|\/+$/g, '')
-        if (!slug || slug.includes('.')) {
-          return new Response('Not found', { status: 404 })
-        }
 
-        const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
-        const isBot = isBotOrPrefetchRequest(request)
+    try {
+      const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
+      const { data: destino, error } = await supabaseAdmin.rpc('incrementar_clique', {
+        link_slug: slug,
+      })
 
-        // Se for bot/crawler/preview, redireciona diretamente sem incrementar
-        if (isBot) {
-          const { data: link } = await supabaseAdmin
-            .from('links')
-            .select('affiliate_url')
-            .eq('slug', slug)
-            .eq('status', 'active')
-            .maybeSingle()
+      if (!error && typeof destino === 'string' && destino) {
+        return { targetUrl: destino }
+      }
 
-          if (link?.affiliate_url) {
-            return new Response(null, {
-              status: 302,
-              headers: { Location: link.affiliate_url, 'Cache-Control': 'no-store' },
-            })
-          }
-          return new Response('Link não encontrado', { status: 404 })
-        }
+      const { data: link } = await supabaseAdmin
+        .from('links')
+        .select('affiliate_url')
+        .eq('slug', slug)
+        .eq('status', 'active')
+        .maybeSingle()
 
-        const userAgent = request.headers.get('user-agent') || ''
-        const isMobile = /android|iphone|ipad|ipod|mobile/i.test(userAgent)
+      if (link?.affiliate_url) {
+        return { targetUrl: link.affiliate_url }
+      }
+    } catch (e) {
+      console.error('Erro ao carregar link no servidor:', e)
+    }
 
-        // Para computadores Desktop, pode fazer o redirect 302 direto
-        if (!isMobile) {
-          const { data: destino, error } = await supabaseAdmin.rpc('incrementar_clique', {
-            link_slug: slug,
-          })
-
-          if (!error && typeof destino === 'string' && destino) {
-            return new Response(null, {
-              status: 302,
-              headers: {
-                Location: destino,
-                'Cache-Control': 'no-store, no-cache, must-revalidate',
-              },
-            })
-          }
-        }
-
-        // Para celulares (Mobile), permite que a página carregue para acionar o App da Shopee via Deep Link
-        return undefined
-      },
-    },
+    return { targetUrl: null }
   },
   component: RedirectPage,
 })
 
 function triggerSmartRedirect(destinationUrl: string) {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined' || !destinationUrl) return
 
   const userAgent = (navigator.userAgent || '').toLowerCase()
   const isAndroid = userAgent.includes('android')
@@ -142,19 +114,21 @@ function triggerSmartRedirect(destinationUrl: string) {
       window.location.href = iosScheme
       setTimeout(() => {
         window.location.href = destinationUrl
-      }, 700)
+      }, 600)
       return
     }
   }
 
-  // Fallback padrão
+  // Fallback padrão para Desktop ou outros sites
   window.location.replace(destinationUrl)
 }
 
 function RedirectPage() {
+  const loaderData = Route.useLoaderData()
+  const targetUrl = loaderData?.targetUrl || null
   const { slug } = Route.useParams()
   const hasExecuted = useRef(false)
-  const [destUrl, setDestUrl] = useState<string>('')
+  const [destUrl, setDestUrl] = useState<string>(targetUrl || '')
 
   useEffect(() => {
     // Remove qualquer elemento ou badge do Lovable do DOM
@@ -176,59 +150,45 @@ function RedirectPage() {
       observer.observe(document.body, { childList: true, subtree: true })
     }
 
-    if (!slug || hasExecuted.current) return
-    hasExecuted.current = true // Trava estrita para executar exatamente 1 vez no cliente
+    if (hasExecuted.current) return
+    hasExecuted.current = true // Trava estrita de execução única
 
-    const processRedirect = async () => {
-      const cleanSlug = String(slug).replace(/^\/+|\/+$/g, '')
-      if (!cleanSlug || cleanSlug.includes('.')) return
+    // Se o loader no servidor já obteve o destino com clique somado:
+    if (targetUrl) {
+      setDestUrl(targetUrl)
+      triggerSmartRedirect(targetUrl)
+      return
+    }
 
-      const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent.toLowerCase() : ''
-      const isBot = BOT_USER_AGENTS.some((bot) => userAgent.includes(bot.toLowerCase()))
+    // Fallback no cliente se necessário
+    const cleanSlug = String(slug ?? '').replace(/^\/+|\/+$/g, '')
+    if (!cleanSlug || cleanSlug.includes('.')) {
+      window.location.replace('/')
+      return
+    }
 
-      if (!isBot) {
-        try {
-          // Incrementa exatamente 1 vez
-          const { data: destino, error } = await supabase.rpc('incrementar_clique', {
-            link_slug: cleanSlug,
-          })
-
-          if (!error && typeof destino === 'string' && destino) {
-            setDestUrl(destino)
-            triggerSmartRedirect(destino)
-            return
-          }
-        } catch (err) {
-          console.error('Erro ao incrementar clique no cliente:', err)
-        }
-      }
-
-      // Fallback simples caso a RPC falhe
-      try {
-        const { data: link } = await supabase
-          .from('links')
-          .select('affiliate_url')
-          .eq('slug', cleanSlug)
-          .eq('status', 'active')
-          .maybeSingle()
-
+    supabase
+      .from('links')
+      .select('affiliate_url')
+      .eq('slug', cleanSlug)
+      .eq('status', 'active')
+      .maybeSingle()
+      .then(({ data: link }) => {
         if (link?.affiliate_url) {
           setDestUrl(link.affiliate_url)
           triggerSmartRedirect(link.affiliate_url)
         } else {
           window.location.replace('/')
         }
-      } catch (_) {
+      })
+      .catch(() => {
         window.location.replace('/')
-      }
-    }
-
-    processRedirect()
+      })
 
     return () => {
       observer.disconnect()
     }
-  }, [slug])
+  }, [targetUrl, slug])
 
   return (
     <div className="fixed inset-0 z-[99999] flex min-h-screen flex-col items-center justify-center bg-background p-6 text-center">
