@@ -2,10 +2,42 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 
+// 1. Lista de User-Agents de bots e crawlers conhecidos
+const BOT_USER_AGENTS = [
+  'facebookexternalhit',
+  'WhatsApp',
+  'TelegramBot',
+  'Twitterbot',
+  'LinkedInBot',
+  'Slackbot-LinkExpanding',
+  'Discordbot',
+  'Googlebot',
+  'bingbot',
+  'applebot',
+  'duckduckbot',
+  'baiduspider',
+  'yandexbot',
+  'sogou',
+  'facebot',
+  'ia_archiver',
+  'petalbot',
+  'bytespider',
+  'semrushbot',
+  'ahrefsbot',
+  'preview',
+  'crawler',
+  'spider',
+  'curl',
+  'wget',
+  'python-requests',
+  'headlesschrome',
+  'lighthouse',
+]
+
 function isBotOrPrefetchRequest(request?: Request): boolean {
   if (!request) return false
 
-  const userAgent = (request.headers.get('user-agent') || '').toLowerCase()
+  const userAgent = request.headers.get('user-agent') || ''
   const purpose = (
     request.headers.get('purpose') ||
     request.headers.get('sec-purpose') ||
@@ -18,38 +50,19 @@ function isBotOrPrefetchRequest(request?: Request): boolean {
     return true
   }
 
-  const botPatterns = [
-    'bot',
-    'crawler',
-    'spider',
-    'facebookexternalhit',
-    'whatsapp',
-    'telegrambot',
-    'twitterbot',
-    'discordbot',
-    'applebot',
-    'googlebot',
-    'bingbot',
-    'slurp',
-    'duckduckbot',
-    'baiduspider',
-    'yandexbot',
-    'sogou',
-    'facebot',
-    'ia_archiver',
-    'petalbot',
-    'bytespider',
-    'semrushbot',
-    'ahrefsbot',
-    'preview',
-    'curl',
-    'wget',
-    'python-requests',
-    'headlesschrome',
-    'lighthouse',
-  ]
+  return BOT_USER_AGENTS.some((bot) =>
+    userAgent.toLowerCase().includes(bot.toLowerCase())
+  )
+}
 
-  return botPatterns.some((pattern) => userAgent.includes(pattern))
+function getClientIp(request?: Request): string {
+  if (!request) return '0.0.0.0'
+  return (
+    request.headers.get('cf-connecting-ip') ||
+    request.headers.get('x-real-ip') ||
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    '0.0.0.0'
+  )
 }
 
 export const Route = createFileRoute('/$slug')({
@@ -62,54 +75,65 @@ export const Route = createFileRoute('/$slug')({
         }
 
         const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
-        const isBot = isBotOrPrefetchRequest(request)
 
-        // Se for bot, crawler ou requisição de prefetch (ex: WhatsApp Web, Facebook Preview),
-        // redireciona SEM incrementar o contador de cliques.
-        if (isBot) {
-          const { data: link } = await supabaseAdmin
-            .from('links')
-            .select('affiliate_url')
-            .eq('slug', slug)
-            .eq('status', 'active')
-            .maybeSingle()
-
-          if (link?.affiliate_url) {
-            return new Response(null, {
-              status: 302,
-              headers: { Location: link.affiliate_url, 'Cache-Control': 'no-store' },
-            })
-          }
-          return new Response('Link não encontrado', { status: 404 })
-        }
-
-        // Para usuários humanos reais: incrementa clique e redireciona
-        const { data: destino, error } = await supabaseAdmin.rpc('incrementar_clique', {
-          link_slug: slug,
-        })
-
-        if (!error && typeof destino === 'string' && destino) {
-          return new Response(null, {
-            status: 302,
-            headers: { Location: destino, 'Cache-Control': 'no-store' },
-          })
-        }
-
+        // 1. Busca o link ativo correspondente ao slug
         const { data: link } = await supabaseAdmin
           .from('links')
-          .select('affiliate_url')
+          .select('id, affiliate_url, status, expires_at')
           .eq('slug', slug)
           .eq('status', 'active')
           .maybeSingle()
 
-        if (link?.affiliate_url) {
-          return new Response(null, {
-            status: 302,
-            headers: { Location: link.affiliate_url, 'Cache-Control': 'no-store' },
-          })
+        if (!link?.affiliate_url) {
+          return new Response('Link não encontrado', { status: 404 })
         }
 
-        return new Response('Link não encontrado', { status: 404 })
+        const isBot = isBotOrPrefetchRequest(request)
+
+        // 2. Se não for bot, valida IP único nas últimas 24 horas antes de incrementar
+        if (!isBot) {
+          try {
+            const clientIp = getClientIp(request)
+            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+            // Verifica se o mesmo IP já clicou neste link nas últimas 24 horas
+            const { data: existingClick } = await supabaseAdmin
+              .from('link_clicks')
+              .select('id')
+              .eq('link_id', link.id)
+              .eq('ip_address', clientIp)
+              .gte('created_at', twentyFourHoursAgo)
+              .maybeSingle()
+
+            if (!existingClick) {
+              // Registra o IP na tabela link_clicks
+              await supabaseAdmin.from('link_clicks').insert({
+                link_id: link.id,
+                ip_address: clientIp,
+              })
+
+              // Registra na tabela clicks para gráficos
+              await supabaseAdmin.from('clicks').insert({
+                link_id: link.id,
+                ip_address: clientIp,
+              })
+
+              // Incrementa atomicamente o contador
+              await supabaseAdmin.rpc('increment_clicks', { row_id: link.id })
+            }
+          } catch (trackError) {
+            console.error('Erro ao registrar clique seguro:', trackError)
+          }
+        }
+
+        // Redireciona imediatamente para a URL de afiliado
+        return new Response(null, {
+          status: 302,
+          headers: {
+            Location: link.affiliate_url,
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+          },
+        })
       },
     },
   },
@@ -127,19 +151,6 @@ function RedirectPage() {
     const processRedirect = async () => {
       const cleanSlug = String(slug).replace(/^\/+|\/+$/g, '')
       if (!cleanSlug || cleanSlug.includes('.')) return
-
-      try {
-        const { data: destino, error } = await supabase.rpc('incrementar_clique', {
-          link_slug: cleanSlug,
-        })
-
-        if (!error && typeof destino === 'string' && destino) {
-          window.location.replace(destino)
-          return
-        }
-      } catch (err) {
-        console.error('Erro ao incrementar clique via RPC:', err)
-      }
 
       try {
         const { data: link } = await supabase

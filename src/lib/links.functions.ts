@@ -130,7 +130,12 @@ export const resetLinkClicks = createServerFn({ method: "POST" })
 
     if (linkError) throw linkError;
 
-    // 2. Remove registros de cliques relacionados
+    // 2. Remove registros de cliques relacionados em ambas as tabelas
+    await authenticatedSupabase
+      .from("link_clicks")
+      .delete()
+      .eq("link_id", id);
+
     await authenticatedSupabase
       .from("clicks")
       .delete()
