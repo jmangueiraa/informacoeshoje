@@ -91,36 +91,33 @@ export const Route = createFileRoute('/$slug')({
   component: RedirectPage,
 })
 
-function triggerSmartRedirect(destinationUrl: string) {
+function redirectToShopee(destinationUrl: string) {
   if (typeof window === 'undefined' || !destinationUrl) return
 
-  const userAgent = (navigator.userAgent || '').toLowerCase()
-  const isAndroid = userAgent.includes('android')
-  const isIOS = /iphone|ipad|ipod/.test(userAgent)
-  const isShopee = destinationUrl.includes('shopee.com')
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  const isAndroid = /Android/i.test(navigator.userAgent)
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
 
-  if (isShopee) {
+  if (isMobile) {
     if (isAndroid) {
-      // Intent nativo para abrir o App Shopee Brasil no Android
-      const cleanPath = destinationUrl.replace(/^https?:\/\//, '')
-      const androidIntent = `intent://${cleanPath}#Intent;scheme=https;package=com.shopee.br;S.browser_fallback_url=${encodeURIComponent(destinationUrl)};end`
-      window.location.href = androidIntent
-      return
+      // Intent Scheme nativo do Android para o app da Shopee
+      const cleanUrl = destinationUrl.replace(/^https?:\/\//, '')
+      const intentUrl = `intent://${cleanUrl}#Intent;scheme=https;package=com.shopee.br;end;`
+      window.location.href = intentUrl
+    } else if (isIOS) {
+      // Custom URL scheme para o app da Shopee no iOS
+      const iosUrl = destinationUrl.replace(/^https?:\/\//, 'shopee://')
+      window.location.href = iosUrl
     }
 
-    if (isIOS) {
-      // URL Scheme para abrir o App Shopee no iOS
-      const iosScheme = `shopee://open?url=${encodeURIComponent(destinationUrl)}`
-      window.location.href = iosScheme
-      setTimeout(() => {
-        window.location.href = destinationUrl
-      }, 600)
-      return
-    }
+    // Fallback: se o app não estiver instalado, abre a URL web em 1.5s
+    setTimeout(() => {
+      window.location.replace(destinationUrl)
+    }, 1500)
+  } else {
+    // Computador / Desktop
+    window.location.replace(destinationUrl)
   }
-
-  // Fallback padrão para Desktop ou outros sites
-  window.location.replace(destinationUrl)
 }
 
 function RedirectPage() {
@@ -156,7 +153,7 @@ function RedirectPage() {
     // Se o loader no servidor já obteve o destino com clique somado:
     if (targetUrl) {
       setDestUrl(targetUrl)
-      triggerSmartRedirect(targetUrl)
+      redirectToShopee(targetUrl)
       return
     }
 
@@ -176,7 +173,7 @@ function RedirectPage() {
       .then(({ data: link }) => {
         if (link?.affiliate_url) {
           setDestUrl(link.affiliate_url)
-          triggerSmartRedirect(link.affiliate_url)
+          redirectToShopee(link.affiliate_url)
         } else {
           window.location.replace('/')
         }
@@ -200,7 +197,7 @@ function RedirectPage() {
         </div>
         {destUrl && (
           <button
-            onClick={() => triggerSmartRedirect(destUrl)}
+            onClick={() => redirectToShopee(destUrl)}
             className="w-full py-3 px-4 rounded-xl bg-[#EE4D2D] hover:bg-[#d43f20] text-white font-semibold text-sm shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
           >
             Toque aqui para abrir no App
