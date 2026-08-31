@@ -356,9 +356,10 @@ function LinksPage() {
                           <DropdownMenuItem 
                             onClick={() => resetMutation.mutate(link.id)} 
                             disabled={resetMutation.isPending}
-                            className="gap-2 text-amber-600 focus:bg-amber-500/10 focus:text-amber-600"
+                            className="cursor-pointer text-amber-600 focus:text-amber-600 focus:bg-amber-500/10 gap-2"
                           >
-                            <RotateCcw className="h-4 w-4" /> Zerar Cliques
+                            <RotateCcw className="h-4 w-4" />
+                            <span>Zerar cliques</span>
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
