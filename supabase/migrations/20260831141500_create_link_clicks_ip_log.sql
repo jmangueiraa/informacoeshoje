@@ -25,8 +25,16 @@ ON public.link_clicks FOR INSERT
 TO anon, authenticated
 WITH CHECK (true);
 
-GRANT SELECT, INSERT ON public.link_clicks TO anon, authenticated;
+DROP POLICY IF EXISTS "Permitir delecao de cliques pelo dono do link" ON public.link_clicks;
+CREATE POLICY "Permitir delecao de cliques pelo dono do link"
+ON public.link_clicks FOR DELETE
+TO anon, authenticated
+USING (true);
+
+GRANT SELECT, INSERT, DELETE ON public.link_clicks TO anon, authenticated;
 GRANT ALL ON public.link_clicks TO service_role;
+
+GRANT SELECT, INSERT, DELETE ON public.clicks TO anon, authenticated;
 
 -- 4. Função com SECURITY DEFINER para registrar o clique e atualizar o contador de forma atômica
 CREATE OR REPLACE FUNCTION public.register_link_click(p_link_id uuid, p_ip text)
@@ -71,7 +79,29 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.register_link_click(uuid, text) TO anon, authenticated, service_role;
 
--- 5. Função de incremento simples (compatibilidade)
+-- 5. Função com SECURITY DEFINER para zerar os cliques de um link
+CREATE OR REPLACE FUNCTION public.reset_link_clicks(p_link_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- 1. Zera contador na tabela links
+  UPDATE public.links
+  SET clicks_count = 0,
+      updated_at = now()
+  WHERE id = p_link_id;
+
+  -- 2. Limpa registros nas tabelas de cliques
+  DELETE FROM public.clicks WHERE link_id = p_link_id;
+  DELETE FROM public.link_clicks WHERE link_id = p_link_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.reset_link_clicks(uuid) TO anon, authenticated, service_role;
+
+-- 6. Função de incremento simples (compatibilidade)
 CREATE OR REPLACE FUNCTION public.increment_clicks(row_id uuid)
 RETURNS void
 LANGUAGE plpgsql

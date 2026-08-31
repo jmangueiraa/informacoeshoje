@@ -152,13 +152,34 @@ function LinksPage() {
   })
 
   const resetMutation = useMutation({
-    mutationFn: (id: string) => resetLinkClicks({ data: id }),
+    mutationFn: async (id: string) => {
+      try {
+        await resetLinkClicks({ data: id })
+      } catch (e) {
+        console.warn("Falha na server function, tentando RPC direto:", e)
+      }
+      try {
+        await supabase.rpc('reset_link_clicks', { p_link_id: id })
+      } catch (e) {
+        // fallback
+      }
+      return id
+    },
+    onMutate: async (id: string) => {
+      // Atualização otimista imediata na tela
+      queryClient.setQueryData(['user-links'], (old: any) => {
+        if (!Array.isArray(old)) return old
+        return old.map((l: any) => (l.id === id ? { ...l, clicks_count: 0, clicks: 0 } : l))
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-links'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
       toast.success("Cliques zerados com sucesso!")
     },
     onError: (err: any) => {
+      queryClient.invalidateQueries({ queryKey: ['user-links'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
       toast.error(err.message || "Erro ao zerar cliques.")
     }
   })

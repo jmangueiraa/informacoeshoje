@@ -146,25 +146,35 @@ export const resetLinkClicks = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((id: unknown) => z.string().parse(id))
   .handler(async ({ data: id, context }) => {
-    const { userId, supabase: authenticatedSupabase } = context;
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // 1. Zera o contador na tabela links
-    const { error: linkError } = await authenticatedSupabase
+    // 1. Verifica se o link pertence ao usuário autenticado por segurança
+    const { data: link, error: linkError } = await supabaseAdmin
       .from("links")
-      .update({ clicks_count: 0 })
+      .select("id")
       .eq("id", id)
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .maybeSingle();
 
-    if (linkError) throw linkError;
+    if (linkError || !link) {
+      throw new Error("Link não encontrado ou sem permissão.");
+    }
 
-    // 2. Remove registros de cliques relacionados em ambas as tabelas
-    await authenticatedSupabase
-      .from("link_clicks")
+    // 2. Zera o contador na tabela links
+    await supabaseAdmin
+      .from("links")
+      .update({ clicks_count: 0 } as any)
+      .eq("id", id);
+
+    // 3. Remove registros das tabelas de histórico de cliques (com service_role)
+    await supabaseAdmin
+      .from("clicks")
       .delete()
       .eq("link_id", id);
 
-    await authenticatedSupabase
-      .from("clicks")
+    await supabaseAdmin
+      .from("link_clicks")
       .delete()
       .eq("link_id", id);
 
