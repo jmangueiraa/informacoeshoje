@@ -115,6 +115,30 @@ export const toggleLinkStatus = createServerFn({ method: "POST" })
     return { success: true };
   });
 
+export const resetLinkClicks = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((id: unknown) => z.string().parse(id))
+  .handler(async ({ data: id, context }) => {
+    const { userId, supabase: authenticatedSupabase } = context;
+
+    // 1. Zera o contador na tabela links
+    const { error: linkError } = await authenticatedSupabase
+      .from("links")
+      .update({ clicks_count: 0 })
+      .eq("id", id)
+      .eq("user_id", userId);
+
+    if (linkError) throw linkError;
+
+    // 2. Remove registros de cliques relacionados
+    await authenticatedSupabase
+      .from("clicks")
+      .delete()
+      .eq("link_id", id);
+
+    return { success: true };
+  });
+
 export const getUserProfile = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

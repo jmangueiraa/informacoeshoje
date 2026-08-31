@@ -1,12 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { PlusCircle, Link2, BarChart3, MousePointer2, Activity, Copy, ExternalLink, TrendingUp } from "lucide-react"
+import { PlusCircle, Link2, BarChart3, MousePointer2, Activity, Copy, ExternalLink, TrendingUp, RotateCcw } from "lucide-react"
 import { Link } from "@tanstack/react-router"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useEffect } from "react"
 import { supabase } from "@/integrations/supabase/client"
 import { getDashboardStats } from "@/lib/analytics.functions"
-import { getUserLinks, getUserProfile } from "@/lib/links.functions"
+import { getUserLinks, getUserProfile, resetLinkClicks } from "@/lib/links.functions"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 
@@ -42,6 +42,18 @@ export function DashboardHome() {
     }
   }, [queryClient])
 
+
+  const resetMutation = useMutation({
+    mutationFn: (id: string) => resetLinkClicks({ data: id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-links'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      toast.success("Cliques zerados com sucesso!")
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Erro ao zerar cliques.")
+    }
+  })
 
   const copyToClipboard = (link: any) => {
     const profileDomain = profile && !('error' in profile) ? profile.custom_domain : null;
@@ -173,8 +185,18 @@ export function DashboardHome() {
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-2">
-                          <Button size="icon" variant="ghost" onClick={() => copyToClipboard(link)}>
+                          <Button size="icon" variant="ghost" onClick={() => copyToClipboard(link)} title="Copiar Link">
                             <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            onClick={() => resetMutation.mutate(link.id)} 
+                            disabled={resetMutation.isPending}
+                            title="Zerar Cliques"
+                            className="text-amber-600 hover:text-amber-700 hover:bg-amber-500/10"
+                          >
+                            <RotateCcw className="h-4 w-4" />
                           </Button>
                           <Button size="icon" variant="ghost" asChild title="Ver Estatísticas">
                             <Link to="/links">

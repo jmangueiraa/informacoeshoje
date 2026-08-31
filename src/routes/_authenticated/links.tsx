@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getUserLinks, createCustomLink, deleteLink, toggleLinkStatus, getUserProfile, updateProfileDomain } from '@/lib/links.functions'
+import { getUserLinks, createCustomLink, deleteLink, toggleLinkStatus, resetLinkClicks, getUserProfile, updateProfileDomain } from '@/lib/links.functions'
 import { getUserDomains } from '@/lib/domains.functions'
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
@@ -20,7 +20,8 @@ import {
   BarChart3,
   Calendar,
   MousePointer2,
-  Settings2
+  Settings2,
+  RotateCcw
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -141,7 +142,20 @@ function LinksPage() {
     mutationFn: (id: string) => deleteLink({ data: id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-links'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
       toast.success("Link excluído com sucesso!")
+    }
+  })
+
+  const resetMutation = useMutation({
+    mutationFn: (id: string) => resetLinkClicks({ data: id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-links'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      toast.success("Cliques zerados com sucesso!")
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Erro ao zerar cliques.")
     }
   })
 
@@ -338,6 +352,13 @@ function LinksPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => navigate({ to: '/settings' })} className="gap-2">
                             <Settings2 className="h-4 w-4" /> Configurações
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => resetMutation.mutate(link.id)} 
+                            disabled={resetMutation.isPending}
+                            className="gap-2 text-amber-600 focus:bg-amber-500/10 focus:text-amber-600"
+                          >
+                            <RotateCcw className="h-4 w-4" /> Zerar Cliques
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
