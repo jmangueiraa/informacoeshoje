@@ -73,14 +73,41 @@ export const getUserLinks = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { userId, supabase: authenticatedSupabase } = context;
 
-    const { data, error } = await authenticatedSupabase
+    // 1. Busca os links do usuário
+    const { data: links, error } = await authenticatedSupabase
       .from("links")
       .select("*")
       .eq("user_id", userId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data;
+    if (!links || links.length === 0) return [];
+
+    const linkIds = links.map((l) => l.id);
+
+    // 2. Busca a contagem real agrupada por link_id na tabela clicks
+    const { data: clicksData } = await authenticatedSupabase
+      .from("clicks")
+      .select("link_id")
+      .in("link_id", linkIds);
+
+    // 3. Mapeia a contagem de cliques para cada link individualmente
+    const clickCounts: Record<string, number> = {};
+    (clicksData || []).forEach((c: any) => {
+      if (c.link_id) {
+        clickCounts[c.link_id] = (clickCounts[c.link_id] || 0) + 1;
+      }
+    });
+
+    return links.map((link) => {
+      const counted = clickCounts[link.id];
+      const count = counted !== undefined ? counted : (link.clicks_count ?? (link as any).clicks ?? 0);
+      return {
+        ...link,
+        clicks_count: count,
+        clicks: count,
+      };
+    });
   });
 
 export const deleteLink = createServerFn({ method: "POST" })

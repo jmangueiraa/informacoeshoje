@@ -33,6 +33,11 @@ export function DashboardHome() {
         queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clicks' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['user-links'] })
+        queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'link_clicks' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['user-links'] })
         queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
       })
       .subscribe()
@@ -176,7 +181,7 @@ export function DashboardHome() {
                         </div>
                       </td>
                       <td className="p-4 text-center font-semibold">
-                        {Number(link.clicks_count) || 0}
+                        {Number(link.clicks_count ?? (link as any).clicks) || 0}
                       </td>
                       <td className="p-4 text-center">
                         <Badge variant={link.status === 'active' ? 'secondary' : 'outline'} className={link.status === 'active' ? 'bg-green-500/10 text-green-500 hover:bg-green-500/20' : ''}>

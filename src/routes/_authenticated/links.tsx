@@ -95,6 +95,10 @@ function LinksPage() {
         queryClient.invalidateQueries({ queryKey: ['user-links'] })
         queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
       })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'link_clicks' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['user-links'] })
+        queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      })
       .subscribe()
 
     return () => {
@@ -321,7 +325,7 @@ function LinksPage() {
                   
                   <div className="px-6 pb-6 md:pb-0 md:py-6 flex items-center gap-8 border-t md:border-t-0 md:border-l">
                     <div className="text-center min-w-[80px]">
-                      <div className="text-2xl font-bold">{link.clicks_count || 0}</div>
+                      <div className="text-2xl font-bold">{link.clicks_count ?? (link as any).clicks ?? 0}</div>
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Cliques</p>
                     </div>
                     
