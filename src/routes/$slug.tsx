@@ -75,58 +75,66 @@ export const Route = createFileRoute('/$slug')({
         }
 
         const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
+        const isBot = isBotOrPrefetchRequest(request)
 
-        // 1. Busca o link ativo correspondente ao slug
+        // Se for bot/crawler/preview, redireciona SEM incrementar
+        if (isBot) {
+          const { data: link } = await supabaseAdmin
+            .from('links')
+            .select('affiliate_url')
+            .eq('slug', slug)
+            .eq('status', 'active')
+            .maybeSingle()
+
+          if (link?.affiliate_url) {
+            return new Response(null, {
+              status: 302,
+              headers: { Location: link.affiliate_url, 'Cache-Control': 'no-store' },
+            })
+          }
+          return new Response('Link não encontrado', { status: 404 })
+        }
+
+        // Para usuário humano: incrementa exatamente 1 clique via RPC única
+        const { data: destino, error } = await supabaseAdmin.rpc('incrementar_clique', {
+          link_slug: slug,
+        })
+
+        if (!error && typeof destino === 'string' && destino) {
+          return new Response(null, {
+            status: 302,
+            headers: {
+              Location: destino,
+              'Cache-Control': 'no-store, no-cache, must-revalidate',
+            },
+          })
+        }
+
+        // Fallback: se a RPC falhar, busca o link e adiciona exatamente 1 clique
         const { data: link } = await supabaseAdmin
           .from('links')
-          .select('id, affiliate_url, status, clicks_count, expires_at')
+          .select('id, affiliate_url, clicks_count')
           .eq('slug', slug)
           .eq('status', 'active')
           .maybeSingle()
 
-        if (!link?.affiliate_url) {
-          return new Response('Link não encontrado', { status: 404 })
+        if (link?.affiliate_url) {
+          await supabaseAdmin.from('clicks').insert({ link_id: link.id })
+          await supabaseAdmin
+            .from('links')
+            .update({ clicks_count: (link.clicks_count || 0) + 1 })
+            .eq('id', link.id)
+
+          return new Response(null, {
+            status: 302,
+            headers: {
+              Location: link.affiliate_url,
+              'Cache-Control': 'no-store, no-cache, must-revalidate',
+            },
+          })
         }
 
-        const isBot = isBotOrPrefetchRequest(request)
-
-        // 2. Se for humano, registra o clique por IP com fallback garantido
-        if (!isBot) {
-          try {
-            const clientIp = getClientIp(request)
-            const { error: rpcError } = await supabaseAdmin.rpc('register_link_click', {
-              p_link_id: link.id,
-              p_ip: clientIp,
-            })
-
-            // Fallback caso a RPC register_link_click ainda não tenha sido executada no Supabase
-            if (rpcError) {
-              await supabaseAdmin.from('clicks').insert({
-                link_id: link.id,
-                ip_address: clientIp,
-              })
-              await supabaseAdmin.rpc('incrementar_clique', { link_slug: slug })
-              await supabaseAdmin
-                .from('links')
-                .update({ clicks_count: (link.clicks_count || 0) + 1 })
-                .eq('id', link.id)
-            }
-          } catch (trackError) {
-            console.error('Erro ao registrar clique:', trackError)
-            try {
-              await supabaseAdmin.from('clicks').insert({ link_id: link.id })
-            } catch (_) {}
-          }
-        }
-
-        // 3. Redireciona imediatamente para a URL de afiliado
-        return new Response(null, {
-          status: 302,
-          headers: {
-            Location: link.affiliate_url,
-            'Cache-Control': 'no-store, no-cache, must-revalidate',
-          },
-        })
+        return new Response('Link não encontrado', { status: 404 })
       },
     },
   },
@@ -135,73 +143,50 @@ export const Route = createFileRoute('/$slug')({
 
 function RedirectPage() {
   const { slug } = Route.useParams()
-  const executouIncremento = useRef(false)
+  const hasExecuted = useRef(false)
 
   useEffect(() => {
-    if (!slug || executouIncremento.current) return
-    executouIncremento.current = true // Trava para não executar múltiplas vezes no cliente
+    if (!slug || hasExecuted.current) return
+    hasExecuted.current = true // Trava estrita para executar exatamente 1 vez no cliente
 
     const processRedirect = async () => {
       const cleanSlug = String(slug).replace(/^\/+|\/+$/g, '')
       if (!cleanSlug || cleanSlug.includes('.')) return
 
+      const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent.toLowerCase() : ''
+      const isBot = BOT_USER_AGENTS.some((bot) => userAgent.includes(bot.toLowerCase()))
+
+      if (!isBot) {
+        try {
+          // Incrementa exatamente 1 vez
+          const { data: destino, error } = await supabase.rpc('incrementar_clique', {
+            link_slug: cleanSlug,
+          })
+
+          if (!error && typeof destino === 'string' && destino) {
+            window.location.replace(destino)
+            return
+          }
+        } catch (err) {
+          console.error('Erro ao incrementar clique no cliente:', err)
+        }
+      }
+
+      // Fallback simples caso a RPC falhe
       try {
-        const { data: link, error } = await supabase
+        const { data: link } = await supabase
           .from('links')
-          .select('id, affiliate_url, status, clicks_count')
+          .select('affiliate_url')
           .eq('slug', cleanSlug)
+          .eq('status', 'active')
           .maybeSingle()
 
-        if (error || !link) {
+        if (link?.affiliate_url) {
+          window.location.replace(link.affiliate_url)
+        } else {
           window.location.replace('/')
-          return
         }
-
-        if (link.status !== 'active') {
-          alert('Este link está inativo.')
-          return
-        }
-
-        // Filtra User-Agents de bots / crawlers
-        const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent.toLowerCase() : ''
-        const isBot = BOT_USER_AGENTS.some((bot) => userAgent.includes(bot.toLowerCase()))
-
-        // Se for humano, registra clique de forma resiliente
-        if (!isBot) {
-          try {
-            // Busca IP com timeout de 600ms para não travar o redirecionamento
-            let clientIp = 'direct-client'
-            try {
-              const controller = new AbortController()
-              const timeoutId = setTimeout(() => controller.abort(), 600)
-              const ipRes = await fetch('https://api.ipify.org?format=json', { signal: controller.signal })
-              clearTimeout(timeoutId)
-              const ipData = await ipRes.json()
-              clientIp = ipData.ip || 'direct-client'
-            } catch (_) {}
-
-            const { error: rpcError } = await supabase.rpc('register_link_click', {
-              p_link_id: link.id,
-              p_ip: clientIp,
-            })
-
-            // Fallback garantido se a RPC não existir
-            if (rpcError) {
-              await supabase.from('clicks').insert({ link_id: link.id, ip_address: clientIp })
-              await supabase.rpc('incrementar_clique', { link_slug: cleanSlug })
-            }
-          } catch (e) {
-            console.error('Falha ao registrar clique no cliente:', e)
-            try {
-              await supabase.from('clicks').insert({ link_id: link.id })
-            } catch (_) {}
-          }
-        }
-
-        // Redireciona para o destino
-        window.location.replace(link.affiliate_url)
-      } catch (err) {
-        console.error('Erro geral no redirecionamento:', err)
+      } catch (_) {
         window.location.replace('/')
       }
     }
