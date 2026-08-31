@@ -79,7 +79,7 @@ export const Route = createFileRoute('/$slug')({
         // 1. Busca o link ativo correspondente ao slug
         const { data: link } = await supabaseAdmin
           .from('links')
-          .select('id, affiliate_url, status, expires_at')
+          .select('id, affiliate_url, status, clicks_count, expires_at')
           .eq('slug', slug)
           .eq('status', 'active')
           .maybeSingle()
@@ -90,16 +90,32 @@ export const Route = createFileRoute('/$slug')({
 
         const isBot = isBotOrPrefetchRequest(request)
 
-        // 2. Se for humano, registra o clique por IP com controle de 24h via RPC seguro
+        // 2. Se for humano, registra o clique por IP com fallback garantido
         if (!isBot) {
           try {
             const clientIp = getClientIp(request)
-            await supabaseAdmin.rpc('register_link_click', {
+            const { error: rpcError } = await supabaseAdmin.rpc('register_link_click', {
               p_link_id: link.id,
               p_ip: clientIp,
             })
+
+            // Fallback caso a RPC register_link_click ainda não tenha sido executada no Supabase
+            if (rpcError) {
+              await supabaseAdmin.from('clicks').insert({
+                link_id: link.id,
+                ip_address: clientIp,
+              })
+              await supabaseAdmin.rpc('incrementar_clique', { link_slug: slug })
+              await supabaseAdmin
+                .from('links')
+                .update({ clicks_count: (link.clicks_count || 0) + 1 })
+                .eq('id', link.id)
+            }
           } catch (trackError) {
-            console.error('Erro ao registrar clique seguro:', trackError)
+            console.error('Erro ao registrar clique:', trackError)
+            try {
+              await supabaseAdmin.from('clicks').insert({ link_id: link.id })
+            } catch (_) {}
           }
         }
 
@@ -132,7 +148,7 @@ function RedirectPage() {
       try {
         const { data: link, error } = await supabase
           .from('links')
-          .select('id, affiliate_url, status')
+          .select('id, affiliate_url, status, clicks_count')
           .eq('slug', cleanSlug)
           .maybeSingle()
 
@@ -150,19 +166,35 @@ function RedirectPage() {
         const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent.toLowerCase() : ''
         const isBot = BOT_USER_AGENTS.some((bot) => userAgent.includes(bot.toLowerCase()))
 
-        // Se for humano, busca IP e registra clique no Supabase
+        // Se for humano, registra clique de forma resiliente
         if (!isBot) {
           try {
-            const ipRes = await fetch('https://api.ipify.org?format=json')
-            const ipData = await ipRes.json()
-            const clientIp = ipData.ip || 'unknown'
+            // Busca IP com timeout de 600ms para não travar o redirecionamento
+            let clientIp = 'direct-client'
+            try {
+              const controller = new AbortController()
+              const timeoutId = setTimeout(() => controller.abort(), 600)
+              const ipRes = await fetch('https://api.ipify.org?format=json', { signal: controller.signal })
+              clearTimeout(timeoutId)
+              const ipData = await ipRes.json()
+              clientIp = ipData.ip || 'direct-client'
+            } catch (_) {}
 
-            await supabase.rpc('register_link_click', {
+            const { error: rpcError } = await supabase.rpc('register_link_click', {
               p_link_id: link.id,
               p_ip: clientIp,
             })
+
+            // Fallback garantido se a RPC não existir
+            if (rpcError) {
+              await supabase.from('clicks').insert({ link_id: link.id, ip_address: clientIp })
+              await supabase.rpc('incrementar_clique', { link_slug: cleanSlug })
+            }
           } catch (e) {
-            console.error('Falha ao registrar IP do clique no cliente:', e)
+            console.error('Falha ao registrar clique no cliente:', e)
+            try {
+              await supabase.from('clicks').insert({ link_id: link.id })
+            } catch (_) {}
           }
         }
 
