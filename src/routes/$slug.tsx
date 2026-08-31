@@ -91,43 +91,49 @@ export const Route = createFileRoute('/$slug')({
   component: RedirectPage,
 })
 
-function handleMobileRedirect(destinationUrl: string) {
+function executeRedirect(destinationUrl: string) {
   if (typeof window === 'undefined' || !destinationUrl) return
 
-  const isAndroid = /Android/i.test(navigator.userAgent)
-  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+  const userAgent = navigator.userAgent || ''
+  const isAndroid = /Android/i.test(userAgent)
+  const isIOS = /iPhone|iPad|iPod/i.test(userAgent)
+  const isInApp = /FBAN|FBAV|Instagram|TikTok|BytedanceWebview/i.test(userAgent)
 
+  // --- BYPASS PARA ANDROID ---
   if (isAndroid) {
-    // 1. URL scheme nativo da Shopee BR para rotas e links web
-    const appDeepLink = `shopee://open?url=${encodeURIComponent(destinationUrl)}`
+    const cleanPath = destinationUrl.replace(/^https?:\/\//, '')
 
-    // 2. Intent oficial do pacote com fallback
-    const cleanUrl = destinationUrl.replace(/^https?:\/\//, '')
-    const androidIntent = `intent://${cleanUrl}#Intent;scheme=https;package=com.shopee.br;S.browser_fallback_url=${encodeURIComponent(destinationUrl)};end;`
+    // Se estiver preso dentro do In-App Browser (Instagram/TikTok/Facebook), escapa para o Chrome externo
+    if (isInApp) {
+      window.location.href = `intent://${cleanPath}#Intent;scheme=https;package=com.android.chrome;end;`
+      return
+    }
 
-    // Tenta primeiro o deep link direto
-    window.location.href = appDeepLink
+    // Se estiver no navegador padrão (Chrome/WhatsApp), aciona direto o app da Shopee
+    const intentShopee = `intent://${cleanPath}#Intent;scheme=https;package=com.shopee.br;S.browser_fallback_url=${encodeURIComponent(destinationUrl)};end;`
 
-    // Se em 300ms o app não assumir, dispara o Intent nativo do Android
+    const a = document.createElement('a')
+    a.href = intentShopee
+    a.rel = 'noreferrer'
+    document.body.appendChild(a)
+    a.click()
+
     setTimeout(() => {
-      window.location.href = androidIntent
-    }, 300)
+      window.location.replace(destinationUrl)
+    }, 1500)
     return
   }
 
+  // --- BYPASS PARA IOS (IPHONE) ---
   if (isIOS) {
-    // No iOS, o deep link direto com a URL encoded força o app
-    const iosDeepLink = `shopee://open?url=${encodeURIComponent(destinationUrl)}`
-    window.location.href = iosDeepLink
-
-    // Fallback para Safari se o app não estiver instalado
+    window.location.href = `shopee://open?url=${encodeURIComponent(destinationUrl)}`
     setTimeout(() => {
       window.location.replace(destinationUrl)
     }, 1200)
     return
   }
 
-  // Desktop
+  // Desktop / Navegador de PC
   window.location.replace(destinationUrl)
 }
 
@@ -162,7 +168,7 @@ function RedirectPage() {
 
     // Se o loader no servidor já obteve o destino com clique somado:
     if (targetUrl) {
-      handleMobileRedirect(targetUrl)
+      executeRedirect(targetUrl)
       return
     }
 
@@ -181,7 +187,7 @@ function RedirectPage() {
       .maybeSingle()
       .then(({ data: link }) => {
         if (link?.affiliate_url) {
-          handleMobileRedirect(link.affiliate_url)
+          executeRedirect(link.affiliate_url)
         } else {
           window.location.replace('/')
         }
