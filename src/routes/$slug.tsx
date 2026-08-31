@@ -91,41 +91,43 @@ export const Route = createFileRoute('/$slug')({
   component: RedirectPage,
 })
 
-function redirectToShopee(destinationUrl: string) {
+function handleMobileRedirect(destinationUrl: string) {
   if (typeof window === 'undefined' || !destinationUrl) return
 
-  const userAgent = navigator.userAgent || ''
-  const isAndroid = /Android/i.test(userAgent)
-  const isIOS = /iPhone|iPad|iPod/i.test(userAgent)
+  const isAndroid = /Android/i.test(navigator.userAgent)
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
 
   if (isAndroid) {
-    // Tenta o Custom Scheme direto do app Shopee BR primeiro
-    const appUrl = destinationUrl.replace(/^https?:\/\//, 'shopee://')
+    // 1. URL scheme nativo da Shopee BR para rotas e links web
+    const appDeepLink = `shopee://open?url=${encodeURIComponent(destinationUrl)}`
+
+    // 2. Intent oficial do pacote com fallback
     const cleanUrl = destinationUrl.replace(/^https?:\/\//, '')
-    const fallbackIntent = `intent://${cleanUrl}#Intent;scheme=https;package=com.shopee.br;S.browser_fallback_url=${encodeURIComponent(destinationUrl)};end;`
+    const androidIntent = `intent://${cleanUrl}#Intent;scheme=https;package=com.shopee.br;S.browser_fallback_url=${encodeURIComponent(destinationUrl)};end;`
 
-    // Dispara a tentativa direta
-    window.location.href = appUrl
+    // Tenta primeiro o deep link direto
+    window.location.href = appDeepLink
 
-    // Se falhar em abrir o app direto em 500ms, usa o Intent com fallback automático
+    // Se em 300ms o app não assumir, dispara o Intent nativo do Android
     setTimeout(() => {
-      window.location.href = fallbackIntent
-    }, 500)
+      window.location.href = androidIntent
+    }, 300)
     return
   }
 
   if (isIOS) {
-    // No iOS, shopee:// abre o app sem confirmação de página web
-    const iosAppUrl = destinationUrl.replace(/^https?:\/\//, 'shopee://')
-    window.location.href = iosAppUrl
+    // No iOS, o deep link direto com a URL encoded força o app
+    const iosDeepLink = `shopee://open?url=${encodeURIComponent(destinationUrl)}`
+    window.location.href = iosDeepLink
 
+    // Fallback para Safari se o app não estiver instalado
     setTimeout(() => {
       window.location.replace(destinationUrl)
-    }, 1000)
+    }, 1200)
     return
   }
 
-  // Desktop (PC)
+  // Desktop
   window.location.replace(destinationUrl)
 }
 
@@ -160,7 +162,7 @@ function RedirectPage() {
 
     // Se o loader no servidor já obteve o destino com clique somado:
     if (targetUrl) {
-      redirectToShopee(targetUrl)
+      handleMobileRedirect(targetUrl)
       return
     }
 
@@ -179,7 +181,7 @@ function RedirectPage() {
       .maybeSingle()
       .then(({ data: link }) => {
         if (link?.affiliate_url) {
-          redirectToShopee(link.affiliate_url)
+          handleMobileRedirect(link.affiliate_url)
         } else {
           window.location.replace('/')
         }
