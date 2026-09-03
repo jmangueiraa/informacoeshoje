@@ -36,6 +36,17 @@ GRANT ALL ON public.link_clicks TO service_role;
 
 GRANT SELECT, INSERT, DELETE ON public.clicks TO anon, authenticated;
 
+-- Permite leitura pública dos links para visitantes anônimos realizarem o redirect
+ALTER TABLE public.links ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Público pode ver links para redirect" ON public.links;
+DROP POLICY IF EXISTS "Permitir leitura pública de links" ON public.links;
+CREATE POLICY "Permitir leitura pública de links"
+ON public.links FOR SELECT
+TO anon, authenticated
+USING (true);
+
+GRANT SELECT ON public.links TO anon, authenticated;
+
 -- 4. Função com SECURITY DEFINER para registrar o clique e atualizar o contador de forma atômica
 CREATE OR REPLACE FUNCTION public.register_link_click(p_link_id uuid, p_ip text)
 RETURNS boolean

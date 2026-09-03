@@ -19,10 +19,11 @@ const createLinkSchema = z.object({
 export const checkSlugAvailability = createServerFn({ method: "GET" })
   .inputValidator((slug: unknown) => z.string().parse(slug))
   .handler(async ({ data: slug }) => {
+    const cleanSlug = String(slug ?? '').replace(/^\/+|\/+$/g, '').trim().toLowerCase();
     const { data, error } = await supabase
       .from("links")
       .select("id")
-      .eq("slug", slug)
+      .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug}`)
       .maybeSingle();
 
     if (error) throw error;
@@ -37,12 +38,11 @@ export const createCustomLink = createServerFn({ method: "POST" })
 
     console.log("Criando link para usuário:", userId);
 
-    // Lógica de limites removida para conta única unificada
-    // Todos os usuários têm acesso total
+    const cleanSlug = String(data.slug ?? '').replace(/^\/+|\/+$/g, '').trim().toLowerCase();
 
     const insertData = {
       user_id: userId,
-      slug: data.slug,
+      slug: cleanSlug,
       affiliate_url: data.affiliateUrl,
       title: data.title || null,
       expires_at: data.expiresAt || null,

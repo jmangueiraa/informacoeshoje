@@ -80,7 +80,7 @@ export const Route = createFileRoute('/$slug')({
         .from('links')
         .select('id, affiliate_url, status, clicks_count, expires_at')
         .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug}`)
-        .or('status.eq.active,status.is.null')
+        .or('status.eq.active,status.eq.ativo,status.is.null')
         .maybeSingle()
 
       if (!linkError && link?.affiliate_url) {
@@ -196,7 +196,7 @@ function RedirectPage() {
       .from('links')
       .select('id, affiliate_url, status, clicks_count')
       .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug}`)
-      .or('status.eq.active,status.is.null')
+      .or('status.eq.active,status.eq.ativo,status.is.null')
       .maybeSingle()
       .then(({ data: link }) => {
         if (link?.affiliate_url) {
