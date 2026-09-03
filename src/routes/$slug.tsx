@@ -57,29 +57,42 @@ function isBotOrPrefetchRequest(request?: Request): boolean {
 
 export const Route = createFileRoute('/$slug')({
   loader: async ({ params }) => {
-    const slug = String(params.slug ?? '').replace(/^\/+|\/+$/g, '')
-    if (!slug || slug.includes('.')) {
+    const rawSlug = String(params.slug ?? '').trim()
+    const cleanSlug = rawSlug.replace(/^\/+|\/+$/g, '')
+    if (!cleanSlug || cleanSlug.includes('.')) {
       throw notFound()
     }
 
     try {
       const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
-      const { data: destino, error } = await supabaseAdmin.rpc('incrementar_clique', {
-        link_slug: slug,
+
+      // 1. Tenta incrementar via RPC
+      const { data: destino, error: rpcError } = await supabaseAdmin.rpc('incrementar_clique', {
+        link_slug: cleanSlug,
       })
 
-      if (!error && typeof destino === 'string' && destino) {
+      if (!rpcError && typeof destino === 'string' && destino) {
         return { targetUrl: destino }
       }
 
-      const { data: link } = await supabaseAdmin
+      // 2. Busca com ilike (case-insensitive) ignorando barras e maiúsculas/minúsculas
+      const { data: link, error: linkError } = await supabaseAdmin
         .from('links')
-        .select('affiliate_url')
-        .eq('slug', slug)
-        .eq('status', 'active')
+        .select('id, affiliate_url, status, clicks_count, expires_at')
+        .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug}`)
+        .or('status.eq.active,status.is.null')
         .maybeSingle()
 
-      if (link?.affiliate_url) {
+      if (!linkError && link?.affiliate_url) {
+        // Incrementa o contador de cliques
+        try {
+          await supabaseAdmin.from('clicks').insert({ link_id: link.id })
+          await supabaseAdmin
+            .from('links')
+            .update({ clicks_count: (link.clicks_count || 0) + 1 })
+            .eq('id', link.id)
+        } catch (_) {}
+
         return { targetUrl: link.affiliate_url }
       }
     } catch (e) {
@@ -172,8 +185,8 @@ function RedirectPage() {
       return
     }
 
-    // Fallback no cliente se necessário
-    const cleanSlug = String(slug ?? '').replace(/^\/+|\/+$/g, '')
+    // Fallback no cliente: busca com ilike (case-insensitive)
+    const cleanSlug = String(slug ?? '').trim().replace(/^\/+|\/+$/g, '')
     if (!cleanSlug || cleanSlug.includes('.')) {
       window.location.replace('/')
       return
@@ -181,12 +194,21 @@ function RedirectPage() {
 
     supabase
       .from('links')
-      .select('affiliate_url')
-      .eq('slug', cleanSlug)
-      .eq('status', 'active')
+      .select('id, affiliate_url, status, clicks_count')
+      .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug}`)
+      .or('status.eq.active,status.is.null')
       .maybeSingle()
       .then(({ data: link }) => {
         if (link?.affiliate_url) {
+          // Incrementa métrica
+          try {
+            supabase.from('clicks').insert({ link_id: link.id })
+            supabase
+              .from('links')
+              .update({ clicks_count: (link.clicks_count || 0) + 1 })
+              .eq('id', link.id)
+          } catch (_) {}
+
           executeRedirect(link.affiliate_url)
         } else {
           window.location.replace('/')

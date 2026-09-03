@@ -117,3 +117,36 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.increment_clicks(uuid) TO anon, authenticated, service_role;
+
+-- 7. Função de incremento por Slug (Case-Insensitive e flexível a barras)
+CREATE OR REPLACE FUNCTION public.incrementar_clique(link_slug text)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  url_dest text;
+  v_link_id uuid;
+  v_clean_slug text;
+BEGIN
+  v_clean_slug := lower(btrim(link_slug, '/'));
+
+  UPDATE public.links
+  SET clicks_count = COALESCE(clicks_count, 0) + 1,
+      updated_at = now()
+  WHERE lower(btrim(slug, '/')) = v_clean_slug
+    AND (status = 'active' OR status IS NULL)
+    AND (expires_at IS NULL OR expires_at > now())
+  RETURNING id, affiliate_url INTO v_link_id, url_dest;
+
+  IF v_link_id IS NOT NULL THEN
+    INSERT INTO public.clicks (link_id) VALUES (v_link_id);
+  END IF;
+
+  RETURN url_dest;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.incrementar_clique(text) TO anon, authenticated, service_role;
+
