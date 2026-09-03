@@ -64,9 +64,8 @@ export const Route = createFileRoute('/$slug')({
     }
 
     try {
+      // 1. Tenta com supabaseAdmin no servidor se disponível
       const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
-
-      // 1. Tenta incrementar via RPC
       const { data: destino, error: rpcError } = await supabaseAdmin.rpc('incrementar_clique', {
         link_slug: cleanSlug,
       })
@@ -75,16 +74,14 @@ export const Route = createFileRoute('/$slug')({
         return { targetUrl: destino }
       }
 
-      // 2. Busca com ilike (case-insensitive) ignorando barras e maiúsculas/minúsculas
       const { data: link, error: linkError } = await supabaseAdmin
         .from('links')
-        .select('id, affiliate_url, status, clicks_count, expires_at')
+        .select('*')
         .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug}`)
-        .or('status.eq.active,status.eq.ativo,status.is.null')
         .maybeSingle()
 
-      if (!linkError && link?.affiliate_url) {
-        // Incrementa o contador de cliques
+      const targetUrl = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
+      if (!linkError && targetUrl) {
         try {
           await supabaseAdmin.from('clicks').insert({ link_id: link.id })
           await supabaseAdmin
@@ -93,10 +90,10 @@ export const Route = createFileRoute('/$slug')({
             .eq('id', link.id)
         } catch (_) {}
 
-        return { targetUrl: link.affiliate_url }
+        return { targetUrl }
       }
     } catch (e) {
-      console.error('Erro ao carregar link no servidor:', e)
+      console.warn('Loader do servidor pulou para o cliente:', e)
     }
 
     return { targetUrl: null }
@@ -181,25 +178,37 @@ function RedirectPage() {
 
     // Se o loader no servidor já obteve o destino com clique somado:
     if (targetUrl) {
+      console.log('Redirecionando para (loader):', targetUrl)
       executeRedirect(targetUrl)
       return
     }
 
-    // Fallback no cliente: busca com ilike (case-insensitive)
-    const cleanSlug = String(slug ?? '').trim().replace(/^\/+|\/+$/g, '')
+    const rawSlug = String(slug ?? '').trim()
+    const cleanSlug = rawSlug.replace(/^\/+|\/+$/g, '')
     if (!cleanSlug || cleanSlug.includes('.')) {
       window.location.replace('/')
       return
     }
 
+    console.log('Buscando link no Supabase para slug:', cleanSlug)
+
+    // Busca flexível direta no Supabase
     supabase
       .from('links')
-      .select('id, affiliate_url, status, clicks_count')
+      .select('*')
       .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug}`)
-      .or('status.eq.active,status.eq.ativo,status.is.null')
       .maybeSingle()
-      .then(({ data: link }) => {
-        if (link?.affiliate_url) {
+      .then(({ data: link, error }) => {
+        if (error) {
+          console.error('Erro ao buscar link no Supabase:', error)
+          window.location.replace('/')
+          return
+        }
+
+        console.log('Resultado encontrado no Supabase:', link)
+
+        const dest = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
+        if (dest) {
           // Incrementa métrica
           try {
             supabase.from('clicks').insert({ link_id: link.id })
@@ -209,12 +218,14 @@ function RedirectPage() {
               .eq('id', link.id)
           } catch (_) {}
 
-          executeRedirect(link.affiliate_url)
+          executeRedirect(dest)
         } else {
+          console.warn('Slug não localizado ou sem URL de destino no banco.')
           window.location.replace('/')
         }
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('Exceção ao processar redirecionamento:', err)
         window.location.replace('/')
       })
 
