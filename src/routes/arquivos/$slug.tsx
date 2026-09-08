@@ -8,7 +8,7 @@ export const Route = createFileRoute('/arquivos/$slug')({
 
 function ArquivosRedirectPage() {
   const { slug } = Route.useParams()
-  const [statusText, setStatusText] = useState('Redirecionando para a Shopee...')
+  const [statusText, setStatusText] = useState('Redirecionando para o produto...')
 
   useEffect(() => {
     const rawSlug = String(slug ?? '').trim()
@@ -42,7 +42,7 @@ function ArquivosRedirectPage() {
           return
         }
 
-        // Incrementa contagem de cliques
+        // Incrementa contagem de cliques no banco
         try {
           supabase.from('clicks').insert({ link_id: link.id })
           supabase
@@ -51,7 +51,7 @@ function ArquivosRedirectPage() {
             .eq('id', link.id)
         } catch (_) {}
 
-        // Redirecionamento real de navegador no frontend
+        // Executa redirecionamento real de navegador
         window.location.replace(destinationUrl)
       } catch (err) {
         console.error('Erro no redirecionamento:', err)
