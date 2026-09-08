@@ -6,7 +6,7 @@ export const Route = createFileRoute('/$slug')({
   component: SlugRedirectPage,
 })
 
-function redirectToShopeeApp(destinationUrl: string) {
+function executeSmartDeepLink(destinationUrl: string) {
   if (typeof window === 'undefined' || !destinationUrl) return
 
   const userAgent = navigator.userAgent || ''
@@ -14,51 +14,60 @@ function redirectToShopeeApp(destinationUrl: string) {
   const isIOS = /iPhone|iPad|iPod/i.test(userAgent)
   const isInApp = /FBAN|FBAV|Instagram|TikTok|BytedanceWebview/i.test(userAgent)
 
-  // 1. Android
+  // 1. Android (App Nativo ou Fallback Web)
   if (isAndroid) {
     const cleanUrl = destinationUrl.replace(/^https?:\/\//, '')
 
-    // Se estiver dentro do navegador embutido do Instagram/TikTok, abre no Chrome externo
+    // Se estiver no In-App Browser (Instagram/TikTok), abre no Chrome externo
     if (isInApp) {
       window.location.href = `intent://${cleanUrl}#Intent;scheme=https;package=com.android.chrome;end;`
       return
     }
 
-    // Dispara o Deep Link do App da Shopee BR nativo via Android Intent
     const encodedUrl = encodeURIComponent(destinationUrl)
-    const appDeepLink = `intent://open?url=${encodedUrl}#Intent;scheme=shopee;package=com.shopee.br;S.browser_fallback_url=${encodedUrl};end;`
+    const intentUrl = `intent://open?url=${encodedUrl}#Intent;scheme=shopee;package=com.shopee.br;S.browser_fallback_url=${encodedUrl};end;`
 
+    const startTime = Date.now()
     const linkElem = document.createElement('a')
-    linkElem.href = appDeepLink
+    linkElem.href = intentUrl
     linkElem.rel = 'noreferrer'
     document.body.appendChild(linkElem)
     linkElem.click()
 
+    // Fallback inteligente em JavaScript: abre web se o app não estiver instalado
     setTimeout(() => {
-      window.location.replace(destinationUrl)
-    }, 1500)
+      const elapsed = Date.now() - startTime
+      // Se o usuário ainda estiver com a aba aberta e focada (app não abriu):
+      if (!document.hidden && elapsed < 3000) {
+        window.location.replace(destinationUrl)
+      }
+    }, 1200)
     return
   }
 
   // 2. iOS (iPhone / iPad)
   if (isIOS) {
     const appUrl = `shopee://open?url=${encodeURIComponent(destinationUrl)}`
+    const startTime = Date.now()
     window.location.href = appUrl
 
+    // Fallback inteligente no iOS
     setTimeout(() => {
-      window.location.replace(destinationUrl)
-    }, 1200)
+      const elapsed = Date.now() - startTime
+      if (!document.hidden && elapsed < 3000) {
+        window.location.replace(destinationUrl)
+      }
+    }, 1000)
     return
   }
 
-  // 3. Desktop / Navegador PC
+  // 3. Desktop / Computador (Navegador Web direto)
   window.location.replace(destinationUrl)
 }
 
 function SlugRedirectPage() {
   const { slug } = Route.useParams()
   const [statusText, setStatusText] = useState('Abrindo o aplicativo da Shopee...')
-  const [directUrl, setDirectUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const rawSlug = String(slug ?? '').trim()
@@ -118,10 +127,8 @@ function SlugRedirectPage() {
           } catch (_) {}
         }
 
-        setDirectUrl(destinationUrl)
-
-        // Executa redirecionamento direto para o app Shopee
-        redirectToShopeeApp(destinationUrl)
+        // Dispara o Deep Link Inteligente com Fallback Web automático
+        executeSmartDeepLink(destinationUrl)
       } catch (err) {
         console.error('Erro no processamento do clique:', err)
         window.location.replace('/')
@@ -170,29 +177,9 @@ function SlugRedirectPage() {
         <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#222222', margin: '0 0 8px 0' }}>
           {statusText}
         </h2>
-        <p style={{ fontSize: '13px', color: '#888888', margin: '0 0 16px 0' }}>
+        <p style={{ fontSize: '13px', color: '#888888', margin: 0 }}>
           Aguarde um momento...
         </p>
-
-        {directUrl && (
-          <button
-            onClick={() => redirectToShopeeApp(directUrl)}
-            style={{
-              backgroundColor: '#ee4d2d',
-              color: '#ffffff',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '8px',
-              fontWeight: 'bold',
-              fontSize: '14px',
-              cursor: 'pointer',
-              width: '100%',
-              marginTop: '8px',
-            }}
-          >
-            Abrir no App Shopee
-          </button>
-        )}
       </div>
     </div>
   )
