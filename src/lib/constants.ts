@@ -1,16 +1,23 @@
 export const PLATFORM_DOMAIN = "infomacoeshoje.online";
 // Domínio padrão usado nos links curtos enviados aos clientes
-export const LINK_DOMAIN = "www.editaveisdocanva.com.br/arquivos";
+export const LINK_DOMAIN = "links.editaveisdocanva.com.br";
 export const PLATFORM_BASE_URL = `https://${PLATFORM_DOMAIN}`;
 export const PLATFORM_NAME = "LinkAfiliado";
 
 // Domínios disponíveis no criador de links
 export const PREDEFINED_DOMAINS = [
   {
+    id: "canva-links",
+    domain: "links.editaveisdocanva.com.br",
+    label: "links.editaveisdocanva.com.br (Principal)",
+    is_primary: true,
+    verification_status: "verified"
+  },
+  {
     id: "canva-arquivos",
     domain: "www.editaveisdocanva.com.br/arquivos",
-    label: "www.editaveisdocanva.com.br/arquivos (Principal)",
-    is_primary: true,
+    label: "www.editaveisdocanva.com.br/arquivos",
+    is_primary: false,
     verification_status: "verified"
   },
   {

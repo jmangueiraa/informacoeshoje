@@ -57,7 +57,7 @@ function LinksPage() {
     title: '', 
     slug: '', 
     affiliate_url: '', 
-    domain_id: 'canva-arquivos' 
+    domain_id: 'canva-links' 
   })
   
   const queryClient = useQueryClient()
@@ -91,7 +91,7 @@ function LinksPage() {
     if (isCreateOpen) {
       setNewLink(prev => ({ 
         ...prev, 
-        domain_id: prev.domain_id && prev.domain_id !== 'platform-default' ? prev.domain_id : 'canva-arquivos' 
+        domain_id: prev.domain_id && prev.domain_id !== 'platform-default' ? prev.domain_id : 'canva-links' 
       }))
     }
   }, [isCreateOpen])
@@ -134,7 +134,7 @@ function LinksPage() {
             affiliateUrl: data.affiliate_url,
             slug: data.slug,
             title: data.title || undefined,
-            domainId: data.domain_id || 'canva-arquivos'
+            domainId: data.domain_id || 'canva-links'
           }
         });
         return result;
@@ -150,7 +150,7 @@ function LinksPage() {
         queryClient.invalidateQueries({ queryKey: ['user-links'] })
         toast.success("Link criado com sucesso!")
         setIsCreateOpen(false)
-        setNewLink({ title: '', slug: '', affiliate_url: '', domain_id: 'canva-arquivos' })
+        setNewLink({ title: '', slug: '', affiliate_url: '', domain_id: 'canva-links' })
       }
     },
     onError: (error: any) => {
@@ -192,10 +192,10 @@ function LinksPage() {
     }
   })
 
-  // Resolve a URL base do link: domínio escolhido na criação > custom_domain > padrão editaveisdocanva.com.br/arquivos
+  // Resolve a URL base do link: domínio escolhido na criação > custom_domain > padrão links.editaveisdocanva.com.br
   const getLinkBaseUrl = (link: any) => {
     const linkDomain = link.domain_id ? availableDomains.find((d: any) => d.id === link.domain_id) : null
-    const domainName = linkDomain?.domain || link.custom_domain || availableDomains[0]?.domain || "www.editaveisdocanva.com.br/arquivos"
+    const domainName = linkDomain?.domain || link.custom_domain || availableDomains[0]?.domain || "links.editaveisdocanva.com.br"
 
     if (domainName) {
       const clean = domainName.replace(/^https?:\/\//, '').replace(/\/+$/, '')
@@ -216,7 +216,7 @@ function LinksPage() {
   )
 
   const selectedDomainObj = availableDomains.find((d: any) => d.id === newLink.domain_id || d.domain === newLink.domain_id)
-  const currentDomainDisplay = selectedDomainObj?.domain || "www.editaveisdocanva.com.br/arquivos"
+  const currentDomainDisplay = selectedDomainObj?.domain || "links.editaveisdocanva.com.br"
 
   return (
     <div className="container mx-auto p-6 space-y-8 max-w-7xl">
@@ -278,15 +278,15 @@ function LinksPage() {
                 <select 
                   id="domain_id"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={newLink.domain_id || 'canva-arquivos'}
-                  onChange={(e) => setNewLink({...newLink, domain_id: e.target.value || 'canva-arquivos'})}
+                  value={newLink.domain_id || 'canva-links'}
+                  onChange={(e) => setNewLink({...newLink, domain_id: e.target.value || 'canva-links'})}
                 >
                   {availableDomains.map((d: any) => (
                     <option key={d.id} value={d.id}>{d.label || d.domain}</option>
                   ))}
                 </select>
                 <p className="text-[11px] text-muted-foreground">
-                  Domínio padrão selecionado: <strong className="text-foreground">https://www.editaveisdocanva.com.br/arquivos/</strong>
+                  Domínio padrão selecionado: <strong className="text-foreground">https://links.editaveisdocanva.com.br/</strong>
                 </p>
               </div>
             </div>

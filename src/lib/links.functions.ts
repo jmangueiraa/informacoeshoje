@@ -43,13 +43,16 @@ export const createCustomLink = createServerFn({ method: "POST" })
     const isUUID = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
     let domainId: string | null = null;
-    let customDomain: string | null = 'www.editaveisdocanva.com.br/arquivos';
+    let customDomain: string | null = 'links.editaveisdocanva.com.br';
 
     if (data.domainId) {
       if (isUUID(data.domainId)) {
         domainId = data.domainId;
         customDomain = null;
-      } else if (data.domainId === 'canva-arquivos' || data.domainId.includes('editaveisdocanva.com.br')) {
+      } else if (data.domainId === 'canva-links' || data.domainId === 'links.editaveisdocanva.com.br') {
+        customDomain = 'links.editaveisdocanva.com.br';
+        domainId = null;
+      } else if (data.domainId === 'canva-arquivos' || data.domainId.includes('arquivos')) {
         customDomain = 'www.editaveisdocanva.com.br/arquivos';
         domainId = null;
       } else {
