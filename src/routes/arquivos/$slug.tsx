@@ -1,59 +1,6 @@
 import { createFileRoute, notFound } from '@tanstack/react-router'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/integrations/supabase/client'
-
-// 1. Lista de User-Agents de bots e crawlers conhecidos
-const BOT_USER_AGENTS = [
-  'facebookexternalhit',
-  'WhatsApp',
-  'TelegramBot',
-  'Twitterbot',
-  'LinkedInBot',
-  'Slackbot-LinkExpanding',
-  'Discordbot',
-  'Googlebot',
-  'bingbot',
-  'applebot',
-  'duckduckbot',
-  'baiduspider',
-  'yandexbot',
-  'sogou',
-  'facebot',
-  'ia_archiver',
-  'petalbot',
-  'bytespider',
-  'semrushbot',
-  'ahrefsbot',
-  'preview',
-  'crawler',
-  'spider',
-  'curl',
-  'wget',
-  'python-requests',
-  'headlesschrome',
-  'lighthouse',
-]
-
-function isBotOrPrefetchRequest(request?: Request): boolean {
-  if (!request) return false
-
-  const userAgent = request.headers.get('user-agent') || ''
-  const purpose = (
-    request.headers.get('purpose') ||
-    request.headers.get('sec-purpose') ||
-    request.headers.get('x-purpose') ||
-    request.headers.get('x-moz') ||
-    ''
-  ).toLowerCase()
-
-  if (purpose.includes('prefetch') || purpose.includes('preview')) {
-    return true
-  }
-
-  return BOT_USER_AGENTS.some((bot) =>
-    userAgent.toLowerCase().includes(bot.toLowerCase())
-  )
-}
 
 export const Route = createFileRoute('/arquivos/$slug')({
   loader: async ({ params }) => {
@@ -132,7 +79,7 @@ function executeRedirect(destinationUrl: string) {
 
     setTimeout(() => {
       window.location.replace(destinationUrl)
-    }, 1500)
+    }, 1200)
     return
   }
 
@@ -141,7 +88,7 @@ function executeRedirect(destinationUrl: string) {
     window.location.href = `shopee://open?url=${encodeURIComponent(destinationUrl)}`
     setTimeout(() => {
       window.location.replace(destinationUrl)
-    }, 1200)
+    }, 1000)
     return
   }
 
@@ -154,6 +101,7 @@ function ArquivosRedirectPage() {
   const targetUrl = loaderData?.targetUrl || null
   const { slug } = Route.useParams()
   const hasExecuted = useRef(false)
+  const [redirectingUrl, setRedirectingUrl] = useState<string | null>(targetUrl)
 
   useEffect(() => {
     // Remove qualquer elemento ou badge do Lovable do DOM
@@ -176,11 +124,10 @@ function ArquivosRedirectPage() {
     }
 
     if (hasExecuted.current) return
-    hasExecuted.current = true // Trava estrita de execução única
+    hasExecuted.current = true
 
-    // Se o loader no servidor já obteve o destino com clique somado:
+    // Se o loader no servidor já obteve o destino:
     if (targetUrl) {
-      console.log('Redirecionando para (loader /arquivos):', targetUrl)
       executeRedirect(targetUrl)
       return
     }
@@ -192,8 +139,6 @@ function ArquivosRedirectPage() {
       return
     }
 
-    console.log('Buscando link no Supabase sob /arquivos para slug:', cleanSlug)
-
     // Busca flexível direta no Supabase
     supabase
       .from('links')
@@ -201,17 +146,15 @@ function ArquivosRedirectPage() {
       .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
       .maybeSingle()
       .then(({ data: link, error }) => {
-        if (error) {
-          console.error('Erro ao buscar link no Supabase:', error)
+        if (error || !link) {
+          console.error('Link não encontrado:', error)
           window.location.replace('/')
           return
         }
 
-        console.log('Resultado encontrado no Supabase (/arquivos):', link)
-
         const dest = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
         if (dest) {
-          // Incrementa métrica
+          setRedirectingUrl(dest)
           try {
             supabase.from('clicks').insert({ link_id: link.id })
             supabase
@@ -222,7 +165,6 @@ function ArquivosRedirectPage() {
 
           executeRedirect(dest)
         } else {
-          console.warn('Slug não localizado ou sem URL de destino no banco (/arquivos).')
           window.location.replace('/')
         }
       })
@@ -236,6 +178,13 @@ function ArquivosRedirectPage() {
     }
   }, [targetUrl, slug])
 
-  // Retorna tela em branco limpa durante a fração de segundo da requisição
+  if (redirectingUrl) {
+    return (
+      <div style={{ display: 'none' }}>
+        <script dangerouslySetInnerHTML={{ __html: `window.location.replace(${JSON.stringify(redirectingUrl)});` }} />
+      </div>
+    )
+  }
+
   return null
 }

@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SlugRouteImport } from './routes/$slug'
+import { Route as ArquivosIndexRouteImport } from './routes/arquivos/index'
+import { Route as ArquivosSlugRouteImport } from './routes/arquivos/$slug'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedContactsRouteImport } from './routes/_authenticated/contacts'
@@ -29,6 +31,16 @@ const IndexRoute = IndexRouteImport.update({
 const SlugRoute = SlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArquivosIndexRoute = ArquivosIndexRouteImport.update({
+  id: '/arquivos/',
+  path: '/arquivos/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArquivosSlugRoute = ArquivosSlugRouteImport.update({
+  id: '/arquivos/$slug',
+  path: '/arquivos/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -81,6 +93,8 @@ const AuthenticatedAdminDomainsRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
+  '/arquivos': typeof ArquivosIndexRoute
+  '/arquivos/$slug': typeof ArquivosSlugRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/contacts': typeof AuthenticatedContactsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -93,6 +107,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
+  '/arquivos': typeof ArquivosIndexRoute
+  '/arquivos/$slug': typeof ArquivosSlugRoute
   '/contacts': typeof AuthenticatedContactsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/links': typeof AuthenticatedLinksRoute
@@ -105,6 +121,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
+  '/arquivos/': typeof ArquivosIndexRoute
+  '/arquivos/$slug': typeof ArquivosSlugRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/contacts': typeof AuthenticatedContactsRoute
@@ -120,6 +138,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/$slug'
+    | '/arquivos'
+    | '/arquivos/$slug'
     | '/admin'
     | '/contacts'
     | '/dashboard'
@@ -132,6 +152,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/$slug'
+    | '/arquivos'
+    | '/arquivos/$slug'
     | '/contacts'
     | '/dashboard'
     | '/links'
@@ -143,6 +165,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/$slug'
+    | '/arquivos/'
+    | '/arquivos/$slug'
     | '/_authenticated'
     | '/_authenticated/admin'
     | '/_authenticated/contacts'
@@ -157,6 +181,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SlugRoute: typeof SlugRoute
+  ArquivosIndexRoute: typeof ArquivosIndexRoute
+  ArquivosSlugRoute: typeof ArquivosSlugRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
 }
 
@@ -174,6 +200,20 @@ declare module '@tanstack/react-router' {
       path: '/$slug'
       fullPath: '/$slug'
       preLoaderRoute: typeof SlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/arquivos/': {
+      id: '/arquivos/'
+      path: '/arquivos'
+      fullPath: '/arquivos'
+      preLoaderRoute: typeof ArquivosIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/arquivos/$slug': {
+      id: '/arquivos/$slug'
+      path: '/arquivos/$slug'
+      fullPath: '/arquivos/$slug'
+      preLoaderRoute: typeof ArquivosSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -280,6 +320,8 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SlugRoute: SlugRoute,
+  ArquivosIndexRoute: ArquivosIndexRoute,
+  ArquivosSlugRoute: ArquivosSlugRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
 }
 export const routeTree = rootRouteImport
