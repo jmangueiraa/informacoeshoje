@@ -1,5 +1,5 @@
-import { createFileRoute, redirect, notFound } from '@tanstack/react-router'
-import { useEffect, useRef, useState } from 'react'
+import { createFileRoute, notFound } from '@tanstack/react-router'
+import { useEffect, useRef } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 
 // 1. Lista de User-Agents de bots e crawlers conhecidos
@@ -55,7 +55,7 @@ function isBotOrPrefetchRequest(request?: Request): boolean {
   )
 }
 
-export const Route = createFileRoute('/$slug')({
+export const Route = createFileRoute('/arquivos/$slug')({
   loader: async ({ params }) => {
     const rawSlug = String(params.slug ?? '').trim()
     const cleanSlug = rawSlug.replace(/^\/+|\/+$/g, '')
@@ -64,8 +64,9 @@ export const Route = createFileRoute('/$slug')({
     }
 
     try {
-      // 1. Tenta com supabaseAdmin no servidor se disponível
       const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
+
+      // 1. Tenta incrementar via RPC
       const { data: destino, error: rpcError } = await supabaseAdmin.rpc('incrementar_clique', {
         link_slug: cleanSlug,
       })
@@ -74,6 +75,7 @@ export const Route = createFileRoute('/$slug')({
         return { targetUrl: destino }
       }
 
+      // 2. Busca flexível com e sem o prefixo arquivos/
       const { data: link, error: linkError } = await supabaseAdmin
         .from('links')
         .select('*')
@@ -93,12 +95,12 @@ export const Route = createFileRoute('/$slug')({
         return { targetUrl }
       }
     } catch (e) {
-      console.warn('Loader do servidor pulou para o cliente:', e)
+      console.warn('Loader do servidor /arquivos pulou para o cliente:', e)
     }
 
     return { targetUrl: null }
   },
-  component: RedirectPage,
+  component: ArquivosRedirectPage,
 })
 
 function executeRedirect(destinationUrl: string) {
@@ -147,7 +149,7 @@ function executeRedirect(destinationUrl: string) {
   window.location.replace(destinationUrl)
 }
 
-function RedirectPage() {
+function ArquivosRedirectPage() {
   const loaderData = Route.useLoaderData()
   const targetUrl = loaderData?.targetUrl || null
   const { slug } = Route.useParams()
@@ -178,7 +180,7 @@ function RedirectPage() {
 
     // Se o loader no servidor já obteve o destino com clique somado:
     if (targetUrl) {
-      console.log('Redirecionando para (loader):', targetUrl)
+      console.log('Redirecionando para (loader /arquivos):', targetUrl)
       executeRedirect(targetUrl)
       return
     }
@@ -190,7 +192,7 @@ function RedirectPage() {
       return
     }
 
-    console.log('Buscando link no Supabase para slug:', cleanSlug)
+    console.log('Buscando link no Supabase sob /arquivos para slug:', cleanSlug)
 
     // Busca flexível direta no Supabase
     supabase
@@ -205,7 +207,7 @@ function RedirectPage() {
           return
         }
 
-        console.log('Resultado encontrado no Supabase:', link)
+        console.log('Resultado encontrado no Supabase (/arquivos):', link)
 
         const dest = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
         if (dest) {
@@ -220,12 +222,12 @@ function RedirectPage() {
 
           executeRedirect(dest)
         } else {
-          console.warn('Slug não localizado ou sem URL de destino no banco.')
+          console.warn('Slug não localizado ou sem URL de destino no banco (/arquivos).')
           window.location.replace('/')
         }
       })
       .catch((err) => {
-        console.error('Exceção ao processar redirecionamento:', err)
+        console.error('Exceção ao processar redirecionamento (/arquivos):', err)
         window.location.replace('/')
       })
 
