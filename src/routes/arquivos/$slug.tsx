@@ -1,119 +1,110 @@
-import { createFileRoute, redirect, notFound, isRedirect } from '@tanstack/react-router'
-import { useEffect, useRef } from 'react'
+import { createFileRoute } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 
 export const Route = createFileRoute('/arquivos/$slug')({
-  loader: async ({ params }) => {
-    const rawSlug = String(params.slug ?? '').trim()
-    const cleanSlug = rawSlug.replace(/^\/+|\/+$/g, '')
-    if (!cleanSlug || cleanSlug.includes('.')) {
-      throw notFound()
-    }
-
-    try {
-      const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
-
-      // 1. Tenta incrementar via RPC
-      const { data: destino, error: rpcError } = await supabaseAdmin.rpc('incrementar_clique', {
-        link_slug: cleanSlug,
-      })
-
-      let targetUrl: string | null = null
-      if (!rpcError && typeof destino === 'string' && destino) {
-        targetUrl = destino
-      } else {
-        const { data: link, error: linkError } = await supabaseAdmin
-          .from('links')
-          .select('*')
-          .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
-          .maybeSingle()
-
-        targetUrl = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
-        if (!linkError && targetUrl && link?.id) {
-          try {
-            await supabaseAdmin.from('clicks').insert({ link_id: link.id })
-            await supabaseAdmin
-              .from('links')
-              .update({ clicks_count: (link.clicks_count || 0) + 1 })
-              .eq('id', link.id)
-          } catch (_) {}
-        }
-      }
-
-      // 2. Realiza o redirecionamento HTTP real 302 no backend
-      if (targetUrl) {
-        throw redirect({
-          href: targetUrl,
-          statusCode: 302,
-        })
-      }
-    } catch (e) {
-      if (isRedirect(e)) {
-        throw e
-      }
-      console.warn('Erro no loader server-side de /arquivos:', e)
-    }
-
-    return { targetUrl: null }
-  },
-  component: ArquivosRedirectHandlerPage,
+  component: ArquivosRedirectPage,
 })
 
-function ArquivosRedirectHandlerPage() {
+function ArquivosRedirectPage() {
   const { slug } = Route.useParams()
-  const hasExecuted = useRef(false)
+  const [statusText, setStatusText] = useState('Redirecionando para a Shopee...')
 
   useEffect(() => {
-    if (hasExecuted.current) return
-    hasExecuted.current = true
-
     const rawSlug = String(slug ?? '').trim()
     const cleanSlug = rawSlug.replace(/^\/+|\/+$/g, '')
+
     if (!cleanSlug || cleanSlug.includes('.')) {
       window.location.replace('/')
       return
     }
 
-    // Redirecionamento real via window.location.replace no frontend
-    supabase
-      .from('links')
-      .select('*')
-      .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
-      .maybeSingle()
-      .then(({ data: link, error }) => {
+    async function executeRedirect() {
+      try {
+        const { data: link, error } = await supabase
+          .from('links')
+          .select('*')
+          .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
+          .maybeSingle()
+
         if (error || !link) {
-          console.error('Link não encontrado sob /arquivos:', error)
+          console.error('Link não localizado no Supabase:', error)
+          setStatusText('Link não encontrado. Redirecionando...')
+          setTimeout(() => {
+            window.location.replace('/')
+          }, 800)
+          return
+        }
+
+        const destinationUrl = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
+        if (!destinationUrl) {
           window.location.replace('/')
           return
         }
 
-        const dest = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
-        if (dest) {
-          try {
-            supabase.from('clicks').insert({ link_id: link.id })
-            supabase
-              .from('links')
-              .update({ clicks_count: (link.clicks_count || 0) + 1 })
-              .eq('id', link.id)
-          } catch (_) {}
+        // Incrementa contagem de cliques
+        try {
+          supabase.from('clicks').insert({ link_id: link.id })
+          supabase
+            .from('links')
+            .update({ clicks_count: (link.clicks_count || 0) + 1 })
+            .eq('id', link.id)
+        } catch (_) {}
 
-          // Redirecionamento real de navegador
-          window.location.replace(dest)
-        } else {
-          window.location.replace('/')
-        }
-      })
-      .catch((err) => {
-        console.error('Exceção ao processar redirecionamento (/arquivos):', err)
+        // Redirecionamento real de navegador no frontend
+        window.location.replace(destinationUrl)
+      } catch (err) {
+        console.error('Erro no redirecionamento:', err)
         window.location.replace('/')
-      })
+      }
+    }
+
+    executeRedirect()
   }, [slug])
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff' }}>
-      <p style={{ fontFamily: 'system-ui, -apple-system, sans-serif', color: '#666666', fontSize: '14px' }}>
-        Redirecionando para o produto...
-      </p>
+    <div
+      style={{
+        minHeight: '100vh',
+        width: '100vw',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f8f9fa',
+        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: '#ffffff',
+          padding: '36px 28px',
+          borderRadius: '16px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+          textAlign: 'center',
+          maxWidth: '380px',
+          width: '90%',
+        }}
+      >
+        <div
+          style={{
+            width: '48px',
+            height: '48px',
+            border: '4px solid #ee4d2d',
+            borderTopColor: 'transparent',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+            margin: '0 auto 20px auto',
+          }}
+        />
+        <style dangerouslySetInnerHTML={{ __html: `@keyframes spin { to { transform: rotate(360deg); } }` }} />
+        <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#222222', margin: '0 0 8px 0' }}>
+          {statusText}
+        </h2>
+        <p style={{ fontSize: '13px', color: '#888888', margin: 0 }}>
+          Aguarde um momento...
+        </p>
+      </div>
     </div>
   )
 }
