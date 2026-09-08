@@ -6,7 +6,7 @@ export const Route = createFileRoute('/arquivos/$slug')({
   component: ArquivosRedirectPage,
 })
 
-function executeSmartDeepLink(destinationUrl: string) {
+function executeMobileDeepLink(destinationUrl: string) {
   if (typeof window === 'undefined' || !destinationUrl) return
 
   const userAgent = navigator.userAgent || ''
@@ -14,54 +14,65 @@ function executeSmartDeepLink(destinationUrl: string) {
   const isIOS = /iPhone|iPad|iPod/i.test(userAgent)
   const isInApp = /FBAN|FBAV|Instagram|TikTok|BytedanceWebview/i.test(userAgent)
 
-  // 1. Android (App Nativo ou Fallback Web)
+  // 1. Android (Intent Nativo com Fallback Web)
   if (isAndroid) {
     const cleanUrl = destinationUrl.replace(/^https?:\/\//, '')
+    const encodedDest = encodeURIComponent(destinationUrl)
 
-    // Se estiver no In-App Browser (Instagram/TikTok), abre no Chrome externo
+    // Se estiver no In-App Browser (Instagram/TikTok), escapa para o Chrome externo
     if (isInApp) {
       window.location.href = `intent://${cleanUrl}#Intent;scheme=https;package=com.android.chrome;end;`
       return
     }
 
-    const encodedUrl = encodeURIComponent(destinationUrl)
-    const intentUrl = `intent://open?url=${encodedUrl}#Intent;scheme=shopee;package=com.shopee.br;S.browser_fallback_url=${encodedUrl};end;`
+    // Android Intent nativo da Shopee BR
+    const intentUrl = `intent://${cleanUrl}#Intent;scheme=https;package=com.shopee.br;S.browser_fallback_url=${encodedDest};end;`
 
-    const startTime = Date.now()
     const linkElem = document.createElement('a')
     linkElem.href = intentUrl
     linkElem.rel = 'noreferrer'
     document.body.appendChild(linkElem)
     linkElem.click()
 
-    // Fallback inteligente em JavaScript: abre web se o app não estiver instalado
-    setTimeout(() => {
-      const elapsed = Date.now() - startTime
-      // Se o usuário ainda estiver com a aba aberta e focada (app não abriu):
-      if (!document.hidden && elapsed < 3000) {
+    // Fallback inteligente: se o app não estiver instalado, abre a versão web
+    const fallbackTimer = setTimeout(() => {
+      if (!document.hidden) {
         window.location.replace(destinationUrl)
       }
     }, 1200)
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        clearTimeout(fallbackTimer)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange, { once: true })
+    window.addEventListener('pagehide', () => clearTimeout(fallbackTimer), { once: true })
     return
   }
 
-  // 2. iOS (iPhone / iPad)
+  // 2. iOS (iPhone / iPad - Custom URL Scheme com Fallback)
   if (isIOS) {
     const appUrl = `shopee://open?url=${encodeURIComponent(destinationUrl)}`
-    const startTime = Date.now()
     window.location.href = appUrl
 
-    // Fallback inteligente no iOS
-    setTimeout(() => {
-      const elapsed = Date.now() - startTime
-      if (!document.hidden && elapsed < 3000) {
+    const fallbackTimer = setTimeout(() => {
+      if (!document.hidden) {
         window.location.replace(destinationUrl)
       }
     }, 1000)
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        clearTimeout(fallbackTimer)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange, { once: true })
+    window.addEventListener('pagehide', () => clearTimeout(fallbackTimer), { once: true })
     return
   }
 
-  // 3. Desktop / Computador (Navegador Web direto)
+  // 3. Desktop / Navegador PC
   window.location.replace(destinationUrl)
 }
 
@@ -82,7 +93,7 @@ function ArquivosRedirectPage() {
       try {
         let destinationUrl: string | null = null
 
-        // 1. Tenta incrementar e obter o destino atomicamente via RPC
+        // 1. Incrementa clique e obtém o destino de forma atômica
         try {
           const { data: rpcDest, error: rpcError } = await supabase.rpc('incrementar_clique', {
             link_slug: cleanSlug,
@@ -127,8 +138,8 @@ function ArquivosRedirectPage() {
           } catch (_) {}
         }
 
-        // Dispara o Deep Link Inteligente com Fallback Web automático
-        executeSmartDeepLink(destinationUrl)
+        // Dispara o Deep Link Mobile
+        executeMobileDeepLink(destinationUrl)
       } catch (err) {
         console.error('Erro no processamento do clique (/arquivos):', err)
         window.location.replace('/')
