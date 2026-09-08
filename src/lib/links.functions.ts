@@ -186,14 +186,9 @@ export const resetLinkClicks = createServerFn({ method: "POST" })
       .update({ clicks_count: 0 } as any)
       .eq("id", id);
 
-    // 3. Remove registros das tabelas de histórico de cliques (com service_role)
+    // 3. Remove registros do histórico de cliques (com service_role)
     await supabaseAdmin
       .from("clicks")
-      .delete()
-      .eq("link_id", id);
-
-    await supabaseAdmin
-      .from("link_clicks")
       .delete()
       .eq("link_id", id);
 

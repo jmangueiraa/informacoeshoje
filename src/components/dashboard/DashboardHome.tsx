@@ -50,16 +50,7 @@ export function DashboardHome() {
 
   const resetMutation = useMutation({
     mutationFn: async (id: string) => {
-      try {
-        await resetLinkClicks({ data: id })
-      } catch (e) {
-        console.warn("Falha na server function, tentando RPC direto:", e)
-      }
-      try {
-        await supabase.rpc('reset_link_clicks', { p_link_id: id })
-      } catch (e) {
-        // fallback
-      }
+      await resetLinkClicks({ data: id })
       return id
     },
     onMutate: async (id: string) => {
