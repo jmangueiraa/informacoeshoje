@@ -94,7 +94,7 @@ export function DashboardHome() {
           <p className="text-muted-foreground">Gerencie seus links de afiliado e acompanhe resultados.</p>
         </div>
         <Button asChild size="lg" className="gap-2 bg-primary hover:bg-primary/90">
-          <Link to="/links">
+          <Link to="/links" search={{ create: true }}>
             <PlusCircle className="h-5 w-5" />
             Criar Novo Link
           </Link>

@@ -42,17 +42,31 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { z } from 'zod'
 import { Label } from '@/components/ui/label'
 import { supabase } from '@/integrations/supabase/client'
 
+const linksSearchSchema = z.object({
+  create: z.boolean().optional(),
+})
+
 export const Route = createFileRoute('/_authenticated/links')({
+  validateSearch: linksSearchSchema,
   component: LinksPage,
 })
 
 function LinksPage() {
+  const search = Route.useSearch()
   const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
-  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isCreateOpen, setIsCreateOpen] = useState(Boolean(search?.create))
+
+  useEffect(() => {
+    if (search?.create) {
+      setIsCreateOpen(true)
+    }
+  }, [search?.create])
+
   const [newLink, setNewLink] = useState<{ title: string; slug: string; affiliate_url: string; domain_id: string | null }>({ 
     title: '', 
     slug: '', 

@@ -98,7 +98,7 @@ export function AppSidebar() {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Criar Link">
-                  <Link to="/links" className="flex items-center gap-3 py-2">
+                  <Link to="/links" search={{ create: true }} className="flex items-center gap-3 py-2">
                     <PlusCircle className="h-5 w-5 text-primary" />
                     <span>Criar Link</span>
                   </Link>
