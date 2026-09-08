@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/arquivos/:slug*",
+      "destination": "/arquivos/:slug*"
+    }
+  ]
+}
