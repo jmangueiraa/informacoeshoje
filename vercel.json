@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/arquivos/:slug*",
-      "destination": "/arquivos/:slug*"
+      "destination": "https://infomacoeshoje.online/arquivos/:slug*"
     }
   ]
 }
