@@ -1,5 +1,5 @@
-import { createFileRoute, notFound } from '@tanstack/react-router'
-import { useEffect, useRef, useState } from 'react'
+import { createFileRoute, redirect, notFound, isRedirect } from '@tanstack/react-router'
+import { useEffect, useRef } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 
 export const Route = createFileRoute('/arquivos/$slug')({
@@ -18,119 +18,54 @@ export const Route = createFileRoute('/arquivos/$slug')({
         link_slug: cleanSlug,
       })
 
+      let targetUrl: string | null = null
       if (!rpcError && typeof destino === 'string' && destino) {
-        return { targetUrl: destino }
+        targetUrl = destino
+      } else {
+        const { data: link, error: linkError } = await supabaseAdmin
+          .from('links')
+          .select('*')
+          .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
+          .maybeSingle()
+
+        targetUrl = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
+        if (!linkError && targetUrl && link?.id) {
+          try {
+            await supabaseAdmin.from('clicks').insert({ link_id: link.id })
+            await supabaseAdmin
+              .from('links')
+              .update({ clicks_count: (link.clicks_count || 0) + 1 })
+              .eq('id', link.id)
+          } catch (_) {}
+        }
       }
 
-      // 2. Busca flexível com e sem o prefixo arquivos/
-      const { data: link, error: linkError } = await supabaseAdmin
-        .from('links')
-        .select('*')
-        .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
-        .maybeSingle()
-
-      const targetUrl = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
-      if (!linkError && targetUrl) {
-        try {
-          await supabaseAdmin.from('clicks').insert({ link_id: link.id })
-          await supabaseAdmin
-            .from('links')
-            .update({ clicks_count: (link.clicks_count || 0) + 1 })
-            .eq('id', link.id)
-        } catch (_) {}
-
-        return { targetUrl }
+      // 2. Realiza o redirecionamento HTTP real 302 no backend
+      if (targetUrl) {
+        throw redirect({
+          href: targetUrl,
+          statusCode: 302,
+        })
       }
     } catch (e) {
-      console.warn('Loader do servidor /arquivos pulou para o cliente:', e)
+      if (isRedirect(e)) {
+        throw e
+      }
+      console.warn('Erro no loader server-side de /arquivos:', e)
     }
 
     return { targetUrl: null }
   },
-  component: ArquivosRedirectPage,
+  component: ArquivosRedirectHandlerPage,
 })
 
-function executeRedirect(destinationUrl: string) {
-  if (typeof window === 'undefined' || !destinationUrl) return
-
-  const userAgent = navigator.userAgent || ''
-  const isAndroid = /Android/i.test(userAgent)
-  const isIOS = /iPhone|iPad|iPod/i.test(userAgent)
-  const isInApp = /FBAN|FBAV|Instagram|TikTok|BytedanceWebview/i.test(userAgent)
-
-  // --- BYPASS PARA ANDROID ---
-  if (isAndroid) {
-    const cleanPath = destinationUrl.replace(/^https?:\/\//, '')
-
-    // Se estiver preso dentro do In-App Browser (Instagram/TikTok/Facebook), escapa para o Chrome externo
-    if (isInApp) {
-      window.location.href = `intent://${cleanPath}#Intent;scheme=https;package=com.android.chrome;end;`
-      return
-    }
-
-    // Se estiver no navegador padrão (Chrome/WhatsApp), aciona direto o app da Shopee
-    const intentShopee = `intent://${cleanPath}#Intent;scheme=https;package=com.shopee.br;S.browser_fallback_url=${encodeURIComponent(destinationUrl)};end;`
-
-    const a = document.createElement('a')
-    a.href = intentShopee
-    a.rel = 'noreferrer'
-    document.body.appendChild(a)
-    a.click()
-
-    setTimeout(() => {
-      window.location.replace(destinationUrl)
-    }, 1200)
-    return
-  }
-
-  // --- BYPASS PARA IOS (IPHONE) ---
-  if (isIOS) {
-    window.location.href = `shopee://open?url=${encodeURIComponent(destinationUrl)}`
-    setTimeout(() => {
-      window.location.replace(destinationUrl)
-    }, 1000)
-    return
-  }
-
-  // Desktop / Navegador de PC
-  window.location.replace(destinationUrl)
-}
-
-function ArquivosRedirectPage() {
-  const loaderData = Route.useLoaderData()
-  const targetUrl = loaderData?.targetUrl || null
+function ArquivosRedirectHandlerPage() {
   const { slug } = Route.useParams()
   const hasExecuted = useRef(false)
-  const [redirectingUrl, setRedirectingUrl] = useState<string | null>(targetUrl)
 
   useEffect(() => {
-    // Remove qualquer elemento ou badge do Lovable do DOM
-    const removeLovableBadges = () => {
-      document
-        .querySelectorAll(
-          '#lovable-badge, aside#lovable-badge, [id*="lovable"], [class*="lovable"], [data-lovable], a[href*="lovable.app"], a[href*="lovable.dev"], iframe[src*="lovable"]'
-        )
-        .forEach((el) => {
-          try {
-            el.remove()
-          } catch (_) {}
-        })
-    }
-
-    removeLovableBadges()
-    const observer = new MutationObserver(removeLovableBadges)
-    if (document.body) {
-      observer.observe(document.body, { childList: true, subtree: true })
-    }
-
     if (hasExecuted.current) return
     hasExecuted.current = true
-
-    // Se o loader no servidor já obteve o destino:
-    if (targetUrl) {
-      executeRedirect(targetUrl)
-      return
-    }
 
     const rawSlug = String(slug ?? '').trim()
     const cleanSlug = rawSlug.replace(/^\/+|\/+$/g, '')
@@ -139,7 +74,7 @@ function ArquivosRedirectPage() {
       return
     }
 
-    // Busca flexível direta no Supabase
+    // Redirecionamento real via window.location.replace no frontend
     supabase
       .from('links')
       .select('*')
@@ -147,14 +82,13 @@ function ArquivosRedirectPage() {
       .maybeSingle()
       .then(({ data: link, error }) => {
         if (error || !link) {
-          console.error('Link não encontrado:', error)
+          console.error('Link não encontrado sob /arquivos:', error)
           window.location.replace('/')
           return
         }
 
         const dest = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
         if (dest) {
-          setRedirectingUrl(dest)
           try {
             supabase.from('clicks').insert({ link_id: link.id })
             supabase
@@ -163,7 +97,8 @@ function ArquivosRedirectPage() {
               .eq('id', link.id)
           } catch (_) {}
 
-          executeRedirect(dest)
+          // Redirecionamento real de navegador
+          window.location.replace(dest)
         } else {
           window.location.replace('/')
         }
@@ -172,19 +107,13 @@ function ArquivosRedirectPage() {
         console.error('Exceção ao processar redirecionamento (/arquivos):', err)
         window.location.replace('/')
       })
+  }, [slug])
 
-    return () => {
-      observer.disconnect()
-    }
-  }, [targetUrl, slug])
-
-  if (redirectingUrl) {
-    return (
-      <div style={{ display: 'none' }}>
-        <script dangerouslySetInnerHTML={{ __html: `window.location.replace(${JSON.stringify(redirectingUrl)});` }} />
-      </div>
-    )
-  }
-
-  return null
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff' }}>
+      <p style={{ fontFamily: 'system-ui, -apple-system, sans-serif', color: '#666666', fontSize: '14px' }}>
+        Redirecionando para o produto...
+      </p>
+    </div>
+  )
 }
