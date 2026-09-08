@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getUserLinks, createCustomLink, deleteLink, toggleLinkStatus, resetLinkClicks, getUserProfile, updateProfileDomain } from '@/lib/links.functions'
 import { getUserDomains } from '@/lib/domains.functions'
+import { PREDEFINED_DOMAINS, LINK_DOMAIN } from '@/lib/constants'
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,7 +16,7 @@ import {
   Trash2, 
   ExternalLink, 
   Search, 
-  Filter,
+  Filter, 
   MoreVertical,
   BarChart3,
   Calendar,
@@ -52,7 +53,12 @@ function LinksPage() {
   const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [newLink, setNewLink] = useState<{ title: string; slug: string; affiliate_url: string; domain_id: string | null }>({ title: '', slug: '', affiliate_url: '', domain_id: null })
+  const [newLink, setNewLink] = useState<{ title: string; slug: string; affiliate_url: string; domain_id: string | null }>({ 
+    title: '', 
+    slug: '', 
+    affiliate_url: '', 
+    domain_id: 'canva-arquivos' 
+  })
   
   const queryClient = useQueryClient()
 
@@ -67,15 +73,17 @@ function LinksPage() {
     queryFn: () => getUserDomains(),
   })
 
-  // Sincronizar o domínio principal ao abrir o diálogo
+  const availableDomains = [
+    ...PREDEFINED_DOMAINS,
+    ...(domains || []).filter((d: any) => !PREDEFINED_DOMAINS.some((p) => p.domain === d.domain))
+  ]
+
+  // Sincronizar o domínio padrão ao abrir o diálogo
   useEffect(() => {
-    if (domains && domains.length > 0 && !newLink.domain_id && isCreateOpen) {
-      const primary = domains.find((d: any) => d.is_primary && d.verification_status === 'verified')
-      if (primary) {
-        setNewLink(prev => ({ ...prev, domain_id: primary.id }));
-      }
+    if (isCreateOpen && !newLink.domain_id) {
+      setNewLink(prev => ({ ...prev, domain_id: 'canva-arquivos' }))
     }
-  }, [domains, isCreateOpen]);
+  }, [isCreateOpen])
 
   const { data: links, isLoading } = useQuery({
     queryKey: ['user-links'],
@@ -106,8 +114,6 @@ function LinksPage() {
     }
   }, [queryClient])
 
-  // A atualização automática de domínio foi removida para respeitar a nova lógica de user_domains
-
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       console.log("Enviando dados para criação:", data);
@@ -117,7 +123,7 @@ function LinksPage() {
             affiliateUrl: data.affiliate_url,
             slug: data.slug,
             title: data.title || undefined,
-            domainId: data.domain_id || null
+            domainId: data.domain_id || 'canva-arquivos'
           }
         });
         return result;
@@ -133,7 +139,7 @@ function LinksPage() {
         queryClient.invalidateQueries({ queryKey: ['user-links'] })
         toast.success("Link criado com sucesso!")
         setIsCreateOpen(false)
-        setNewLink({ title: '', slug: '', affiliate_url: '', domain_id: null })
+        setNewLink({ title: '', slug: '', affiliate_url: '', domain_id: 'canva-arquivos' })
       }
     },
     onError: (error: any) => {
@@ -184,14 +190,14 @@ function LinksPage() {
     }
   })
 
-  // Resolve a URL base do link: domínio escolhido na criação > domínio principal do usuário > origem atual
+  // Resolve a URL base do link: domínio escolhido na criação > custom_domain > padrão editaveisdocanva.com.br/arquivos
   const getLinkBaseUrl = (link: any) => {
-    const linkDomain = link.domain_id ? domains?.find((d: any) => d.id === link.domain_id) : null
-    const userPrimaryDomain = domains?.find((d: any) => d.is_primary && d.verification_status === 'verified')
-    const domainName = linkDomain?.domain || userPrimaryDomain?.domain
+    const linkDomain = link.domain_id ? availableDomains.find((d: any) => d.id === link.domain_id) : null
+    const domainName = linkDomain?.domain || link.custom_domain || availableDomains[0]?.domain || "www.editaveisdocanva.com.br/arquivos"
 
     if (domainName) {
-      return domainName.startsWith('http') ? domainName : `https://${domainName}`
+      const clean = domainName.replace(/^https?:\/\//, '').replace(/\/+$/, '')
+      return `https://${clean}`
     }
     return window.location.origin
   }
@@ -206,6 +212,9 @@ function LinksPage() {
     link.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     link.slug.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  const selectedDomainObj = availableDomains.find((d: any) => d.id === newLink.domain_id || d.domain === newLink.domain_id)
+  const currentDomainDisplay = selectedDomainObj?.domain || "www.editaveisdocanva.com.br/arquivos"
 
   return (
     <div className="container mx-auto p-6 space-y-8 max-w-7xl">
@@ -251,8 +260,8 @@ function LinksPage() {
               <div className="grid gap-2">
                 <Label htmlFor="slug">Slug Personalizado</Label>
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground text-sm shrink-0">
-                    {domains?.find((d: any) => d.id === newLink.domain_id)?.domain || "linkafiliado.app"}/
+                  <span className="text-muted-foreground text-xs shrink-0 font-mono bg-muted px-2 py-2 rounded-md border truncate max-w-[220px]">
+                    {currentDomainDisplay}/
                   </span>
                   <Input 
                     id="slug" 
@@ -267,16 +276,15 @@ function LinksPage() {
                 <select 
                   id="domain_id"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={newLink.domain_id || ''}
-                  onChange={(e) => setNewLink({...newLink, domain_id: e.target.value || null})}
+                  value={newLink.domain_id || 'canva-arquivos'}
+                  onChange={(e) => setNewLink({...newLink, domain_id: e.target.value || 'canva-arquivos'})}
                 >
-                  <option value="">Padrão da Plataforma</option>
-                  {domains?.filter((d: any) => d.verification_status === 'verified').map((d: any) => (
-                    <option key={d.id} value={d.id}>{d.domain}</option>
+                  {availableDomains.map((d: any) => (
+                    <option key={d.id} value={d.id}>{d.label || d.domain}</option>
                   ))}
                 </select>
-                <p className="text-[10px] text-muted-foreground">
-                  Selecione um domínio verificado ou use o padrão da plataforma.
+                <p className="text-[11px] text-muted-foreground">
+                  Domínio padrão: <strong className="text-foreground">https://www.editaveisdocanva.com.br/arquivos/</strong>
                 </p>
               </div>
             </div>

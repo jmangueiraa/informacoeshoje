@@ -40,13 +40,32 @@ export const createCustomLink = createServerFn({ method: "POST" })
 
     const cleanSlug = String(data.slug ?? '').replace(/^\/+|\/+$/g, '').trim().toLowerCase();
 
+    const isUUID = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+    let domainId: string | null = null;
+    let customDomain: string | null = 'www.editaveisdocanva.com.br/arquivos';
+
+    if (data.domainId) {
+      if (isUUID(data.domainId)) {
+        domainId = data.domainId;
+        customDomain = null;
+      } else if (data.domainId === 'canva-arquivos' || data.domainId.includes('editaveisdocanva.com.br')) {
+        customDomain = 'www.editaveisdocanva.com.br/arquivos';
+        domainId = null;
+      } else {
+        customDomain = data.domainId;
+        domainId = null;
+      }
+    }
+
     const insertData = {
       user_id: userId,
       slug: cleanSlug,
       affiliate_url: data.affiliateUrl,
       title: data.title || null,
       expires_at: data.expiresAt || null,
-      domain_id: data.domainId || null,
+      domain_id: domainId,
+      custom_domain: customDomain,
       status: 'active',
       clicks_count: 0
     };

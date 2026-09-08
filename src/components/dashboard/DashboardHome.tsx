@@ -83,8 +83,9 @@ export function DashboardHome() {
 
   const copyToClipboard = (link: any) => {
     const profileDomain = profile && !('error' in profile) ? profile.custom_domain : null;
-    const domain = link.custom_domain || profileDomain || window.location.origin
-    const url = domain.startsWith('http') ? `${domain}/${link.slug}` : `https://${domain}/${link.slug}`
+    const domain = link.custom_domain || profileDomain || "www.editaveisdocanva.com.br/arquivos";
+    const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const url = `https://${cleanDomain}/${link.slug}`
     navigator.clipboard.writeText(url)
     toast.success("Link copiado para a área de transferência!")
   }
