@@ -6,7 +6,7 @@ export const Route = createFileRoute('/arquivos/$slug')({
   component: ArquivosRedirectPage,
 })
 
-function executeRedirect(destinationUrl: string) {
+function redirectToShopeeApp(destinationUrl: string) {
   if (typeof window === 'undefined' || !destinationUrl) return
 
   const userAgent = navigator.userAgent || ''
@@ -14,20 +14,36 @@ function executeRedirect(destinationUrl: string) {
   const isIOS = /iPhone|iPad|iPod/i.test(userAgent)
   const isInApp = /FBAN|FBAV|Instagram|TikTok|BytedanceWebview/i.test(userAgent)
 
-  // Android: se estiver dentro de app (Instagram/TikTok), escapa para Chrome; senão dispara app Shopee
+  // 1. Android
   if (isAndroid) {
-    const cleanPath = destinationUrl.replace(/^https?:\/\//, '')
+    const cleanUrl = destinationUrl.replace(/^https?:\/\//, '')
+
+    // Se estiver dentro do navegador embutido do Instagram/TikTok, abre no Chrome externo
     if (isInApp) {
-      window.location.href = `intent://${cleanPath}#Intent;scheme=https;package=com.android.chrome;end;`
+      window.location.href = `intent://${cleanUrl}#Intent;scheme=https;package=com.android.chrome;end;`
       return
     }
 
-    const intentShopee = `intent://${cleanPath}#Intent;scheme=https;package=com.shopee.br;S.browser_fallback_url=${encodeURIComponent(destinationUrl)};end;`
-    const a = document.createElement('a')
-    a.href = intentShopee
-    a.rel = 'noreferrer'
-    document.body.appendChild(a)
-    a.click()
+    // Dispara o Deep Link do App da Shopee BR nativo via Android Intent
+    const encodedUrl = encodeURIComponent(destinationUrl)
+    const appDeepLink = `intent://open?url=${encodedUrl}#Intent;scheme=shopee;package=com.shopee.br;S.browser_fallback_url=${encodedUrl};end;`
+
+    const linkElem = document.createElement('a')
+    linkElem.href = appDeepLink
+    linkElem.rel = 'noreferrer'
+    document.body.appendChild(linkElem)
+    linkElem.click()
+
+    setTimeout(() => {
+      window.location.replace(destinationUrl)
+    }, 1500)
+    return
+  }
+
+  // 2. iOS (iPhone / iPad)
+  if (isIOS) {
+    const appUrl = `shopee://open?url=${encodeURIComponent(destinationUrl)}`
+    window.location.href = appUrl
 
     setTimeout(() => {
       window.location.replace(destinationUrl)
@@ -35,22 +51,14 @@ function executeRedirect(destinationUrl: string) {
     return
   }
 
-  // iOS: deep link nativo da Shopee
-  if (isIOS) {
-    window.location.href = `shopee://open?url=${encodeURIComponent(destinationUrl)}`
-    setTimeout(() => {
-      window.location.replace(destinationUrl)
-    }, 1000)
-    return
-  }
-
-  // Desktop / Navegador PC
+  // 3. Desktop / Navegador PC
   window.location.replace(destinationUrl)
 }
 
 function ArquivosRedirectPage() {
   const { slug } = Route.useParams()
-  const [statusText, setStatusText] = useState('Redirecionando para o produto...')
+  const [statusText, setStatusText] = useState('Abrindo o aplicativo da Shopee...')
+  const [directUrl, setDirectUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const rawSlug = String(slug ?? '').trim()
@@ -77,7 +85,7 @@ function ArquivosRedirectPage() {
           console.warn('Erro na RPC de clique (/arquivos):', e)
         }
 
-        // 2. Se a RPC não retornou a URL, busca o link no banco e incrementa
+        // 2. Fallback de busca no Supabase
         if (!destinationUrl) {
           const { data: link, error } = await supabase
             .from('links')
@@ -100,7 +108,7 @@ function ArquivosRedirectPage() {
             return
           }
 
-          // Registra clique no banco com await garantido antes de redirecionar
+          // Registra clique no banco com await garantido
           try {
             await Promise.allSettled([
               supabase.rpc('increment_clicks', { row_id: link.id }),
@@ -110,8 +118,10 @@ function ArquivosRedirectPage() {
           } catch (_) {}
         }
 
-        // Executa redirecionamento real
-        executeRedirect(destinationUrl)
+        setDirectUrl(destinationUrl)
+
+        // Executa redirecionamento direto para o app Shopee
+        redirectToShopeeApp(destinationUrl)
       } catch (err) {
         console.error('Erro no processamento do clique (/arquivos):', err)
         window.location.replace('/')
@@ -160,9 +170,29 @@ function ArquivosRedirectPage() {
         <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#222222', margin: '0 0 8px 0' }}>
           {statusText}
         </h2>
-        <p style={{ fontSize: '13px', color: '#888888', margin: 0 }}>
+        <p style={{ fontSize: '13px', color: '#888888', margin: '0 0 16px 0' }}>
           Aguarde um momento...
         </p>
+
+        {directUrl && (
+          <button
+            onClick={() => redirectToShopeeApp(directUrl)}
+            style={{
+              backgroundColor: '#ee4d2d',
+              color: '#ffffff',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              fontWeight: 'bold',
+              fontSize: '14px',
+              cursor: 'pointer',
+              width: '100%',
+              marginTop: '8px',
+            }}
+          >
+            Abrir no App Shopee
+          </button>
+        )}
       </div>
     </div>
   )
