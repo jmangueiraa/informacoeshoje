@@ -75,13 +75,24 @@ function LinksPage() {
 
   const availableDomains = [
     ...PREDEFINED_DOMAINS,
-    ...(domains || []).filter((d: any) => !PREDEFINED_DOMAINS.some((p) => p.domain === d.domain))
+    ...(domains || [])
+      .filter((d: any) => !d.domain?.includes('editaveisdocanva') && !PREDEFINED_DOMAINS.some((p) => p.domain === d.domain))
+      .map((d: any) => ({
+        id: d.id,
+        domain: d.domain,
+        label: `https://${d.domain.replace(/^https?:\/\//, '')}`,
+        is_primary: d.is_primary,
+        verification_status: d.verification_status
+      }))
   ]
 
   // Sincronizar o domínio padrão ao abrir o diálogo
   useEffect(() => {
-    if (isCreateOpen && !newLink.domain_id) {
-      setNewLink(prev => ({ ...prev, domain_id: 'canva-arquivos' }))
+    if (isCreateOpen) {
+      setNewLink(prev => ({ 
+        ...prev, 
+        domain_id: prev.domain_id && prev.domain_id !== 'platform-default' ? prev.domain_id : 'canva-arquivos' 
+      }))
     }
   }, [isCreateOpen])
 
@@ -231,7 +242,7 @@ function LinksPage() {
               Criar Link
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[440px]">
             <DialogHeader>
               <DialogTitle>Novo Link Personalizado</DialogTitle>
               <DialogDescription>
@@ -260,8 +271,8 @@ function LinksPage() {
               <div className="grid gap-2">
                 <Label htmlFor="slug">Slug Personalizado</Label>
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground text-xs shrink-0 font-mono bg-muted px-2 py-2 rounded-md border truncate max-w-[220px]">
-                    {currentDomainDisplay}/
+                  <span className="text-muted-foreground text-xs shrink-0 font-mono bg-muted px-2.5 py-2 rounded-md border truncate max-w-[240px]">
+                    https://{currentDomainDisplay}/
                   </span>
                   <Input 
                     id="slug" 
@@ -284,7 +295,7 @@ function LinksPage() {
                   ))}
                 </select>
                 <p className="text-[11px] text-muted-foreground">
-                  Domínio padrão: <strong className="text-foreground">https://www.editaveisdocanva.com.br/arquivos/</strong>
+                  Domínio padrão selecionado: <strong className="text-foreground">https://www.editaveisdocanva.com.br/arquivos/</strong>
                 </p>
               </div>
             </div>
