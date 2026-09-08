@@ -14,20 +14,6 @@ export const PREDEFINED_DOMAINS = [
     verification_status: "verified"
   },
   {
-    id: "canva-arquivos",
-    domain: "www.editaveisdocanva.com.br/arquivos",
-    label: "www.editaveisdocanva.com.br/arquivos",
-    is_primary: false,
-    verification_status: "verified"
-  },
-  {
-    id: "shopee-rastreamento",
-    domain: "shopeerastreamento.com.br",
-    label: "shopeerastreamento.com.br",
-    is_primary: false,
-    verification_status: "verified"
-  },
-  {
     id: "platform-default",
     domain: "infomacoeshoje.online",
     label: "infomacoeshoje.online",

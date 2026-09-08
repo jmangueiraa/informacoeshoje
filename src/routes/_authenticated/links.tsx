@@ -90,7 +90,12 @@ function LinksPage() {
   const availableDomains = [
     ...PREDEFINED_DOMAINS,
     ...(domains || [])
-      .filter((d: any) => !d.domain?.includes('editaveisdocanva') && !PREDEFINED_DOMAINS.some((p) => p.domain === d.domain))
+      .filter((d: any) => 
+        !d.domain?.includes('editaveisdocanva') && 
+        !d.domain?.includes('shopeerastreamento') &&
+        !d.domain?.includes('arquivos') &&
+        !PREDEFINED_DOMAINS.some((p) => p.domain === d.domain)
+      )
       .map((d: any) => ({
         id: d.id,
         domain: d.domain,
