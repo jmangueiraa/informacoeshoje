@@ -11,8 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SlugRouteImport } from './routes/$slug'
-import { Route as ArquivosIndexRouteImport } from './routes/arquivos/index'
-import { Route as ArquivosSlugRouteImport } from './routes/arquivos/$slug'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedContactsRouteImport } from './routes/_authenticated/contacts'
@@ -20,6 +18,8 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedLinksRouteImport } from './routes/_authenticated/links'
 import { Route as AuthenticatedPlayGeneratorRouteImport } from './routes/_authenticated/play-generator'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as ArquivosIndexRouteImport } from './routes/arquivos/index'
+import { Route as ArquivosSlugRouteImport } from './routes/arquivos/$slug'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminDomainsRouteImport } from './routes/_authenticated/admin/domains'
 
@@ -31,16 +31,6 @@ const IndexRoute = IndexRouteImport.update({
 const SlugRoute = SlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ArquivosIndexRoute = ArquivosIndexRouteImport.update({
-  id: '/arquivos/',
-  path: '/arquivos/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ArquivosSlugRoute = ArquivosSlugRouteImport.update({
-  id: '/arquivos/$slug',
-  path: '/arquivos/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -78,6 +68,16 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const ArquivosIndexRoute = ArquivosIndexRouteImport.update({
+  id: '/arquivos/',
+  path: '/arquivos/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArquivosSlugRoute = ArquivosSlugRouteImport.update({
+  id: '/arquivos/$slug',
+  path: '/arquivos/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -93,27 +93,27 @@ const AuthenticatedAdminDomainsRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
-  '/arquivos': typeof ArquivosIndexRoute
-  '/arquivos/$slug': typeof ArquivosSlugRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/contacts': typeof AuthenticatedContactsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/links': typeof AuthenticatedLinksRoute
   '/play-generator': typeof AuthenticatedPlayGeneratorRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/arquivos/$slug': typeof ArquivosSlugRoute
+  '/arquivos/': typeof ArquivosIndexRoute
   '/admin/domains': typeof AuthenticatedAdminDomainsRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
-  '/arquivos': typeof ArquivosIndexRoute
-  '/arquivos/$slug': typeof ArquivosSlugRoute
   '/contacts': typeof AuthenticatedContactsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/links': typeof AuthenticatedLinksRoute
   '/play-generator': typeof AuthenticatedPlayGeneratorRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/arquivos/$slug': typeof ArquivosSlugRoute
+  '/arquivos': typeof ArquivosIndexRoute
   '/admin/domains': typeof AuthenticatedAdminDomainsRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
@@ -121,8 +121,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
-  '/arquivos/': typeof ArquivosIndexRoute
-  '/arquivos/$slug': typeof ArquivosSlugRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/contacts': typeof AuthenticatedContactsRoute
@@ -130,6 +128,8 @@ export interface FileRoutesById {
   '/_authenticated/links': typeof AuthenticatedLinksRoute
   '/_authenticated/play-generator': typeof AuthenticatedPlayGeneratorRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/arquivos/$slug': typeof ArquivosSlugRoute
+  '/arquivos/': typeof ArquivosIndexRoute
   '/_authenticated/admin/domains': typeof AuthenticatedAdminDomainsRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
@@ -138,35 +138,33 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/$slug'
-    | '/arquivos'
-    | '/arquivos/$slug'
     | '/admin'
     | '/contacts'
     | '/dashboard'
     | '/links'
     | '/play-generator'
     | '/settings'
+    | '/arquivos/$slug'
+    | '/arquivos/'
     | '/admin/domains'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/$slug'
-    | '/arquivos'
-    | '/arquivos/$slug'
     | '/contacts'
     | '/dashboard'
     | '/links'
     | '/play-generator'
     | '/settings'
+    | '/arquivos/$slug'
+    | '/arquivos'
     | '/admin/domains'
     | '/admin'
   id:
     | '__root__'
     | '/'
     | '/$slug'
-    | '/arquivos/'
-    | '/arquivos/$slug'
     | '/_authenticated'
     | '/_authenticated/admin'
     | '/_authenticated/contacts'
@@ -174,6 +172,8 @@ export interface FileRouteTypes {
     | '/_authenticated/links'
     | '/_authenticated/play-generator'
     | '/_authenticated/settings'
+    | '/arquivos/$slug'
+    | '/arquivos/'
     | '/_authenticated/admin/domains'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
@@ -181,9 +181,9 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SlugRoute: typeof SlugRoute
-  ArquivosIndexRoute: typeof ArquivosIndexRoute
-  ArquivosSlugRoute: typeof ArquivosSlugRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  ArquivosSlugRoute: typeof ArquivosSlugRoute
+  ArquivosIndexRoute: typeof ArquivosIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -200,20 +200,6 @@ declare module '@tanstack/react-router' {
       path: '/$slug'
       fullPath: '/$slug'
       preLoaderRoute: typeof SlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/arquivos/': {
-      id: '/arquivos/'
-      path: '/arquivos'
-      fullPath: '/arquivos'
-      preLoaderRoute: typeof ArquivosIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/arquivos/$slug': {
-      id: '/arquivos/$slug'
-      path: '/arquivos/$slug'
-      fullPath: '/arquivos/$slug'
-      preLoaderRoute: typeof ArquivosSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -264,6 +250,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/arquivos/': {
+      id: '/arquivos/'
+      path: '/arquivos'
+      fullPath: '/arquivos/'
+      preLoaderRoute: typeof ArquivosIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/arquivos/$slug': {
+      id: '/arquivos/$slug'
+      path: '/arquivos/$slug'
+      fullPath: '/arquivos/$slug'
+      preLoaderRoute: typeof ArquivosSlugRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/': {
       id: '/_authenticated/admin/'
@@ -320,9 +320,9 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SlugRoute: SlugRoute,
-  ArquivosIndexRoute: ArquivosIndexRoute,
-  ArquivosSlugRoute: ArquivosSlugRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  ArquivosSlugRoute: ArquivosSlugRoute,
+  ArquivosIndexRoute: ArquivosIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
