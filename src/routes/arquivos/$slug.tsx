@@ -6,73 +6,47 @@ export const Route = createFileRoute('/arquivos/$slug')({
   component: ArquivosRedirectPage,
 })
 
-function executeMobileDeepLink(destinationUrl: string) {
+function autoRedirectToShopee(destinationUrl: string) {
   if (typeof window === 'undefined' || !destinationUrl) return
 
   const userAgent = navigator.userAgent || ''
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(userAgent)
   const isAndroid = /Android/i.test(userAgent)
-  const isIOS = /iPhone|iPad|iPod/i.test(userAgent)
   const isInApp = /FBAN|FBAV|Instagram|TikTok|BytedanceWebview/i.test(userAgent)
 
-  // 1. Android (Intent Nativo com Fallback Web)
-  if (isAndroid) {
+  if (isMobile) {
+    const encodedUrl = encodeURIComponent(destinationUrl)
     const cleanUrl = destinationUrl.replace(/^https?:\/\//, '')
-    const encodedDest = encodeURIComponent(destinationUrl)
 
-    // Se estiver no In-App Browser (Instagram/TikTok), escapa para o Chrome externo
-    if (isInApp) {
+    // Se estiver no navegador embutido (Instagram/TikTok), escapa para o Chrome externo
+    if (isInApp && isAndroid) {
       window.location.href = `intent://${cleanUrl}#Intent;scheme=https;package=com.android.chrome;end;`
       return
     }
 
-    // Android Intent nativo da Shopee BR
-    const intentUrl = `intent://${cleanUrl}#Intent;scheme=https;package=com.shopee.br;S.browser_fallback_url=${encodedDest};end;`
+    // 1. Tenta abrir o app nativo da Shopee imediatamente
+    if (isAndroid) {
+      window.location.href = `intent://${cleanUrl}#Intent;scheme=https;package=com.shopee.br;S.browser_fallback_url=${encodedUrl};end;`
+    } else {
+      window.location.href = `shopee://open?url=${encodedUrl}`
+    }
 
-    const linkElem = document.createElement('a')
-    linkElem.href = intentUrl
-    linkElem.rel = 'noreferrer'
-    document.body.appendChild(linkElem)
-    linkElem.click()
-
-    // Fallback inteligente: se o app não estiver instalado, abre a versão web
+    // 2. Fallback de 1.5 segundo para a URL web caso o usuário continue na mesma página (app não instalado)
     const fallbackTimer = setTimeout(() => {
-      if (!document.hidden) {
-        window.location.replace(destinationUrl)
-      }
-    }, 1200)
+      window.location.replace(destinationUrl)
+    }, 1500)
 
-    const onVisibilityChange = () => {
+    const handleVisibilityChange = () => {
       if (document.hidden) {
         clearTimeout(fallbackTimer)
       }
     }
-    document.addEventListener('visibilitychange', onVisibilityChange, { once: true })
+    document.addEventListener('visibilitychange', handleVisibilityChange, { once: true })
     window.addEventListener('pagehide', () => clearTimeout(fallbackTimer), { once: true })
     return
   }
 
-  // 2. iOS (iPhone / iPad - Custom URL Scheme com Fallback)
-  if (isIOS) {
-    const appUrl = `shopee://open?url=${encodeURIComponent(destinationUrl)}`
-    window.location.href = appUrl
-
-    const fallbackTimer = setTimeout(() => {
-      if (!document.hidden) {
-        window.location.replace(destinationUrl)
-      }
-    }, 1000)
-
-    const onVisibilityChange = () => {
-      if (document.hidden) {
-        clearTimeout(fallbackTimer)
-      }
-    }
-    document.addEventListener('visibilitychange', onVisibilityChange, { once: true })
-    window.addEventListener('pagehide', () => clearTimeout(fallbackTimer), { once: true })
-    return
-  }
-
-  // 3. Desktop / Navegador PC
+  // Desktop / Computador: abre na Web imediatamente
   window.location.replace(destinationUrl)
 }
 
@@ -138,8 +112,8 @@ function ArquivosRedirectPage() {
           } catch (_) {}
         }
 
-        // Dispara o Deep Link Mobile
-        executeMobileDeepLink(destinationUrl)
+        // Executa abertura automática no App Shopee com fallback web em 1.5s
+        autoRedirectToShopee(destinationUrl)
       } catch (err) {
         console.error('Erro no processamento do clique (/arquivos):', err)
         window.location.replace('/')
