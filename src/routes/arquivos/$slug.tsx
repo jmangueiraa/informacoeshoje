@@ -61,47 +61,64 @@ function ArquivosRedirectPage() {
       return
     }
 
-    async function execute() {
+    async function processAndRedirect() {
       try {
-        const { data: link, error } = await supabase
-          .from('links')
-          .select('*')
-          .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
-          .maybeSingle()
+        let destinationUrl: string | null = null
 
-        if (error || !link) {
-          console.error('Link não localizado no Supabase:', error)
-          setStatusText('Link não encontrado. Redirecionando...')
-          setTimeout(() => {
-            window.location.replace('/')
-          }, 800)
-          return
-        }
-
-        const destinationUrl = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
-        if (!destinationUrl) {
-          window.location.replace('/')
-          return
-        }
-
-        // Incrementa contagem de cliques
+        // 1. Tenta incrementar e obter o destino atomicamente via RPC
         try {
-          supabase.from('clicks').insert({ link_id: link.id })
-          supabase
-            .from('links')
-            .update({ clicks_count: (link.clicks_count || 0) + 1 })
-            .eq('id', link.id)
-        } catch (_) {}
+          const { data: rpcDest, error: rpcError } = await supabase.rpc('incrementar_clique', {
+            link_slug: cleanSlug,
+          })
+          if (!rpcError && typeof rpcDest === 'string' && rpcDest) {
+            destinationUrl = rpcDest
+          }
+        } catch (e) {
+          console.warn('Erro na RPC de clique (/arquivos):', e)
+        }
 
-        // Redirecionamento real
+        // 2. Se a RPC não retornou a URL, busca o link no banco e incrementa
+        if (!destinationUrl) {
+          const { data: link, error } = await supabase
+            .from('links')
+            .select('*')
+            .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
+            .maybeSingle()
+
+          if (error || !link) {
+            console.error('Link não localizado no Supabase:', error)
+            setStatusText('Link não encontrado. Redirecionando...')
+            setTimeout(() => {
+              window.location.replace('/')
+            }, 800)
+            return
+          }
+
+          destinationUrl = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
+          if (!destinationUrl) {
+            window.location.replace('/')
+            return
+          }
+
+          // Registra clique no banco com await garantido antes de redirecionar
+          try {
+            await Promise.allSettled([
+              supabase.rpc('increment_clicks', { row_id: link.id }),
+              supabase.from('clicks').insert({ link_id: link.id }),
+              supabase.from('link_clicks').insert({ link_id: link.id, ip_address: 'visitor' }),
+            ])
+          } catch (_) {}
+        }
+
+        // Executa redirecionamento real
         executeRedirect(destinationUrl)
       } catch (err) {
-        console.error('Erro no redirecionamento:', err)
+        console.error('Erro no processamento do clique (/arquivos):', err)
         window.location.replace('/')
       }
     }
 
-    execute()
+    processAndRedirect()
   }, [slug])
 
   return (

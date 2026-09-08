@@ -129,7 +129,7 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.increment_clicks(uuid) TO anon, authenticated, service_role;
 
--- 7. Função de incremento por Slug (Case-Insensitive e flexível a barras)
+-- 7. Função de incremento por Slug (Case-Insensitive e flexível a barras e prefixos)
 CREATE OR REPLACE FUNCTION public.incrementar_clique(link_slug text)
 RETURNS text
 LANGUAGE plpgsql
@@ -142,17 +142,25 @@ DECLARE
   v_clean_slug text;
 BEGIN
   v_clean_slug := lower(btrim(link_slug, '/'));
+  IF v_clean_slug LIKE 'arquivos/%' THEN
+    v_clean_slug := substr(v_clean_slug, 10);
+  END IF;
 
   UPDATE public.links
   SET clicks_count = COALESCE(clicks_count, 0) + 1,
       updated_at = now()
-  WHERE lower(btrim(slug, '/')) = v_clean_slug
+  WHERE (
+    lower(btrim(slug, '/')) = v_clean_slug OR
+    lower(btrim(slug, '/')) = 'arquivos/' || v_clean_slug OR
+    slug ILIKE v_clean_slug
+  )
     AND (status = 'active' OR status IS NULL)
     AND (expires_at IS NULL OR expires_at > now())
-  RETURNING id, affiliate_url INTO v_link_id, url_dest;
+  RETURNING id, COALESCE(affiliate_url, destination_url, url_destino) INTO v_link_id, url_dest;
 
   IF v_link_id IS NOT NULL THEN
     INSERT INTO public.clicks (link_id) VALUES (v_link_id);
+    INSERT INTO public.link_clicks (link_id, ip_address) VALUES (v_link_id, 'visitor');
   END IF;
 
   RETURN url_dest;

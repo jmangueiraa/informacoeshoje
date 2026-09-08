@@ -6,6 +6,48 @@ export const Route = createFileRoute('/$slug')({
   component: SlugRedirectPage,
 })
 
+function executeRedirect(destinationUrl: string) {
+  if (typeof window === 'undefined' || !destinationUrl) return
+
+  const userAgent = navigator.userAgent || ''
+  const isAndroid = /Android/i.test(userAgent)
+  const isIOS = /iPhone|iPad|iPod/i.test(userAgent)
+  const isInApp = /FBAN|FBAV|Instagram|TikTok|BytedanceWebview/i.test(userAgent)
+
+  // Android: se estiver dentro de app (Instagram/TikTok), escapa para Chrome; senão dispara app Shopee
+  if (isAndroid) {
+    const cleanPath = destinationUrl.replace(/^https?:\/\//, '')
+    if (isInApp) {
+      window.location.href = `intent://${cleanPath}#Intent;scheme=https;package=com.android.chrome;end;`
+      return
+    }
+
+    const intentShopee = `intent://${cleanPath}#Intent;scheme=https;package=com.shopee.br;S.browser_fallback_url=${encodeURIComponent(destinationUrl)};end;`
+    const a = document.createElement('a')
+    a.href = intentShopee
+    a.rel = 'noreferrer'
+    document.body.appendChild(a)
+    a.click()
+
+    setTimeout(() => {
+      window.location.replace(destinationUrl)
+    }, 1200)
+    return
+  }
+
+  // iOS: deep link nativo da Shopee
+  if (isIOS) {
+    window.location.href = `shopee://open?url=${encodeURIComponent(destinationUrl)}`
+    setTimeout(() => {
+      window.location.replace(destinationUrl)
+    }, 1000)
+    return
+  }
+
+  // Desktop / Navegador PC
+  window.location.replace(destinationUrl)
+}
+
 function SlugRedirectPage() {
   const { slug } = Route.useParams()
   const [statusText, setStatusText] = useState('Redirecionando para o produto...')
@@ -19,47 +61,64 @@ function SlugRedirectPage() {
       return
     }
 
-    async function executeRedirect() {
+    async function processAndRedirect() {
       try {
-        const { data: link, error } = await supabase
-          .from('links')
-          .select('*')
-          .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
-          .maybeSingle()
+        let destinationUrl: string | null = null
 
-        if (error || !link) {
-          console.error('Link não localizado no Supabase:', error)
-          setStatusText('Link não encontrado. Redirecionando...')
-          setTimeout(() => {
-            window.location.replace('/')
-          }, 800)
-          return
-        }
-
-        const destinationUrl = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
-        if (!destinationUrl) {
-          window.location.replace('/')
-          return
-        }
-
-        // Incrementa contagem de cliques no banco
+        // 1. Tenta incrementar e obter o destino atomicamente via RPC
         try {
-          supabase.from('clicks').insert({ link_id: link.id })
-          supabase
-            .from('links')
-            .update({ clicks_count: (link.clicks_count || 0) + 1 })
-            .eq('id', link.id)
-        } catch (_) {}
+          const { data: rpcDest, error: rpcError } = await supabase.rpc('incrementar_clique', {
+            link_slug: cleanSlug,
+          })
+          if (!rpcError && typeof rpcDest === 'string' && rpcDest) {
+            destinationUrl = rpcDest
+          }
+        } catch (e) {
+          console.warn('Erro na RPC de clique:', e)
+        }
 
-        // Executa redirecionamento real de navegador
-        window.location.replace(destinationUrl)
+        // 2. Se a RPC não retornou a URL, busca o link no banco e incrementa
+        if (!destinationUrl) {
+          const { data: link, error } = await supabase
+            .from('links')
+            .select('*')
+            .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
+            .maybeSingle()
+
+          if (error || !link) {
+            console.error('Link não localizado no Supabase:', error)
+            setStatusText('Link não encontrado. Redirecionando...')
+            setTimeout(() => {
+              window.location.replace('/')
+            }, 800)
+            return
+          }
+
+          destinationUrl = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
+          if (!destinationUrl) {
+            window.location.replace('/')
+            return
+          }
+
+          // Registra clique no banco com await garantido antes de redirecionar
+          try {
+            await Promise.allSettled([
+              supabase.rpc('increment_clicks', { row_id: link.id }),
+              supabase.from('clicks').insert({ link_id: link.id }),
+              supabase.from('link_clicks').insert({ link_id: link.id, ip_address: 'visitor' }),
+            ])
+          } catch (_) {}
+        }
+
+        // Executa redirecionamento real
+        executeRedirect(destinationUrl)
       } catch (err) {
-        console.error('Erro no redirecionamento:', err)
+        console.error('Erro no processamento do clique:', err)
         window.location.replace('/')
       }
     }
 
-    executeRedirect()
+    processAndRedirect()
   }, [slug])
 
   return (
