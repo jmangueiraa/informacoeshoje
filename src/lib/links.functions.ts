@@ -477,29 +477,90 @@ export const trackShopeeClick = createServerFn({ method: "POST" })
       console.warn("Aviso ao extrair IP do cliente:", e);
     }
 
-    // 3. Execução da RPC única com Transaction no Supabase:
-    // (Valida cooldown de 7 dias, filtra bots, incrementa contador se válido e faz UPSERT do IP)
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc('process_shopee_click', {
-      p_slug: cleanSlug,
-      p_ip: clientIp,
-      p_has_cookie: hasCookie,
-      p_is_bot: isBot,
-    });
+    // 3. Execução com Fallbacks em Cascata (Garantia de Redirecionamento 100% Funcional)
+    let destinationUrl: string | null = null;
+    let isValidClick = false;
+    let inCooldown = hasCookie;
 
-    if (rpcError) {
-      console.error("Erro na RPC process_shopee_click:", rpcError);
-      throw rpcError;
+    // Tentativa 1: RPC process_shopee_click
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc('process_shopee_click', {
+        p_slug: cleanSlug,
+        p_ip: clientIp,
+        p_has_cookie: hasCookie,
+        p_is_bot: isBot,
+      });
+
+      if (!rpcError && rpcResult && (rpcResult as any).destination_url) {
+        destinationUrl = (rpcResult as any).destination_url;
+        isValidClick = Boolean((rpcResult as any).is_valid_click);
+        inCooldown = Boolean((rpcResult as any).in_cooldown || hasCookie);
+      } else if (rpcError) {
+        console.warn("Aviso na RPC process_shopee_click (usando fallback):", rpcError);
+      }
+    } catch (rpcEx) {
+      console.warn("Exceção na RPC process_shopee_click:", rpcEx);
     }
 
-    const result = (rpcResult as any) || {};
+    // Tentativa 2: Consulta direta com supabaseAdmin
+    if (!destinationUrl) {
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data: link } = await supabaseAdmin
+          .from("links")
+          .select("*")
+          .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
+          .maybeSingle();
 
-    // 4. Injeção do Cookie (Crucial):
-    // Se o usuário não tinha o cookie na etapa 1 E não for um bot/crawler, injeta Set-Cookie de 7 dias (Max-Age=604800)
+        if (link) {
+          destinationUrl = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino || null;
+
+          if (!hasCookie && !isBot && destinationUrl) {
+            isValidClick = true;
+            try {
+              await Promise.allSettled([
+                supabaseAdmin.from("links").update({ clicks_count: ((link as any).clicks_count || 0) + 1 }).eq("id", link.id),
+                supabaseAdmin.from("clicks").insert({ link_id: link.id, ip_address: clientIp }),
+                supabaseAdmin.from("link_clicks").insert({ link_id: link.id, ip_address: clientIp }),
+                supabaseAdmin.from("ip_cooldown" as any).upsert({ ip_address: clientIp, last_click_at: new Date().toISOString() }),
+              ]);
+            } catch (_) {}
+          }
+        }
+      } catch (dbEx) {
+        console.warn("Exceção no fallback supabaseAdmin:", dbEx);
+      }
+    }
+
+    // Tentativa 3: Consulta com cliente padrão Supabase
+    if (!destinationUrl) {
+      try {
+        const { data: link } = await supabase
+          .from("links")
+          .select("*")
+          .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
+          .maybeSingle();
+
+        if (link) {
+          destinationUrl = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino || null;
+        }
+      } catch (_) {}
+    }
+
+    // Garante protocolo https:// completo se o link foi salvo sem protocolo
+    if (destinationUrl) {
+      destinationUrl = destinationUrl.trim();
+      if (!/^https?:\/\//i.test(destinationUrl)) {
+        destinationUrl = `https://${destinationUrl}`;
+      }
+    }
+
+    // 4. Injeção do Cookie de 7 dias (se não for bot e não tinha cookie)
     if (!hasCookie && !isBot) {
       try {
         setCookie('shopee_click_cooldown', 'true', {
-          maxAge: 604800, // 7 dias (7 * 24 * 60 * 60)
+          maxAge: 604800, // 7 dias
           path: '/',
           httpOnly: true,
           sameSite: 'lax',
@@ -515,11 +576,11 @@ export const trackShopeeClick = createServerFn({ method: "POST" })
     }
 
     return {
-      destinationUrl: result.destination_url || null,
-      isValidClick: Boolean(result.is_valid_click),
-      inCooldown: Boolean(result.in_cooldown || hasCookie),
+      destinationUrl,
+      isValidClick,
+      inCooldown,
       isBot,
-      success: Boolean(result.success),
+      success: Boolean(destinationUrl),
     };
   });
 
@@ -529,7 +590,6 @@ export const clearIpCooldownList = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from('ip_cooldown' as any).delete().neq('ip_address', 'dummy_value_to_delete_all');
     if (error) {
-      // Fallback via RPC se delete sem where restrito
       await supabaseAdmin.rpc('clear_all_ip_cooldown' as any);
     }
     return { success: true };

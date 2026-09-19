@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState, useRef } from 'react'
 import { trackShopeeClick } from '@/lib/links.functions'
+import { supabase } from '@/integrations/supabase/client'
 
 export const Route = createFileRoute('/$slug')({
   loader: async ({ params }) => {
@@ -14,15 +15,20 @@ export const Route = createFileRoute('/$slug')({
       const response = await trackShopeeClick({ data: { slug: cleanSlug } })
       return response
     } catch (err) {
-      console.error('Erro no loader ao rastrear clique:', err)
+      console.warn('Aviso no loader ao rastrear clique:', err)
       return { destinationUrl: null, success: false }
     }
   },
   component: SlugRedirectPage,
 })
 
-function autoRedirectToShopee(destinationUrl: string) {
-  if (typeof window === 'undefined' || !destinationUrl) return
+function autoRedirectToShopee(rawUrl: string) {
+  if (typeof window === 'undefined' || !rawUrl) return
+
+  let destinationUrl = rawUrl.trim()
+  if (!/^https?:\/\//i.test(destinationUrl)) {
+    destinationUrl = `https://${destinationUrl}`
+  }
 
   const userAgent = navigator.userAgent || ''
   const isMobile = /iPhone|iPad|iPod|Android/i.test(userAgent)
@@ -86,17 +92,38 @@ function SlugRedirectPage() {
       try {
         let destinationUrl = loaderData?.destinationUrl
 
-        // Se não obteve a URL no loader (ex: navegação client-side pura), executa a rota backend
+        // 1. Se não obteve a URL no loader, tenta o server function
         if (!destinationUrl) {
-          const res = await trackShopeeClick({ data: { slug: cleanSlug } })
-          destinationUrl = res?.destinationUrl
+          try {
+            const res = await trackShopeeClick({ data: { slug: cleanSlug } })
+            destinationUrl = res?.destinationUrl
+          } catch (e) {
+            console.warn('Erro ao chamar trackShopeeClick:', e)
+          }
+        }
+
+        // 2. Fallback de resgate direto no Supabase
+        if (!destinationUrl) {
+          try {
+            const { data: link } = await supabase
+              .from('links')
+              .select('*')
+              .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
+              .maybeSingle()
+
+            if (link) {
+              destinationUrl = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
+            }
+          } catch (dbErr) {
+            console.warn('Erro na busca de resgate no Supabase:', dbErr)
+          }
         }
 
         if (!destinationUrl) {
           setStatusText('Link não encontrado. Redirecionando...')
           setTimeout(() => {
             window.location.replace('/')
-          }, 800)
+          }, 1200)
           return
         }
 
