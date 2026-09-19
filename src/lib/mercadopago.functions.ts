@@ -197,27 +197,70 @@ export const checkMercadoPagoPaymentStatus = createServerFn({ method: "POST" })
                 .update({ status: 'approved', paid_at: new Date().toISOString() })
                 .eq("mercadopago_payment_id", paymentId);
 
-              // 4. Renova a assinatura do usuário por +30 dias
-              await supabaseAdmin.rpc('superadmin_renew_subscription' as any, {
+              // 4. Renova a assinatura do usuário por +30 dias de forma garantida
+              const [{ data: userProfile }, authUserRes] = await Promise.all([
+                supabaseAdmin
+                  .from("profiles")
+                  .select("*")
+                  .eq("id", userId)
+                  .maybeSingle(),
+                supabaseAdmin.auth.admin.getUserById(userId).catch(() => ({ data: { user: null } }))
+              ]);
+
+              const authUser = authUserRes?.data?.user;
+              const nowTime = new Date().getTime();
+              const currentExpStr = userProfile?.subscription_expires_at 
+                || userProfile?.trial_expires_at 
+                || authUser?.user_metadata?.subscription_expires_at;
+
+              let currentExp = currentExpStr ? new Date(currentExpStr).getTime() : 0;
+              if (!currentExp && authUser?.created_at) {
+                currentExp = new Date(authUser.created_at).getTime() + 30 * 24 * 3600 * 1000;
+              }
+
+              const baseTime = (currentExp > nowTime) ? currentExp : nowTime;
+              const newExpiresAt = new Date(baseTime + 30 * 24 * 3600 * 1000).toISOString();
+              const clientName = userProfile?.full_name || authUser?.user_metadata?.full_name || authUser?.email?.split('@')[0] || 'Cliente';
+              const clientPhone = userProfile?.phone_number || authUser?.user_metadata?.phone_number || authUser?.phone || null;
+
+              await supabaseAdmin
+                .from("profiles")
+                .upsert({
+                  id: userId,
+                  full_name: clientName,
+                  phone_number: clientPhone,
+                  subscription_expires_at: newExpiresAt,
+                  trial_expires_at: newExpiresAt,
+                  subscription_status: 'active',
+                  subscription_type: 'monthly',
+                  subscription_price: 30.00,
+                  is_trial: false,
+                  updated_at: new Date().toISOString(),
+                }, { onConflict: 'id' });
+
+              if (authUser) {
+                await supabaseAdmin.auth.admin.updateUserById(userId, {
+                  user_metadata: {
+                    ...(authUser.user_metadata || {}),
+                    subscription_expires_at: newExpiresAt,
+                    trial_expires_at: newExpiresAt,
+                    subscription_status: 'active',
+                    subscription_type: 'monthly',
+                    subscription_price: 30.00,
+                    is_trial: false,
+                  }
+                }).catch(() => {});
+              }
+
+              supabaseAdmin.rpc('superadmin_renew_subscription' as any, {
                 p_user_id: userId,
                 p_days_to_add: 30,
                 p_new_price: 30.00,
                 p_new_type: 'monthly',
-              });
+              }).catch(() => {});
 
-              // 5. Busca dados do usuário para a notificação
-              const { data: userProfile } = await supabaseAdmin
-                .from("profiles")
-                .select("full_name, username, subscription_expires_at")
-                .eq("id", userId)
-                .maybeSingle();
-
-              const clientName = userProfile?.full_name || userProfile?.username || 'Cliente';
-              const formattedExp = userProfile?.subscription_expires_at 
-                ? new Date(userProfile.subscription_expires_at).toLocaleDateString('pt-BR')
-                : '30 dias';
-
-              // 6. Notifica no Telegram o pagamento aprovado
+              // 5. Notifica no Telegram o pagamento aprovado
+              const formattedExp = new Date(newExpiresAt).toLocaleDateString('pt-BR');
               dispatchTelegramMessage(
                 `🎉 <b>PAGAMENTO CONFIRMADO! (MERCADO PAGO)</b>\n\n` +
                 `👤 <b>Cliente:</b> ${clientName}\n` +
@@ -227,7 +270,7 @@ export const checkMercadoPagoPaymentStatus = createServerFn({ method: "POST" })
                 `🚀 <i>Acesso liberado automaticamente no sistema!</i>`
               ).catch(console.error);
 
-              return { paid: true, status: 'approved', newExpiresAt: userProfile?.subscription_expires_at };
+              return { paid: true, status: 'approved', newExpiresAt };
             }
 
             return { paid: false, status: mpPayment.status };

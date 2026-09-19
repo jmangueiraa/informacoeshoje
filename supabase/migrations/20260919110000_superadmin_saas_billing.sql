@@ -172,22 +172,41 @@ BEGIN
         v_new_expires := v_current_expires + (p_days_to_add || ' days')::INTERVAL;
     END IF;
 
-    UPDATE public.profiles
-    SET 
-        subscription_expires_at = v_new_expires,
-        subscription_status = 'active',
-        subscription_type = COALESCE(p_new_type, subscription_type, 'monthly'),
-        subscription_price = COALESCE(p_new_price, subscription_price, 30.00),
-        trial_expires_at = v_new_expires,
-        is_trial = FALSE,
-        updated_at = NOW()
-    WHERE id = p_user_id;
+    INSERT INTO public.profiles (
+        id,
+        subscription_expires_at,
+        trial_expires_at,
+        subscription_status,
+        subscription_type,
+        subscription_price,
+        is_trial,
+        updated_at
+    )
+    VALUES (
+        p_user_id,
+        v_new_expires,
+        v_new_expires,
+        'active',
+        COALESCE(p_new_type, 'monthly'),
+        COALESCE(p_new_price, 30.00),
+        FALSE,
+        NOW()
+    )
+    ON CONFLICT (id) DO UPDATE SET
+        subscription_expires_at = EXCLUDED.subscription_expires_at,
+        trial_expires_at = EXCLUDED.trial_expires_at,
+        subscription_status = EXCLUDED.subscription_status,
+        subscription_type = EXCLUDED.subscription_type,
+        subscription_price = EXCLUDED.subscription_price,
+        is_trial = EXCLUDED.is_trial,
+        updated_at = NOW();
 
     v_result := jsonb_build_object(
         'success', true,
         'user_id', p_user_id,
         'new_expires_at', v_new_expires,
-        'status', 'active'
+        'status', 'active',
+        'days_added', p_days_to_add
     );
 
     RETURN v_result;

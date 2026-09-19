@@ -213,10 +213,13 @@ function SuperAdminDashboard() {
   const renewMutation = useMutation({
     mutationFn: (data: { userId: string; daysToAdd: number; price: number; planType: string }) => 
       renewUserSubscription({ data }),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['superadmin-users'] })
       queryClient.invalidateQueries({ queryKey: ['superadmin-stats'] })
-      toast.success(`Assinatura renovada por +${renewDays} dias com sucesso!`)
+      queryClient.invalidateQueries({ queryKey: ['user-profile'] })
+      const days = res?.daysAdded || renewDays || 30
+      const formattedDate = res?.newExpiresAt ? ` (Novo vencimento: ${new Date(res.newExpiresAt).toLocaleDateString('pt-BR')})` : ''
+      toast.success(`Assinatura renovada por +${days} dias com sucesso!${formattedDate}`)
       setIsRenewOpen(false)
     },
     onError: (err: any) => {
@@ -1149,8 +1152,8 @@ function SuperAdminDashboard() {
                   renewMutation.mutate({
                     userId: selectedUser.id,
                     daysToAdd: renewDays,
-                    price: 30.00,
-                    planType: 'monthly',
+                    price: Number(selectedUser.subscription_price) || 30.00,
+                    planType: selectedUser.subscription_type === 'trial_7d' ? 'monthly' : (selectedUser.subscription_type || 'monthly'),
                   })
                 }
               }}

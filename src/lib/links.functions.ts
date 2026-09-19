@@ -201,15 +201,39 @@ export const resetLinkClicks = createServerFn({ method: "POST" })
 export const getUserProfile = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { userId, supabase: authenticatedSupabase } = context;
+    const { userId, supabase: authenticatedSupabase, claims } = context;
+    const userEmail = typeof claims.email === 'string' ? claims.email.toLowerCase() : '';
+    const isMasterAdmin = userEmail === 'ajpentretedimento@hotmail.com';
 
-    const { data: profile, error } = await authenticatedSupabase
+    const { data: profile } = await authenticatedSupabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
-      .single();
+      .maybeSingle();
 
-    if (error) return { error: error.message };
+    if (!profile) {
+      const defaultExp = isMasterAdmin 
+        ? new Date(Date.now() + 10 * 365 * 24 * 3600 * 1000).toISOString()
+        : (claims.user_metadata?.subscription_expires_at || new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString());
+
+      const initialProfile = {
+        id: userId,
+        full_name: (claims.user_metadata as any)?.full_name || userEmail.split('@')[0] || 'Usuário',
+        username: userEmail,
+        phone_number: (claims.user_metadata as any)?.phone_number || (claims.user_metadata as any)?.phone || null,
+        subscription_type: isMasterAdmin ? 'lifetime' : ((claims.user_metadata as any)?.subscription_type || 'trial_7d'),
+        subscription_price: isMasterAdmin ? 0.00 : (Number((claims.user_metadata as any)?.subscription_price) || 30.00),
+        subscription_status: isMasterAdmin ? 'active' : ((claims.user_metadata as any)?.subscription_status || 'trial'),
+        subscription_expires_at: defaultExp,
+        trial_expires_at: defaultExp,
+        is_trial: isMasterAdmin ? false : ((claims.user_metadata as any)?.is_trial !== false),
+        updated_at: new Date().toISOString(),
+      };
+
+      authenticatedSupabase.from("profiles").upsert(initialProfile, { onConflict: 'id' }).then(() => {}).catch(() => {});
+      return initialProfile;
+    }
+
     return profile;
   });
 

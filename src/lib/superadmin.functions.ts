@@ -47,19 +47,23 @@ export const getSuperAdminFinancialStats = createServerFn({ method: "GET" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // 1. Busca todos os perfis com seus dados de assinatura
-    const { data: profiles, error: profilesError } = await supabaseAdmin
-      .from("profiles")
-      .select("*");
+    // 1. Busca todos os perfis e usuários no Auth
+    const [{ data: profiles, error: profilesError }, { data: authUsersData }] = await Promise.all([
+      supabaseAdmin.from("profiles").select("*"),
+      supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 }).catch(() => ({ data: { users: [] } })),
+    ]);
 
     if (profilesError) throw profilesError;
 
     const allProfiles = profiles || [];
+    const authUsers = authUsersData?.users || [];
+    const profilesMap = new Map<string, any>();
+    allProfiles.forEach((p: any) => profilesMap.set(p.id, p));
+
     const now = new Date().getTime();
     const in3Days = now + 3 * 24 * 60 * 60 * 1000;
     const in7Days = now + 7 * 24 * 60 * 60 * 1000;
 
-    let totalUsers = allProfiles.length;
     let activeUsers = 0;
     let expiredUsers = 0;
     let trialUsers = 0;
@@ -68,17 +72,26 @@ export const getSuperAdminFinancialStats = createServerFn({ method: "GET" })
     let expiringIn7DaysCount = 0;
 
     const expiringSoonList: any[] = [];
+    const processedUserIds = new Set<string>();
 
-    allProfiles.forEach((profile: any) => {
-      // Ignora o próprio superadmin dos cálculos de mensalidade
-      const isMasterAdmin = profile.id === context.userId;
+    // Processa usuários do auth
+    authUsers.forEach((u: any) => {
+      processedUserIds.add(u.id);
+      const isMasterAdmin = u.email?.toLowerCase() === MASTER_SUPERADMIN_EMAIL;
+      const profile = profilesMap.get(u.id) || {};
 
-      const expDate = profile.subscription_expires_at 
-        ? new Date(profile.subscription_expires_at).getTime()
-        : (profile.trial_expires_at ? new Date(profile.trial_expires_at).getTime() : 0);
+      const expDateStr = profile.subscription_expires_at 
+        || profile.trial_expires_at 
+        || u.user_metadata?.subscription_expires_at 
+        || u.user_metadata?.trial_expires_at;
 
-      const isTrial = profile.subscription_type === 'trial_7d' || profile.is_trial === true;
-      const isExpired = expDate > 0 && expDate < now;
+      let expDate = expDateStr ? new Date(expDateStr).getTime() : 0;
+      if (!expDate && !isMasterAdmin && u.created_at) {
+        expDate = new Date(u.created_at).getTime() + 30 * 24 * 3600 * 1000;
+      }
+
+      const isTrial = (profile.subscription_type === 'trial_7d' || profile.is_trial === true || u.user_metadata?.is_trial === true) && !isMasterAdmin;
+      const isExpired = !isMasterAdmin && expDate > 0 && expDate < now;
       const isSuspended = profile.subscription_status === 'suspended';
 
       if (isTrial) {
@@ -90,22 +103,23 @@ export const getSuperAdminFinancialStats = createServerFn({ method: "GET" })
       } else {
         activeUsers++;
         if (!isTrial && !isMasterAdmin) {
-          const price = Number(profile.subscription_price) || 30.00;
+          const price = Number(profile.subscription_price) || Number(u.user_metadata?.subscription_price) || 30.00;
           mrr += price;
         }
       }
 
-      // Vencimentos próximos
-      if (!isExpired && !isSuspended && expDate > now) {
+      // Vencimentos próximos (não expirados e não admin)
+      if (!isExpired && !isSuspended && !isMasterAdmin && expDate > now) {
+        const daysLeft = Math.ceil((expDate - now) / (24 * 3600 * 1000));
         if (expDate <= in3Days) {
           expiringIn3DaysCount++;
           expiringSoonList.push({
-            id: profile.id,
-            name: profile.full_name || profile.username || 'Sem nome',
-            phone: profile.phone_number || '',
-            expires_at: profile.subscription_expires_at || profile.trial_expires_at,
+            id: u.id,
+            name: profile.full_name || u.user_metadata?.full_name || u.email?.split('@')[0] || 'Usuário',
+            phone: profile.phone_number || u.user_metadata?.phone_number || u.user_metadata?.phone || u.phone || '',
+            expires_at: new Date(expDate).toISOString(),
             type: profile.subscription_type || 'monthly',
-            days_left: Math.ceil((expDate - now) / (24 * 3600 * 1000)),
+            days_left: daysLeft,
           });
         } else if (expDate <= in7Days) {
           expiringIn7DaysCount++;
@@ -123,7 +137,7 @@ export const getSuperAdminFinancialStats = createServerFn({ method: "GET" })
     return {
       mrr,
       annualProjection: mrr * 12,
-      totalUsers,
+      totalUsers: authUsers.length || allProfiles.length,
       activeUsers,
       expiredUsers,
       trialUsers,
@@ -190,8 +204,12 @@ export const getSuperAdminUsersList = createServerFn({ method: "GET" })
       // Telefone: busca do profile ou do metadata do Auth
       const phone = profile.phone_number || u.user_metadata?.phone_number || u.user_metadata?.phone || u.phone || '';
 
-      // Expiração: se não tiver definida, calcula 30 dias a partir da criação
-      let expDateStr = profile.subscription_expires_at || profile.trial_expires_at;
+      // Expiração: busca do profile ou do metadata do Auth
+      let expDateStr = profile.subscription_expires_at 
+        || profile.trial_expires_at 
+        || u.user_metadata?.subscription_expires_at 
+        || u.user_metadata?.trial_expires_at;
+
       if (!expDateStr && !isMasterAdmin) {
         const userCreated = new Date(u.created_at).getTime();
         expDateStr = new Date(userCreated + 30 * 24 * 3600 * 1000).toISOString();
@@ -201,11 +219,15 @@ export const getSuperAdminUsersList = createServerFn({ method: "GET" })
           .from("profiles")
           .upsert({
             id: u.id,
+            full_name: profile.full_name || u.user_metadata?.full_name || u.email?.split('@')[0] || 'Usuário',
             subscription_expires_at: expDateStr,
+            trial_expires_at: expDateStr,
             subscription_status: 'active',
             subscription_type: 'monthly',
             subscription_price: 30.00,
             phone_number: phone || null,
+            is_trial: false,
+            updated_at: new Date().toISOString(),
           }, { onConflict: 'id' })
           .then(() => {})
           .catch((err: any) => console.warn("Auto backfill profile warning:", err));
@@ -213,29 +235,32 @@ export const getSuperAdminUsersList = createServerFn({ method: "GET" })
 
       const expDate = expDateStr ? new Date(expDateStr).getTime() : 0;
       const isExpired = !isMasterAdmin && expDate > 0 && expDate < now;
-      const isTrial = profile.subscription_type === 'trial_7d' || profile.is_trial === true;
+      const isTrial = (profile.subscription_type === 'trial_7d' || profile.is_trial === true || u.user_metadata?.is_trial === true) && !isMasterAdmin;
 
       const diffMs = expDate - now;
       const daysRemaining = isMasterAdmin ? 9999 : (expDate > 0 ? Math.ceil(diffMs / (24 * 3600 * 1000)) : 30);
 
-      let status = profile.subscription_status || (isTrial ? 'trial' : 'active');
+      let status = profile.subscription_status || u.user_metadata?.subscription_status || (isTrial ? 'trial' : 'active');
       if (isMasterAdmin) {
         status = 'active';
       } else if (isExpired && status !== 'suspended') {
         status = 'expired';
       }
 
+      const price = isMasterAdmin ? 0.00 : (Number(profile.subscription_price) || Number(u.user_metadata?.subscription_price) || 30.00);
+      const planType = isMasterAdmin ? 'lifetime' : (profile.subscription_type || u.user_metadata?.subscription_type || (isTrial ? 'trial_7d' : 'monthly'));
+
       return {
         id: u.id,
         email: u.email || '',
         full_name: profile.full_name || u.user_metadata?.full_name || u.email?.split('@')[0] || 'Usuário',
         phone_number: phone,
-        notes: profile.notes || '',
-        subscription_type: isMasterAdmin ? 'lifetime' : (profile.subscription_type || (isTrial ? 'trial_7d' : 'monthly')),
-        subscription_price: isMasterAdmin ? 0.00 : (Number(profile.subscription_price) || 30.00),
+        notes: profile.notes || u.user_metadata?.notes || '',
+        subscription_type: planType,
+        subscription_price: price,
         subscription_status: status,
         subscription_expires_at: isMasterAdmin ? null : expDateStr,
-        is_trial: isTrial && !isMasterAdmin,
+        is_trial: isTrial,
         is_expired: isExpired,
         days_remaining: daysRemaining,
         created_at: u.created_at,
@@ -296,6 +321,12 @@ export const createSuperAdminUser = createServerFn({ method: "POST" })
         full_name: data.full_name.trim(),
         phone_number: data.phone_number?.trim() || null,
         phone: data.phone_number?.trim() || null,
+        subscription_type: data.plan_type,
+        subscription_price: finalPrice,
+        subscription_status: isTrial ? 'trial' : 'active',
+        subscription_expires_at: expiresAt,
+        trial_expires_at: expiresAt,
+        is_trial: isTrial,
       },
     });
 
@@ -349,7 +380,8 @@ export const createSuperAdminUser = createServerFn({ method: "POST" })
   });
 
 /**
- * Renovação de Assinatura pelo SuperAdmin com 1 Clique (+30 dias ou custom)
+ * Renovação de Assinatura pelo SuperAdmin (+30 dias ou custom)
+ * Adiciona dias à data atual de expiração (se ativa) ou a partir de hoje (se expirada)
  */
 export const renewUserSubscription = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -373,43 +405,102 @@ export const renewUserSubscription = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Executa a RPC de renovação atômica
-    const { data: rpcRes, error } = await supabaseAdmin.rpc('superadmin_renew_subscription' as any, {
-      p_user_id: data.userId,
-      p_days_to_add: data.daysToAdd,
-      p_new_price: data.price,
-      p_new_type: data.planType,
-    });
-
-    if (error) {
-      // Fallback manual caso a migration da RPC ainda não tenha sido executada
-      const { data: profile } = await supabaseAdmin
+    // 1. Busca dados atuais do perfil e do auth do usuário
+    const [{ data: profile }, authUserRes] = await Promise.all([
+      supabaseAdmin
         .from("profiles")
-        .select("subscription_expires_at, full_name, username")
+        .select("*")
         .eq("id", data.userId)
-        .single();
+        .maybeSingle(),
+      supabaseAdmin.auth.admin.getUserById(data.userId).catch(() => ({ data: { user: null } }))
+    ]);
 
-      const now = new Date().getTime();
-      const currentExp = profile?.subscription_expires_at ? new Date(profile.subscription_expires_at).getTime() : 0;
-      const baseTime = currentExp > now ? currentExp : now;
-      const newExpiresAt = new Date(baseTime + data.daysToAdd * 24 * 3600 * 1000).toISOString();
+    const authUser = authUserRes?.data?.user;
+    const now = new Date().getTime();
 
-      await supabaseAdmin
-        .from("profiles")
-        .update({
-          subscription_expires_at: newExpiresAt,
-          subscription_status: 'active',
-          subscription_type: data.planType,
-          subscription_price: data.price,
-          is_trial: false,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", data.userId);
+    // Obtém a data de expiração atual de qualquer fonte disponível
+    const currentExpStr = profile?.subscription_expires_at 
+      || profile?.trial_expires_at 
+      || authUser?.user_metadata?.subscription_expires_at
+      || authUser?.user_metadata?.trial_expires_at;
 
-      return { success: true, newExpiresAt };
+    let currentExp = currentExpStr ? new Date(currentExpStr).getTime() : 0;
+    if (!currentExp && authUser?.created_at) {
+      const userCreated = new Date(authUser.created_at).getTime();
+      currentExp = userCreated + 30 * 24 * 3600 * 1000;
     }
 
-    return rpcRes;
+    // Se o cliente ainda tem dias válidos (currentExp > now), soma a partir da data de vencimento futura.
+    // Se já venceu (currentExp <= now), soma a partir de hoje (now + daysToAdd).
+    const baseTime = (currentExp > now) ? currentExp : now;
+    const daysToAdd = data.daysToAdd || 30;
+    const newExpiresAt = new Date(baseTime + daysToAdd * 24 * 3600 * 1000).toISOString();
+
+    const planPrice = Number(data.price) || 30.00;
+    const planType = data.planType || 'monthly';
+    const clientName = profile?.full_name || authUser?.user_metadata?.full_name || authUser?.email?.split('@')[0] || 'Usuário';
+    const clientPhone = profile?.phone_number || authUser?.user_metadata?.phone_number || authUser?.user_metadata?.phone || authUser?.phone || null;
+
+    // 2. Salva no banco via UPSERT garantido (cria o registro caso não exista)
+    const { error: upsertError } = await supabaseAdmin
+      .from("profiles")
+      .upsert({
+        id: data.userId,
+        full_name: clientName,
+        phone_number: clientPhone,
+        subscription_expires_at: newExpiresAt,
+        trial_expires_at: newExpiresAt,
+        subscription_status: 'active',
+        subscription_type: planType,
+        subscription_price: planPrice,
+        is_trial: false,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+
+    if (upsertError) {
+      console.warn("Aviso no upsert do profiles ao renovar:", upsertError);
+    }
+
+    // 3. Atualiza também no user_metadata do Auth para redundância total
+    if (authUser) {
+      await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+        user_metadata: {
+          ...(authUser.user_metadata || {}),
+          subscription_expires_at: newExpiresAt,
+          trial_expires_at: newExpiresAt,
+          subscription_status: 'active',
+          subscription_type: planType,
+          subscription_price: planPrice,
+          is_trial: false,
+        }
+      }).catch((err) => console.warn("Aviso ao atualizar auth user metadata:", err));
+    }
+
+    // 4. Executa também a RPC atômica se ela existir no banco
+    supabaseAdmin.rpc('superadmin_renew_subscription' as any, {
+      p_user_id: data.userId,
+      p_days_to_add: daysToAdd,
+      p_new_price: planPrice,
+      p_new_type: planType,
+    }).catch(() => {});
+
+    // 5. Notificação via Telegram
+    const formattedExp = new Date(newExpiresAt).toLocaleDateString('pt-BR');
+    dispatchTelegramMessage(
+      `🎉 <b>ASSINATURA RENOVADA PELO SUPERADMIN!</b>\n\n` +
+      `👤 <b>Cliente:</b> ${clientName}\n` +
+      `➕ <b>Dias adicionados:</b> +${daysToAdd} dias\n` +
+      `📅 <b>Novo Vencimento:</b> ${formattedExp}\n` +
+      `💳 <b>Plano:</b> Mensal (R$ ${planPrice.toFixed(2).replace('.', ',')})\n` +
+      `🟢 <b>Status:</b> Ativo`
+    ).catch(console.error);
+
+    return { 
+      success: true, 
+      userId: data.userId, 
+      newExpiresAt, 
+      daysAdded: daysToAdd 
+    };
   });
 
 /**
