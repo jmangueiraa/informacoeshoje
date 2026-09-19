@@ -53,3 +53,58 @@ export const getDashboardStats = createServerFn({ method: "GET" })
       activeLinks
     };
   });
+
+export const getIpCooldownList = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // 1. Tenta buscar via RPC get_ip_cooldown_status
+    try {
+      const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('get_ip_cooldown_status' as any);
+      if (!rpcError && Array.isArray(rpcData) && rpcData.length > 0) {
+        return rpcData;
+      }
+    } catch (e) {
+      console.warn("Aviso ao buscar RPC get_ip_cooldown_status:", e);
+    }
+
+    // 2. Consulta direta na tabela ip_cooldown (com fallback de cálculo)
+    const { data: rawData, error: rawError } = await supabaseAdmin
+      .from('ip_cooldown' as any)
+      .select('*')
+      .order('last_click_at', { ascending: false });
+
+    if (rawError || !rawData) {
+      return [];
+    }
+
+    const now = new Date().getTime();
+    return rawData.map((row: any) => {
+      const lastClick = new Date(row.last_click_at).getTime();
+      const cooldownUntil = lastClick + 7 * 24 * 60 * 60 * 1000;
+      const diffMs = cooldownUntil - now;
+      const inCooldown = diffMs > 0;
+      const daysRemaining = inCooldown ? Math.round((diffMs / (24 * 3600 * 1000)) * 10) / 10 : 0;
+      const hoursRemaining = inCooldown ? Math.round((diffMs / (3600 * 1000)) * 10) / 10 : 0;
+
+      let formattedTimeRemaining = 'Liberado para novo clique';
+      if (inCooldown) {
+        const days = Math.floor(diffMs / (24 * 3600 * 1000));
+        const hours = Math.floor((diffMs % (24 * 3600 * 1000)) / (3600 * 1000));
+        const minutes = Math.floor((diffMs % (3600 * 1000)) / (60 * 1000));
+        formattedTimeRemaining = `${days}d ${hours}h ${minutes}m restantes`;
+      }
+
+      return {
+        ip_address: row.ip_address,
+        last_click_at: row.last_click_at,
+        cooldown_until: new Date(cooldownUntil).toISOString(),
+        days_remaining: daysRemaining,
+        hours_remaining: hoursRemaining,
+        formatted_time_remaining: formattedTimeRemaining,
+        status: inCooldown ? 'Em Quarentena' : 'Liberado',
+      };
+    });
+  });
+

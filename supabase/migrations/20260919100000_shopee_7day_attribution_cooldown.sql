@@ -152,3 +152,46 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.incrementar_clique(text) TO anon, authenticated, service_role;
+
+-- 5. Função para listar os IPs e a contagem regressiva / dias faltantes para liberar o próximo clique
+CREATE OR REPLACE FUNCTION public.get_ip_cooldown_status()
+RETURNS TABLE (
+  ip_address text,
+  last_click_at timestamp with time zone,
+  cooldown_until timestamp with time zone,
+  days_remaining numeric,
+  hours_remaining numeric,
+  formatted_time_remaining text,
+  status text
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    c.ip_address,
+    c.last_click_at,
+    (c.last_click_at + interval '7 days') AS cooldown_until,
+    ROUND(GREATEST(0, EXTRACT(EPOCH FROM ((c.last_click_at + interval '7 days') - now())) / 86400.0)::numeric, 1) AS days_remaining,
+    ROUND(GREATEST(0, EXTRACT(EPOCH FROM ((c.last_click_at + interval '7 days') - now())) / 3600.0)::numeric, 1) AS hours_remaining,
+    CASE 
+      WHEN (c.last_click_at + interval '7 days') <= now() THEN 'Liberado para novo clique'
+      ELSE 
+        CONCAT(
+          FLOOR(EXTRACT(EPOCH FROM ((c.last_click_at + interval '7 days') - now())) / 86400), 'd ',
+          FLOOR(MOD(EXTRACT(EPOCH FROM ((c.last_click_at + interval '7 days') - now())) / 3600, 24)), 'h ',
+          FLOOR(MOD(EXTRACT(EPOCH FROM ((c.last_click_at + interval '7 days') - now())) / 60, 60)), 'm restantes'
+        )
+    END AS formatted_time_remaining,
+    CASE 
+      WHEN (c.last_click_at + interval '7 days') <= now() THEN 'Liberado'
+      ELSE 'Em Quarentena'
+    END AS status
+  FROM public.ip_cooldown c
+  ORDER BY c.last_click_at DESC;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_ip_cooldown_status() TO anon, authenticated, service_role;
