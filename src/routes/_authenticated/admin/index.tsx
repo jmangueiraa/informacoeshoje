@@ -108,6 +108,42 @@ function SuperAdminDashboard() {
   const [isRenewOpen, setIsRenewOpen] = useState(false)
   const [renewDays, setRenewDays] = useState(30)
 
+  // Formulário controlado de edição
+  const [editForm, setEditForm] = useState({
+    userId: '',
+    full_name: '',
+    phone_number: '',
+    subscription_status: 'active' as 'active' | 'expired' | 'trial' | 'suspended',
+    subscription_type: 'monthly',
+    subscription_price: 30.00,
+    subscription_expires_at: '',
+    new_password: '',
+  })
+
+  const handleOpenEditUser = (user: any) => {
+    setSelectedUser(user)
+    const dateVal = user.subscription_expires_at 
+      ? new Date(user.subscription_expires_at).toISOString().split('T')[0] 
+      : ''
+    
+    let initialStatus: 'active' | 'expired' | 'trial' | 'suspended' = 'active'
+    if (user.subscription_status === 'suspended') initialStatus = 'suspended'
+    else if (user.subscription_status === 'expired' || user.is_expired) initialStatus = 'expired'
+    else if (user.subscription_status === 'trial' || user.is_trial) initialStatus = 'trial'
+
+    setEditForm({
+      userId: user.id,
+      full_name: user.full_name || '',
+      phone_number: user.phone_number || '',
+      subscription_status: initialStatus,
+      subscription_type: user.subscription_type || 'monthly',
+      subscription_price: Number(user.subscription_price) || 30.00,
+      subscription_expires_at: dateVal,
+      new_password: '',
+    })
+    setIsEditUserOpen(true)
+  }
+
   // Configurações de API (Telegram e Mercado Pago)
   const [settingsForm, setSettingsForm] = useState({
     telegram_bot_token: '',
@@ -608,10 +644,7 @@ function SuperAdminDashboard() {
                               ) : (
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setSelectedUser(user)
-                                    setIsEditUserOpen(true)
-                                  }}
+                                  onClick={() => handleOpenEditUser(user)}
                                   className="text-xs text-primary/70 hover:text-primary hover:underline flex items-center gap-1"
                                 >
                                   + Informar Telefone
@@ -728,10 +761,7 @@ function SuperAdminDashboard() {
                                   )}
 
                                   <DropdownMenuItem
-                                    onClick={() => {
-                                      setSelectedUser(user)
-                                      setIsEditUserOpen(true)
-                                    }}
+                                    onClick={() => handleOpenEditUser(user)}
                                     className="gap-2 cursor-pointer"
                                   >
                                     <Edit3 className="w-4 h-4" />
@@ -1134,7 +1164,7 @@ function SuperAdminDashboard() {
       </Dialog>
 
       {/* ========================================================================= */}
-      {/* MODAL: EDITAR USUÁRIO */}
+      {/* MODAL: EDITAR USUÁRIO (TOTALMENTE CONTROLADO VIA REACT STATE) */}
       {/* ========================================================================= */}
       <Dialog open={isEditUserOpen} onOpenChange={setIsEditUserOpen}>
         <DialogContent className="sm:max-w-[480px]">
@@ -1149,61 +1179,83 @@ function SuperAdminDashboard() {
             <form
               onSubmit={(e) => {
                 e.preventDefault()
-                const form = e.target as any
-                const expiresAtVal = form.edit_expires_at.value 
-                  ? new Date(form.edit_expires_at.value + 'T23:59:59').toISOString() 
+                const expIso = editForm.subscription_expires_at 
+                  ? new Date(editForm.subscription_expires_at + 'T23:59:59').toISOString() 
                   : undefined
+
                 updateUserMutation.mutate({
-                  userId: selectedUser.id,
-                  full_name: form.edit_name.value,
-                  phone_number: form.edit_phone.value,
-                  subscription_status: form.edit_status.value,
-                  subscription_type: form.edit_type.value,
-                  subscription_price: Number(form.edit_price.value) || 30.00,
-                  subscription_expires_at: expiresAtVal,
-                  new_password: form.edit_password.value || undefined,
+                  userId: editForm.userId,
+                  full_name: editForm.full_name,
+                  phone_number: editForm.phone_number,
+                  subscription_status: editForm.subscription_status,
+                  subscription_type: editForm.subscription_type,
+                  subscription_price: Number(editForm.subscription_price) || 30.00,
+                  subscription_expires_at: expIso,
+                  new_password: editForm.new_password ? editForm.new_password : undefined,
                 })
               }}
               className="space-y-4 py-2"
             >
               <div className="space-y-2">
                 <Label htmlFor="edit_name">Nome</Label>
-                <Input id="edit_name" defaultValue={selectedUser.full_name} required />
+                <Input 
+                  id="edit_name" 
+                  value={editForm.full_name} 
+                  onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} 
+                  required 
+                />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="edit_phone">WhatsApp / Telefone</Label>
-                <Input id="edit_phone" defaultValue={selectedUser.phone_number} />
+                <Input 
+                  id="edit_phone" 
+                  value={editForm.phone_number} 
+                  onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })} 
+                  placeholder="Ex: 19981356505"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="edit_status">Status</Label>
-                  <Select name="edit_status" defaultValue={selectedUser.subscription_status}>
+                  <Select 
+                    value={editForm.subscription_status} 
+                    onValueChange={(val: any) => setEditForm({ ...editForm, subscription_status: val })}
+                  >
                     <SelectTrigger id="edit_status">
-                      <SelectValue />
+                      <SelectValue placeholder="Selecione o status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="active">Ativo</SelectItem>
-                      <SelectItem value="trial">Em Teste</SelectItem>
-                      <SelectItem value="expired">Vencido</SelectItem>
-                      <SelectItem value="suspended">Suspenso</SelectItem>
+                      <SelectItem value="active">🟢 Ativo</SelectItem>
+                      <SelectItem value="trial">⚡ Em Teste</SelectItem>
+                      <SelectItem value="expired">🔴 Vencido</SelectItem>
+                      <SelectItem value="suspended">⚪ Suspenso</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="edit_price">Mensalidade (R$)</Label>
-                  <Input id="edit_price" type="number" step="0.01" defaultValue={selectedUser.subscription_price || 30.00} />
+                  <Input 
+                    id="edit_price" 
+                    type="number" 
+                    step="0.01" 
+                    value={editForm.subscription_price} 
+                    onChange={(e) => setEditForm({ ...editForm, subscription_price: Number(e.target.value) })} 
+                  />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="edit_type">Tipo de Plano</Label>
-                  <Select name="edit_type" defaultValue={selectedUser.subscription_type || 'monthly'}>
+                  <Select 
+                    value={editForm.subscription_type} 
+                    onValueChange={(val: string) => setEditForm({ ...editForm, subscription_type: val })}
+                  >
                     <SelectTrigger id="edit_type">
-                      <SelectValue />
+                      <SelectValue placeholder="Selecione o plano" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="trial_7d">⚡ Teste 7 Dias</SelectItem>
@@ -1220,18 +1272,20 @@ function SuperAdminDashboard() {
                   <Input 
                     id="edit_expires_at" 
                     type="date" 
-                    defaultValue={
-                      selectedUser.subscription_expires_at 
-                        ? new Date(selectedUser.subscription_expires_at).toISOString().split('T')[0]
-                        : ''
-                    } 
+                    value={editForm.subscription_expires_at} 
+                    onChange={(e) => setEditForm({ ...editForm, subscription_expires_at: e.target.value })} 
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="edit_password">Redefinir Senha (opcional)</Label>
-                <Input id="edit_password" placeholder="Preencha apenas se quiser trocar" />
+                <Input 
+                  id="edit_password" 
+                  placeholder="Preencha apenas se quiser trocar" 
+                  value={editForm.new_password} 
+                  onChange={(e) => setEditForm({ ...editForm, new_password: e.target.value })} 
+                />
               </div>
 
               <DialogFooter className="pt-3">

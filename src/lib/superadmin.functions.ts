@@ -419,14 +419,19 @@ export const updateSuperAdminUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => z.object({
     userId: z.string(),
-    full_name: z.string().optional(),
-    phone_number: z.string().optional(),
-    notes: z.string().optional(),
-    subscription_type: z.string().optional(),
-    subscription_price: z.number().optional(),
-    subscription_status: z.enum(['active', 'expired', 'trial', 'suspended']).optional(),
-    subscription_expires_at: z.string().optional(),
-    new_password: z.string().optional(),
+    full_name: z.string().optional().nullable(),
+    phone_number: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+    subscription_type: z.string().optional().nullable(),
+    subscription_price: z.number().optional().nullable(),
+    subscription_status: z.preprocess((val) => {
+      if (!val || val === '' || typeof val !== 'string') return undefined;
+      const clean = val.toLowerCase().trim();
+      if (['active', 'expired', 'trial', 'suspended'].includes(clean)) return clean;
+      return undefined;
+    }, z.enum(['active', 'expired', 'trial', 'suspended']).optional().nullable()),
+    subscription_expires_at: z.string().optional().nullable(),
+    new_password: z.string().optional().nullable(),
   }).parse(data))
   .handler(async ({ data, context }) => {
     const userEmail = typeof context.claims.email === 'string' ? context.claims.email.toLowerCase() : '';
@@ -442,27 +447,36 @@ export const updateSuperAdminUser = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // 1. Atualiza senha no Auth se informada
-    if (data.new_password && data.new_password.trim().length >= 6) {
-      await supabaseAdmin.auth.admin.updateUserById(data.userId, {
-        password: data.new_password.trim(),
+    // 1. Atualiza dados no Auth (metadata e/ou senha)
+    const userMetaUpdates: any = {};
+    if (data.full_name !== undefined && data.full_name !== null) userMetaUpdates.full_name = data.full_name;
+    if (data.phone_number !== undefined) {
+      userMetaUpdates.phone_number = data.phone_number || '';
+      userMetaUpdates.phone = data.phone_number || '';
+    }
+
+    if (Object.keys(userMetaUpdates).length > 0 || (data.new_password && data.new_password.trim().length >= 6)) {
+      const authUpdatePayload: any = {};
+      if (Object.keys(userMetaUpdates).length > 0) authUpdatePayload.user_metadata = userMetaUpdates;
+      if (data.new_password && data.new_password.trim().length >= 6) authUpdatePayload.password = data.new_password.trim();
+      await supabaseAdmin.auth.admin.updateUserById(data.userId, authUpdatePayload).catch((err) => {
+        console.warn("Aviso ao atualizar auth user:", err);
       });
     }
 
-    // 2. Atualiza profile
-    const updateData: any = { updated_at: new Date().toISOString() };
-    if (data.full_name !== undefined) updateData.full_name = data.full_name;
-    if (data.phone_number !== undefined) updateData.phone_number = data.phone_number;
+    // 2. Atualiza profile com upsert
+    const updateData: any = { id: data.userId, updated_at: new Date().toISOString() };
+    if (data.full_name !== undefined && data.full_name !== null) updateData.full_name = data.full_name;
+    if (data.phone_number !== undefined) updateData.phone_number = data.phone_number || null;
     if (data.notes !== undefined) updateData.notes = data.notes;
-    if (data.subscription_type !== undefined) updateData.subscription_type = data.subscription_type;
-    if (data.subscription_price !== undefined) updateData.subscription_price = data.subscription_price;
-    if (data.subscription_status !== undefined) updateData.subscription_status = data.subscription_status;
-    if (data.subscription_expires_at !== undefined) updateData.subscription_expires_at = data.subscription_expires_at;
+    if (data.subscription_type !== undefined && data.subscription_type !== null) updateData.subscription_type = data.subscription_type;
+    if (data.subscription_price !== undefined && data.subscription_price !== null) updateData.subscription_price = data.subscription_price;
+    if (data.subscription_status !== undefined && data.subscription_status !== null) updateData.subscription_status = data.subscription_status;
+    if (data.subscription_expires_at !== undefined && data.subscription_expires_at !== null) updateData.subscription_expires_at = data.subscription_expires_at;
 
     const { error } = await supabaseAdmin
       .from("profiles")
-      .update(updateData)
-      .eq("id", data.userId);
+      .upsert(updateData, { onConflict: 'id' });
 
     if (error) throw error;
 
