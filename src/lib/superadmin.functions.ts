@@ -185,31 +185,57 @@ export const getSuperAdminUsersList = createServerFn({ method: "GET" })
     const usersList = (authUsersData.users || []).map(u => {
       const profile = profilesMap.get(u.id) || {};
       const stats = linksByUser.get(u.id) || { count: 0, clicks: 0 };
+      const isMasterAdmin = u.email?.toLowerCase() === MASTER_SUPERADMIN_EMAIL;
 
-      const expDateStr = profile.subscription_expires_at || profile.trial_expires_at;
+      // Telefone: busca do profile ou do metadata do Auth
+      const phone = profile.phone_number || u.user_metadata?.phone_number || u.user_metadata?.phone || u.phone || '';
+
+      // Expiração: se não tiver definida, calcula 30 dias a partir da criação
+      let expDateStr = profile.subscription_expires_at || profile.trial_expires_at;
+      if (!expDateStr && !isMasterAdmin) {
+        const userCreated = new Date(u.created_at).getTime();
+        expDateStr = new Date(userCreated + 30 * 24 * 3600 * 1000).toISOString();
+
+        // Salva de forma assíncrona no banco para persistir
+        supabaseAdmin
+          .from("profiles")
+          .upsert({
+            id: u.id,
+            subscription_expires_at: expDateStr,
+            subscription_status: 'active',
+            subscription_type: 'monthly',
+            subscription_price: 30.00,
+            phone_number: phone || null,
+          }, { onConflict: 'id' })
+          .then(() => {})
+          .catch((err: any) => console.warn("Auto backfill profile warning:", err));
+      }
+
       const expDate = expDateStr ? new Date(expDateStr).getTime() : 0;
-      const isExpired = expDate > 0 && expDate < now;
+      const isExpired = !isMasterAdmin && expDate > 0 && expDate < now;
       const isTrial = profile.subscription_type === 'trial_7d' || profile.is_trial === true;
 
       const diffMs = expDate - now;
-      const daysRemaining = expDate > 0 ? Math.ceil(diffMs / (24 * 3600 * 1000)) : 0;
+      const daysRemaining = isMasterAdmin ? 9999 : (expDate > 0 ? Math.ceil(diffMs / (24 * 3600 * 1000)) : 30);
 
       let status = profile.subscription_status || (isTrial ? 'trial' : 'active');
-      if (isExpired && status !== 'suspended') {
+      if (isMasterAdmin) {
+        status = 'active';
+      } else if (isExpired && status !== 'suspended') {
         status = 'expired';
       }
 
       return {
         id: u.id,
         email: u.email || '',
-        full_name: profile.full_name || u.user_metadata?.full_name || '',
-        phone_number: profile.phone_number || '',
+        full_name: profile.full_name || u.user_metadata?.full_name || u.email?.split('@')[0] || 'Usuário',
+        phone_number: phone,
         notes: profile.notes || '',
-        subscription_type: profile.subscription_type || (isTrial ? 'trial_7d' : 'monthly'),
-        subscription_price: Number(profile.subscription_price) || 30.00,
+        subscription_type: isMasterAdmin ? 'lifetime' : (profile.subscription_type || (isTrial ? 'trial_7d' : 'monthly')),
+        subscription_price: isMasterAdmin ? 0.00 : (Number(profile.subscription_price) || 30.00),
         subscription_status: status,
-        subscription_expires_at: expDateStr,
-        is_trial: isTrial,
+        subscription_expires_at: isMasterAdmin ? null : expDateStr,
+        is_trial: isTrial && !isMasterAdmin,
         is_expired: isExpired,
         days_remaining: daysRemaining,
         created_at: u.created_at,
@@ -268,6 +294,8 @@ export const createSuperAdminUser = createServerFn({ method: "POST" })
       email_confirm: true,
       user_metadata: {
         full_name: data.full_name.trim(),
+        phone_number: data.phone_number?.trim() || null,
+        phone: data.phone_number?.trim() || null,
       },
     });
 
@@ -278,10 +306,11 @@ export const createSuperAdminUser = createServerFn({ method: "POST" })
 
     const newUserId = newUser.user.id;
 
-    // 2. Atualiza profile com plano e expiração
-    await supabaseAdmin
+    // 2. Salva profile com upsert garantido
+    const { error: profileUpsertError } = await supabaseAdmin
       .from("profiles")
-      .update({
+      .upsert({
+        id: newUserId,
         full_name: data.full_name.trim(),
         phone_number: data.phone_number?.trim() || null,
         notes: data.notes?.trim() || null,
@@ -292,8 +321,11 @@ export const createSuperAdminUser = createServerFn({ method: "POST" })
         trial_expires_at: expiresAt,
         is_trial: isTrial,
         updated_at: new Date().toISOString(),
-      })
-      .eq("id", newUserId);
+      }, { onConflict: 'id' });
+
+    if (profileUpsertError) {
+      console.warn("Aviso ao dar upsert no profile:", profileUpsertError);
+    }
 
     // 3. Notifica no Telegram
     const formattedExp = new Date(expiresAt).toLocaleDateString('pt-BR');

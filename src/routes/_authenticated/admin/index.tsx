@@ -599,14 +599,23 @@ function SuperAdminDashboard() {
                                   href={getWhatsAppBillingLink(user)}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-medium hover:underline"
+                                  className="inline-flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 font-semibold hover:underline"
                                   title="Enviar mensagem no WhatsApp"
                                 >
                                   <Phone className="w-3.5 h-3.5" />
                                   {user.phone_number}
                                 </a>
                               ) : (
-                                <span className="text-xs text-muted-foreground italic">Não informado</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedUser(user)
+                                    setIsEditUserOpen(true)
+                                  }}
+                                  className="text-xs text-primary/70 hover:text-primary hover:underline flex items-center gap-1"
+                                >
+                                  + Informar Telefone
+                                </button>
                               )}
                             </TableCell>
 
@@ -614,29 +623,51 @@ function SuperAdminDashboard() {
                             <TableCell>
                               <div className="flex flex-col gap-0.5">
                                 <Badge variant="outline" className="w-fit text-[11px] font-semibold">
-                                  {user.subscription_type === 'trial_7d' ? '⚡ Teste 7 Dias' : '💳 Mensal'}
+                                  {user.subscription_type === 'lifetime'
+                                    ? '👑 Vitalício'
+                                    : user.subscription_type === 'trial_7d'
+                                    ? '⚡ Teste 7 Dias'
+                                    : '💳 Mensal'}
                                 </Badge>
                                 <span className="text-xs text-muted-foreground">
-                                  {user.subscription_type === 'trial_7d' ? 'Grátis' : `R$ ${user.subscription_price.toFixed(2).replace('.', ',')}/mês`}
+                                  {user.subscription_type === 'lifetime'
+                                    ? 'Sem cobrança'
+                                    : user.subscription_type === 'trial_7d'
+                                    ? 'Grátis'
+                                    : `R$ ${user.subscription_price.toFixed(2).replace('.', ',')}/mês`}
                                 </span>
                               </div>
                             </TableCell>
 
                             {/* Vencimento */}
                             <TableCell>
-                              {user.subscription_expires_at ? (
+                              {user.subscription_type === 'lifetime' || user.email?.toLowerCase() === 'ajpentretedimento@hotmail.com' ? (
+                                <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-500/30 text-xs font-semibold">
+                                  👑 Vitalício (Admin)
+                                </Badge>
+                              ) : user.subscription_expires_at ? (
                                 <div className="flex flex-col text-xs">
-                                  <span className="font-medium">
+                                  <span className="font-semibold text-foreground">
                                     {format(new Date(user.subscription_expires_at), "dd/MM/yyyy", { locale: ptBR })}
                                   </span>
-                                  <span className={`text-[11px] ${user.is_expired ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
+                                  <span className={`text-[11px] font-medium ${user.is_expired ? 'text-destructive' : 'text-muted-foreground'}`}>
                                     {user.is_expired 
                                       ? `Vencido há ${Math.abs(user.days_remaining)} dias` 
                                       : `${user.days_remaining} dias restantes`}
                                   </span>
                                 </div>
                               ) : (
-                                <span className="text-xs text-muted-foreground">Indefinido</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedUser(user)
+                                    setRenewDays(30)
+                                    setIsRenewOpen(true)
+                                  }}
+                                  className="text-xs text-orange-600 hover:underline flex items-center gap-1 font-medium"
+                                >
+                                  + Definir Vencimento
+                                </button>
                               )}
                             </TableCell>
 
@@ -1119,12 +1150,17 @@ function SuperAdminDashboard() {
               onSubmit={(e) => {
                 e.preventDefault()
                 const form = e.target as any
+                const expiresAtVal = form.edit_expires_at.value 
+                  ? new Date(form.edit_expires_at.value + 'T23:59:59').toISOString() 
+                  : undefined
                 updateUserMutation.mutate({
                   userId: selectedUser.id,
                   full_name: form.edit_name.value,
                   phone_number: form.edit_phone.value,
                   subscription_status: form.edit_status.value,
+                  subscription_type: form.edit_type.value,
                   subscription_price: Number(form.edit_price.value) || 30.00,
+                  subscription_expires_at: expiresAtVal,
                   new_password: form.edit_password.value || undefined,
                 })
               }}
@@ -1159,6 +1195,37 @@ function SuperAdminDashboard() {
                 <div className="space-y-2">
                   <Label htmlFor="edit_price">Mensalidade (R$)</Label>
                   <Input id="edit_price" type="number" step="0.01" defaultValue={selectedUser.subscription_price || 30.00} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="edit_type">Tipo de Plano</Label>
+                  <Select name="edit_type" defaultValue={selectedUser.subscription_type || 'monthly'}>
+                    <SelectTrigger id="edit_type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="trial_7d">⚡ Teste 7 Dias</SelectItem>
+                      <SelectItem value="monthly">💳 Mensal</SelectItem>
+                      <SelectItem value="quarterly">📅 Trimestral</SelectItem>
+                      <SelectItem value="yearly">👑 Anual</SelectItem>
+                      <SelectItem value="lifetime">♾️ Vitalício</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit_expires_at">Data de Vencimento</Label>
+                  <Input 
+                    id="edit_expires_at" 
+                    type="date" 
+                    defaultValue={
+                      selectedUser.subscription_expires_at 
+                        ? new Date(selectedUser.subscription_expires_at).toISOString().split('T')[0]
+                        : ''
+                    } 
+                  />
                 </div>
               </div>
 

@@ -195,3 +195,18 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.superadmin_renew_subscription TO authenticated, service_role;
+
+-- 6. Retroactive Backfill para perfis já existentes no banco de dados
+UPDATE public.profiles
+SET 
+    subscription_expires_at = COALESCE(subscription_expires_at, created_at + INTERVAL '30 days', NOW() + INTERVAL '30 days'),
+    subscription_status = COALESCE(subscription_status, 'active'),
+    subscription_type = CASE 
+        WHEN id IN (SELECT user_id FROM public.user_roles WHERE role = 'admin') THEN 'lifetime' 
+        ELSE COALESCE(subscription_type, 'monthly') 
+    END,
+    subscription_price = CASE 
+        WHEN id IN (SELECT user_id FROM public.user_roles WHERE role = 'admin') THEN 0.00 
+        ELSE COALESCE(subscription_price, 30.00) 
+    END
+WHERE subscription_expires_at IS NULL;
