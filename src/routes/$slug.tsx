@@ -88,39 +88,8 @@ function SlugRedirectPage() {
 
         // Se não obteve a URL no loader (ex: navegação client-side pura), executa a rota backend
         if (!destinationUrl) {
-<<<<<<< HEAD
           const res = await trackShopeeClick({ data: { slug: cleanSlug } })
           destinationUrl = res?.destinationUrl
-=======
-          const { data: link, error } = await supabase
-            .from('links')
-            .select('*')
-            .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
-            .maybeSingle()
-
-          if (error || !link) {
-            console.error('Link não localizado no Supabase:', error)
-            setStatusText('Link não encontrado. Redirecionando...')
-            setTimeout(() => {
-              window.location.replace('/')
-            }, 800)
-            return
-          }
-
-          destinationUrl = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
-          if (!destinationUrl) {
-            window.location.replace('/')
-            return
-          }
-
-          // Registra clique no banco com await garantido
-          try {
-            await Promise.allSettled([
-              supabase.from('clicks').insert({ link_id: link.id }),
-              supabase.from('link_clicks').insert({ link_id: link.id, ip_address: 'visitor' }),
-            ])
-          } catch (_) {}
->>>>>>> fb66bb70af8774644605b69344675fc493ca69b0
         }
 
         if (!destinationUrl) {

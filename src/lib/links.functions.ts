@@ -415,7 +415,7 @@ export const trackShopeeClick = createServerFn({ method: "POST" })
       const cfConnectingIp = getRequestHeader('cf-connecting-ip');
       const h3Ip = getRequestIP({ xForwardedFor: true });
 
-      const extracted = (forwardedFor ? forwardedFor.split(',')[0].trim() : '') || realIp || cfConnectingIp || h3Ip;
+      const extracted = (forwardedFor ? forwardedFor.split(',').at(0)?.trim() : '') || realIp || cfConnectingIp || h3Ip;
       if (extracted && extracted !== '::1' && extracted !== '127.0.0.1') {
         clientIp = extracted;
       }
@@ -448,7 +448,7 @@ export const trackShopeeClick = createServerFn({ method: "POST" })
           path: '/',
           httpOnly: true,
           sameSite: 'lax',
-          secure: process.env.NODE_ENV === 'production',
+          secure: process.env['NODE_ENV'] === 'production',
         });
         setResponseHeader(
           'Set-Cookie',
