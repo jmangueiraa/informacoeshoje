@@ -100,6 +100,53 @@ export type Database = {
         }
         Relationships: []
       }
+      ip_cooldown: {
+        Row: {
+          created_at: string
+          ip_address: string
+          last_click_at: string
+        }
+        Insert: {
+          created_at?: string
+          ip_address: string
+          last_click_at?: string
+        }
+        Update: {
+          created_at?: string
+          ip_address?: string
+          last_click_at?: string
+        }
+        Relationships: []
+      }
+      link_clicks: {
+        Row: {
+          created_at: string
+          id: string
+          ip_address: string
+          link_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip_address: string
+          link_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip_address?: string
+          link_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "link_clicks_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       links: {
         Row: {
           affiliate_url: string
@@ -490,6 +537,10 @@ export type Database = {
       }
       incrementar_clique: { Args: { link_slug: string }; Returns: string }
       normalize_contact_phone: { Args: { raw_phone: string }; Returns: string }
+      process_shopee_click: {
+        Args: { p_has_cookie?: boolean; p_ip: string; p_slug: string }
+        Returns: Json
+      }
       sync_all_link_clicks: { Args: never; Returns: undefined }
     }
     Enums: {

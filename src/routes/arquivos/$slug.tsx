@@ -105,7 +105,6 @@ function ArquivosRedirectPage() {
           // Registra clique no banco com await garantido
           try {
             await Promise.allSettled([
-              supabase.rpc('increment_clicks', { row_id: link.id }),
               supabase.from('clicks').insert({ link_id: link.id }),
               supabase.from('link_clicks').insert({ link_id: link.id, ip_address: 'visitor' }),
             ])
