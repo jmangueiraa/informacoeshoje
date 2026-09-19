@@ -35,7 +35,8 @@ GRANT ALL ON public.ip_cooldown TO anon, authenticated, service_role;
 CREATE OR REPLACE FUNCTION public.process_shopee_click(
   p_slug text,
   p_ip text,
-  p_has_cookie boolean DEFAULT false
+  p_has_cookie boolean DEFAULT false,
+  p_is_bot boolean DEFAULT false
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -79,6 +80,17 @@ BEGIN
   END IF;
 
   v_dest_url := COALESCE(v_link.affiliate_url, v_link.destination_url, v_link.url_destino);
+
+  -- Se for Bot, Crawler, Link Preview (WhatsApp/Google/Facebook) ou Prefetch, retorna a URL sem registrar clique nem cooldown
+  IF p_is_bot IS TRUE THEN
+    RETURN jsonb_build_object(
+      'success', true,
+      'destination_url', v_dest_url,
+      'is_valid_click', false,
+      'in_cooldown', false,
+      'link_id', v_link.id
+    );
+  END IF;
 
   -- 3. Checagem 1 (Navegador/Cookie):
   -- Se o cookie shopee_click_cooldown existir, usuário está na quarentena
@@ -134,7 +146,21 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.process_shopee_click(text, text, boolean) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.process_shopee_click(text, text, boolean, boolean) TO anon, authenticated, service_role;
+
+-- Função para limpar/resetar o registro de cooldown de IPs (para testes e manutenção)
+CREATE OR REPLACE FUNCTION public.clear_all_ip_cooldown()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  DELETE FROM public.ip_cooldown;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.clear_all_ip_cooldown() TO anon, authenticated, service_role;
 
 -- 4. Atualização da função legado incrementar_clique para compatibilidade retroativa
 CREATE OR REPLACE FUNCTION public.incrementar_clique(link_slug text)

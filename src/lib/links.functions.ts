@@ -385,6 +385,55 @@ const trackShopeeClickSchema = z.object({
   slug: z.string().min(1).max(250),
 });
 
+function isBotUserAgent(userAgent: string, prefetchHeader?: string | null): boolean {
+  if (prefetchHeader && prefetchHeader.toLowerCase().includes('prefetch')) {
+    return true;
+  }
+  if (!userAgent) return false;
+  const ua = userAgent.toLowerCase();
+  const botKeywords = [
+    'googlebot',
+    'bingbot',
+    'yandex',
+    'baiduspider',
+    'facebookexternalhit',
+    'facebot',
+    'whatsapp',
+    'twitterbot',
+    'telegrambot',
+    'applebot',
+    'discordbot',
+    'pinterest',
+    'linkedinbot',
+    'slackbot',
+    'skypeuripreview',
+    'petalbot',
+    'bytespider',
+    'semrushbot',
+    'ahrefsbot',
+    'mj12bot',
+    'dotbot',
+    'headlesschrome',
+    'phantomjs',
+    'curl',
+    'wget',
+    'python-requests',
+    'axios',
+    'got',
+    'node-fetch',
+    'postmanruntime',
+    'lighthouse',
+    'gtmetrix',
+    'google-read-aloud',
+    'feedfetcher-google',
+    'mediapartners-google',
+    'adsbot-google',
+    'spider',
+    'crawler',
+  ];
+  return botKeywords.some((keyword) => ua.includes(keyword));
+}
+
 /**
  * Backend de Rastreamento com Janela de Atribuição da Shopee (7 dias).
  * Validação dupla: Cookies de Navegador (shopee_click_cooldown) + Registro de IP no Supabase (ip_cooldown).
@@ -396,6 +445,11 @@ export const trackShopeeClick = createServerFn({ method: "POST" })
     const cleanSlug = rawSlug.replace(/^\/+|\/+$/g, '').toLowerCase();
 
     const { getCookie, setCookie, getRequestHeader, getRequestIP, setResponseHeader } = await import("@tanstack/react-start/server");
+
+    // 0. Detecção de Robôs, Crawlers, Links Previews (WhatsApp, Google, Facebook) e Prefetches
+    const userAgent = getRequestHeader('user-agent') || '';
+    const prefetchHeader = getRequestHeader('purpose') || getRequestHeader('sec-purpose') || getRequestHeader('x-purpose');
+    const isBot = isBotUserAgent(userAgent, prefetchHeader);
 
     // 1. Checagem 1 (Navegador/Cookie):
     // Verifica se existe o cookie shopee_click_cooldown
@@ -424,12 +478,13 @@ export const trackShopeeClick = createServerFn({ method: "POST" })
     }
 
     // 3. Execução da RPC única com Transaction no Supabase:
-    // (Valida cooldown de 7 dias, incrementa contador se válido e faz UPSERT do IP)
+    // (Valida cooldown de 7 dias, filtra bots, incrementa contador se válido e faz UPSERT do IP)
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc('process_shopee_click', {
       p_slug: cleanSlug,
       p_ip: clientIp,
       p_has_cookie: hasCookie,
+      p_is_bot: isBot,
     });
 
     if (rpcError) {
@@ -440,8 +495,8 @@ export const trackShopeeClick = createServerFn({ method: "POST" })
     const result = (rpcResult as any) || {};
 
     // 4. Injeção do Cookie (Crucial):
-    // Se o usuário não tinha o cookie na etapa 1, injeta Set-Cookie de 7 dias (Max-Age=604800)
-    if (!hasCookie) {
+    // Se o usuário não tinha o cookie na etapa 1 E não for um bot/crawler, injeta Set-Cookie de 7 dias (Max-Age=604800)
+    if (!hasCookie && !isBot) {
       try {
         setCookie('shopee_click_cooldown', 'true', {
           maxAge: 604800, // 7 dias (7 * 24 * 60 * 60)
@@ -463,6 +518,19 @@ export const trackShopeeClick = createServerFn({ method: "POST" })
       destinationUrl: result.destination_url || null,
       isValidClick: Boolean(result.is_valid_click),
       inCooldown: Boolean(result.in_cooldown || hasCookie),
+      isBot,
       success: Boolean(result.success),
     };
+  });
+
+export const clearIpCooldownList = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from('ip_cooldown' as any).delete().neq('ip_address', 'dummy_value_to_delete_all');
+    if (error) {
+      // Fallback via RPC se delete sem where restrito
+      await supabaseAdmin.rpc('clear_all_ip_cooldown' as any);
+    }
+    return { success: true };
   });

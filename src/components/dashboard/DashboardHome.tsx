@@ -333,6 +333,9 @@ export function DashboardHome() {
               <RefreshCw className={`h-3.5 w-3.5 ${cooldownLoading ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Atualizar</span>
             </Button>
+            <Button variant="ghost" size="sm" asChild className="h-9">
+              <Link to="/quarentena">Ver Completo</Link>
+            </Button>
           </div>
         </div>
 

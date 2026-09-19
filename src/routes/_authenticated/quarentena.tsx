@@ -9,12 +9,15 @@ import {
   RefreshCw, 
   Info,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Trash2
 } from "lucide-react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useState, useMemo } from "react"
 import { supabase } from "@/integrations/supabase/client"
 import { getIpCooldownList } from "@/lib/analytics.functions"
+import { clearIpCooldownList } from "@/lib/links.functions"
+import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 
@@ -31,6 +34,19 @@ export function QuarentenaPage() {
     queryFn: () => getIpCooldownList(),
     refetchOnWindowFocus: true,
     refetchInterval: 15000,
+  })
+
+  const clearMutation = useMutation({
+    mutationFn: async () => {
+      await clearIpCooldownList()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ip-cooldown-list'] })
+      toast.success("Histórico de IPs limpo com sucesso!")
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Erro ao limpar histórico de IPs.")
+    }
   })
 
   useEffect(() => {
@@ -105,16 +121,33 @@ export function QuarentenaPage() {
           </p>
         </div>
 
-        <Button 
-          variant="outline" 
-          size="default" 
-          onClick={() => refetchCooldown()}
-          disabled={cooldownLoading}
-          className="gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${cooldownLoading ? 'animate-spin' : ''}`} />
-          <span>Atualizar Dados</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="default" 
+            onClick={() => refetchCooldown()}
+            disabled={cooldownLoading}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${cooldownLoading ? 'animate-spin' : ''}`} />
+            <span>Atualizar</span>
+          </Button>
+
+          <Button 
+            variant="outline" 
+            size="default" 
+            onClick={() => {
+              if (window.confirm("Deseja limpar todos os registros de teste da quarentena de IPs?")) {
+                clearMutation.mutate()
+              }
+            }}
+            disabled={clearMutation.isPending || !cooldownList || cooldownList.length === 0}
+            className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="h-4 w-4" />
+            <span>Limpar IPs</span>
+          </Button>
+        </div>
       </header>
 
       {/* Cards de Métricas Rápidas */}
