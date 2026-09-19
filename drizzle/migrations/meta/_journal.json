@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1789794836331,
+      "tag": "0000_add_ip_cooldown_and_process_shopee_click",
+      "breakpoints": true
+    }
+  ]
+}
