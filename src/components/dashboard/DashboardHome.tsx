@@ -1,18 +1,20 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { PlusCircle, Link2, BarChart3, MousePointer2, Activity, Copy, ExternalLink, TrendingUp, RotateCcw } from "lucide-react"
+import { PlusCircle, Link2, BarChart3, MousePointer2, Activity, Copy, ExternalLink, TrendingUp, RotateCcw, Zap, Clock, CreditCard, RefreshCw } from "lucide-react"
 import { Link } from "@tanstack/react-router"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { supabase } from "@/integrations/supabase/client"
 import { getDashboardStats } from "@/lib/analytics.functions"
 import { getUserLinks, getUserProfile, resetLinkClicks } from "@/lib/links.functions"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { SubscriptionExpiredCard } from "@/components/subscription/SubscriptionExpiredCard"
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 
 export function DashboardHome() {
   const queryClient = useQueryClient()
+  const [isRenewModalOpen, setIsRenewModalOpen] = useState(false)
 
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
     queryKey: ['dashboard-stats'],
@@ -88,14 +90,30 @@ export function DashboardHome() {
 
   // Validação de expiração da assinatura ou teste de 7 dias
   const now = new Date().getTime();
+  const isMasterAdmin = profile && !('error' in profile) && (
+    profile.username?.toLowerCase() === 'ajpentretedimento@hotmail.com' ||
+    profile.full_name?.toLowerCase() === 'ajp entretenimento'
+  );
+
   const expDateStr = profile && !('error' in profile) 
     ? (profile.subscription_expires_at || profile.trial_expires_at) 
     : null;
-  const expDate = expDateStr ? new Date(expDateStr).getTime() : 0;
+
+  const userCreatedAt = profile && !('error' in profile) && profile.created_at
+    ? new Date(profile.created_at).getTime()
+    : now;
+
+  const effectiveExpDate = expDateStr 
+    ? new Date(expDateStr).getTime() 
+    : (userCreatedAt + 30 * 24 * 3600 * 1000);
+
   const isTrial = profile && !('error' in profile) && (profile.subscription_type === 'trial_7d' || profile.is_trial === true);
-  const isExpired = profile && !('error' in profile) && (
-    (expDate > 0 && expDate < now) || profile.subscription_status === 'expired' || profile.subscription_status === 'suspended'
+  const isExpired = !isMasterAdmin && (
+    (effectiveExpDate > 0 && effectiveExpDate < now) || 
+    (profile && !('error' in profile) && (profile.subscription_status === 'expired' || profile.subscription_status === 'suspended'))
   );
+
+  const daysRemaining = isMasterAdmin ? 9999 : Math.ceil((effectiveExpDate - now) / (24 * 3600 * 1000));
 
   // Se a assinatura ou teste de 7 dias estiver expirado, exibe o Card de Bloqueio com Pix de R$ 30
   if (isExpired) {
@@ -103,7 +121,7 @@ export function DashboardHome() {
       <div className="p-6 max-w-7xl mx-auto space-y-6">
         <SubscriptionExpiredCard 
           userName={profile && !('error' in profile) ? profile.full_name : undefined}
-          expiresAt={expDateStr || undefined}
+          expiresAt={new Date(effectiveExpDate).toISOString()}
           isTrial={isTrial}
           onRenewSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ['user-profile'] })
@@ -116,15 +134,98 @@ export function DashboardHome() {
 
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
-      {/* Banner discreto se estiver em teste grátis */}
-      {isTrial && expDate > now && (
-        <div className="bg-orange-500/10 border border-orange-500/30 text-orange-600 dark:text-orange-400 px-4 py-3 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="border-orange-500/50 bg-orange-500/20 text-orange-600 dark:text-orange-400 font-semibold">
-              ⚡ Teste Grátis (7 Dias)
+      {/* FAIXA DE AVISO DE DIAS RESTANTES DO PLANO */}
+      {isMasterAdmin ? (
+        <div className="bg-purple-500/10 border border-purple-500/30 text-purple-700 dark:text-purple-300 px-4 py-3 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <Badge className="bg-purple-500/20 text-purple-600 dark:text-purple-300 border border-purple-500/40 font-bold text-xs py-0.5">
+              👑 SuperAdmin Master
             </Badge>
-            <span>Seu período de teste vence em <b>{new Date(expDate).toLocaleDateString('pt-BR')}</b> ({Math.ceil((expDate - now) / (24 * 3600 * 1000))} dias restantes).</span>
+            <span className="font-medium">Acesso Vitalício Ilimitado ativado. Você possui controle total da plataforma e da revenda.</span>
           </div>
+          <Button asChild size="sm" variant="outline" className="border-purple-500/40 text-purple-600 dark:text-purple-300 hover:bg-purple-500/10 font-semibold h-8 text-xs shrink-0">
+            <Link to="/admin">Painel SuperAdmin</Link>
+          </Button>
+        </div>
+      ) : isTrial ? (
+        <div className="bg-gradient-to-r from-orange-500/15 via-orange-500/10 to-transparent border border-orange-500/30 px-4 py-3.5 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-500/20 rounded-lg text-orange-600 shrink-0">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-base text-foreground">Período de Teste Grátis</span>
+                <Badge variant="outline" className="border-orange-500/50 bg-orange-500/20 text-orange-600 dark:text-orange-400 font-bold text-xs">
+                  ⚡ Restam {daysRemaining <= 0 ? 'Expira hoje' : (daysRemaining === 1 ? '1 dia' : `${daysRemaining} dias`)}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Seu teste vence em <b>{new Date(effectiveExpDate).toLocaleDateString('pt-BR')}</b>. Assine o plano mensal por R$ 30,00 para manter seus links sempre ativos.
+              </p>
+            </div>
+          </div>
+
+          <Dialog open={isRenewModalOpen} onOpenChange={setIsRenewModalOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white font-bold h-9 px-4 text-xs shadow-md shadow-orange-500/20 shrink-0 gap-1.5">
+                <CreditCard className="w-4 h-4" />
+                Assinar Plano (R$ 30/mês)
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[560px] p-0 border-0 bg-transparent shadow-none">
+              <SubscriptionExpiredCard
+                userName={profile && !('error' in profile) ? profile.full_name : undefined}
+                expiresAt={new Date(effectiveExpDate).toISOString()}
+                isTrial={true}
+                onRenewSuccess={() => {
+                  setIsRenewModalOpen(false)
+                  queryClient.invalidateQueries({ queryKey: ['user-profile'] })
+                  queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+                }}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
+      ) : (
+        <div className={`bg-gradient-to-r ${daysRemaining <= 5 ? 'from-amber-500/15 via-amber-500/10' : 'from-green-500/15 via-green-500/10'} to-transparent border ${daysRemaining <= 5 ? 'border-amber-500/40' : 'border-green-500/30'} px-4 py-3.5 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm shadow-sm`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 ${daysRemaining <= 5 ? 'bg-amber-500/20 text-amber-600' : 'bg-green-500/20 text-green-600 dark:text-green-400'} rounded-lg shrink-0`}>
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-base text-foreground">Plano Mensal Ativo</span>
+                <Badge variant="outline" className={`${daysRemaining <= 5 ? 'border-amber-500/50 bg-amber-500/20 text-amber-600' : 'border-green-500/50 bg-green-500/20 text-green-600 dark:text-green-400'} font-bold text-xs`}>
+                  {daysRemaining <= 0 ? 'Vence hoje' : (daysRemaining === 1 ? '1 dia restante' : `Restam ${daysRemaining} dias`)}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Validade da assinatura até <b>{new Date(effectiveExpDate).toLocaleDateString('pt-BR')}</b>. {daysRemaining <= 5 ? '⚠️ Sua assinatura está próxima do vencimento. Renove agora para continuar sem pausas.' : 'Todos os recursos e redirecionamentos estão operando normalmente.'}
+              </p>
+            </div>
+          </div>
+
+          <Dialog open={isRenewModalOpen} onOpenChange={setIsRenewModalOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant={daysRemaining <= 5 ? "default" : "outline"} className={`h-9 px-4 text-xs font-bold shrink-0 gap-1.5 ${daysRemaining <= 5 ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-md' : 'border-green-500/40 text-green-600 dark:text-green-400 hover:bg-green-500/10'}`}>
+                <RefreshCw className="w-3.5 h-3.5" />
+                Renovar Plano (R$ 30)
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[560px] p-0 border-0 bg-transparent shadow-none">
+              <SubscriptionExpiredCard
+                userName={profile && !('error' in profile) ? profile.full_name : undefined}
+                expiresAt={new Date(effectiveExpDate).toISOString()}
+                isTrial={false}
+                onRenewSuccess={() => {
+                  setIsRenewModalOpen(false)
+                  queryClient.invalidateQueries({ queryKey: ['user-profile'] })
+                  queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+                }}
+              />
+            </DialogContent>
+          </Dialog>
         </div>
       )}
 
