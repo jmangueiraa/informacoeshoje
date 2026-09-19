@@ -406,16 +406,27 @@ export const renewUserSubscription = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // 1. Busca dados atuais do perfil e do auth do usuário
-    const [{ data: profile }, authUserRes] = await Promise.all([
-      supabaseAdmin
+    let profile: any = null;
+    let authUser: any = null;
+
+    try {
+      const { data: prof } = await supabaseAdmin
         .from("profiles")
         .select("*")
         .eq("id", data.userId)
-        .maybeSingle(),
-      supabaseAdmin.auth.admin.getUserById(data.userId).catch(() => ({ data: { user: null } }))
-    ]);
+        .maybeSingle();
+      profile = prof;
+    } catch (err) {
+      console.warn("Aviso ao buscar profile:", err);
+    }
 
-    const authUser = authUserRes?.data?.user;
+    try {
+      const authUserRes = await supabaseAdmin.auth.admin.getUserById(data.userId);
+      authUser = authUserRes?.data?.user || null;
+    } catch (err) {
+      console.warn("Aviso ao buscar auth user:", err);
+    }
+
     const now = new Date().getTime();
 
     // Obtém a data de expiração atual de qualquer fonte disponível
@@ -463,26 +474,32 @@ export const renewUserSubscription = createServerFn({ method: "POST" })
 
     // 3. Atualiza também no user_metadata do Auth para redundância total
     if (authUser) {
-      await supabaseAdmin.auth.admin.updateUserById(data.userId, {
-        user_metadata: {
-          ...(authUser.user_metadata || {}),
-          subscription_expires_at: newExpiresAt,
-          trial_expires_at: newExpiresAt,
-          subscription_status: 'active',
-          subscription_type: planType,
-          subscription_price: planPrice,
-          is_trial: false,
-        }
-      }).catch((err) => console.warn("Aviso ao atualizar auth user metadata:", err));
+      try {
+        await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+          user_metadata: {
+            ...(authUser.user_metadata || {}),
+            subscription_expires_at: newExpiresAt,
+            trial_expires_at: newExpiresAt,
+            subscription_status: 'active',
+            subscription_type: planType,
+            subscription_price: planPrice,
+            is_trial: false,
+          }
+        });
+      } catch (err) {
+        console.warn("Aviso ao atualizar auth user metadata:", err);
+      }
     }
 
     // 4. Executa também a RPC atômica se ela existir no banco
-    supabaseAdmin.rpc('superadmin_renew_subscription' as any, {
-      p_user_id: data.userId,
-      p_days_to_add: daysToAdd,
-      p_new_price: planPrice,
-      p_new_type: planType,
-    }).catch(() => {});
+    try {
+      await supabaseAdmin.rpc('superadmin_renew_subscription' as any, {
+        p_user_id: data.userId,
+        p_days_to_add: daysToAdd,
+        p_new_price: planPrice,
+        p_new_type: planType,
+      });
+    } catch (_) {}
 
     // 5. Notificação via Telegram
     const formattedExp = new Date(newExpiresAt).toLocaleDateString('pt-BR');

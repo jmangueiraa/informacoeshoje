@@ -239,25 +239,29 @@ export const checkMercadoPagoPaymentStatus = createServerFn({ method: "POST" })
                 }, { onConflict: 'id' });
 
               if (authUser) {
-                await supabaseAdmin.auth.admin.updateUserById(userId, {
-                  user_metadata: {
-                    ...(authUser.user_metadata || {}),
-                    subscription_expires_at: newExpiresAt,
-                    trial_expires_at: newExpiresAt,
-                    subscription_status: 'active',
-                    subscription_type: 'monthly',
-                    subscription_price: 30.00,
-                    is_trial: false,
-                  }
-                }).catch(() => {});
+                try {
+                  await supabaseAdmin.auth.admin.updateUserById(userId, {
+                    user_metadata: {
+                      ...(authUser.user_metadata || {}),
+                      subscription_expires_at: newExpiresAt,
+                      trial_expires_at: newExpiresAt,
+                      subscription_status: 'active',
+                      subscription_type: 'monthly',
+                      subscription_price: 30.00,
+                      is_trial: false,
+                    }
+                  });
+                } catch (_) {}
               }
 
-              supabaseAdmin.rpc('superadmin_renew_subscription' as any, {
-                p_user_id: userId,
-                p_days_to_add: 30,
-                p_new_price: 30.00,
-                p_new_type: 'monthly',
-              }).catch(() => {});
+              try {
+                await supabaseAdmin.rpc('superadmin_renew_subscription' as any, {
+                  p_user_id: userId,
+                  p_days_to_add: 30,
+                  p_new_price: 30.00,
+                  p_new_type: 'monthly',
+                });
+              } catch (_) {}
 
               // 5. Notifica no Telegram o pagamento aprovado
               const formattedExp = new Date(newExpiresAt).toLocaleDateString('pt-BR');

@@ -230,7 +230,9 @@ export const getUserProfile = createServerFn({ method: "GET" })
         updated_at: new Date().toISOString(),
       };
 
-      authenticatedSupabase.from("profiles").upsert(initialProfile, { onConflict: 'id' }).then(() => {}).catch(() => {});
+      try {
+        await authenticatedSupabase.from("profiles").upsert(initialProfile, { onConflict: 'id' });
+      } catch (_) {}
       return initialProfile;
     }
 
