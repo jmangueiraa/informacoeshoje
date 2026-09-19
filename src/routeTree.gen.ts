@@ -17,6 +17,7 @@ import { Route as AuthenticatedContactsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedLinksRouteImport } from './routes/_authenticated/links'
 import { Route as AuthenticatedPlayGeneratorRouteImport } from './routes/_authenticated/play-generator'
+import { Route as AuthenticatedQuarentenaRouteImport } from './routes/_authenticated/quarentena'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as ArquivosIndexRouteImport } from './routes/arquivos/index'
 import { Route as ArquivosSlugRouteImport } from './routes/arquivos/$slug'
@@ -63,6 +64,11 @@ const AuthenticatedPlayGeneratorRoute =
     path: '/play-generator',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedQuarentenaRoute = AuthenticatedQuarentenaRouteImport.update({
+  id: '/quarentena',
+  path: '/quarentena',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -98,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/links': typeof AuthenticatedLinksRoute
   '/play-generator': typeof AuthenticatedPlayGeneratorRoute
+  '/quarentena': typeof AuthenticatedQuarentenaRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/arquivos/$slug': typeof ArquivosSlugRoute
   '/arquivos/': typeof ArquivosIndexRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/links': typeof AuthenticatedLinksRoute
   '/play-generator': typeof AuthenticatedPlayGeneratorRoute
+  '/quarentena': typeof AuthenticatedQuarentenaRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/arquivos/$slug': typeof ArquivosSlugRoute
   '/arquivos': typeof ArquivosIndexRoute
@@ -127,6 +135,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/links': typeof AuthenticatedLinksRoute
   '/_authenticated/play-generator': typeof AuthenticatedPlayGeneratorRoute
+  '/_authenticated/quarentena': typeof AuthenticatedQuarentenaRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/arquivos/$slug': typeof ArquivosSlugRoute
   '/arquivos/': typeof ArquivosIndexRoute
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/links'
     | '/play-generator'
+    | '/quarentena'
     | '/settings'
     | '/arquivos/$slug'
     | '/arquivos/'
@@ -156,6 +166,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/links'
     | '/play-generator'
+    | '/quarentena'
     | '/settings'
     | '/arquivos/$slug'
     | '/arquivos'
@@ -171,6 +182,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/links'
     | '/_authenticated/play-generator'
+    | '/_authenticated/quarentena'
     | '/_authenticated/settings'
     | '/arquivos/$slug'
     | '/arquivos/'
@@ -244,6 +256,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPlayGeneratorRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/quarentena': {
+      id: '/_authenticated/quarentena'
+      path: '/quarentena'
+      fullPath: '/quarentena'
+      preLoaderRoute: typeof AuthenticatedQuarentenaRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -301,6 +320,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedLinksRoute: typeof AuthenticatedLinksRoute
   AuthenticatedPlayGeneratorRoute: typeof AuthenticatedPlayGeneratorRoute
+  AuthenticatedQuarentenaRoute: typeof AuthenticatedQuarentenaRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
 }
 
@@ -310,6 +330,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedLinksRoute: AuthenticatedLinksRoute,
   AuthenticatedPlayGeneratorRoute: AuthenticatedPlayGeneratorRoute,
+  AuthenticatedQuarentenaRoute: AuthenticatedQuarentenaRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
 }
 

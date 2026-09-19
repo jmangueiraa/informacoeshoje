@@ -1,5 +1,5 @@
 import * as React from "react"
-import { LayoutDashboard, PlusCircle, Link2, BarChart3, Settings, LogOut, CreditCard, Video, ShieldAlert, Globe, Users } from "lucide-react"
+import { LayoutDashboard, PlusCircle, Link2, BarChart3, Settings, LogOut, CreditCard, Video, ShieldAlert, Globe, Users, Clock } from "lucide-react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import { supabase } from "@/integrations/supabase/client"
 import {
@@ -109,6 +109,14 @@ export function AppSidebar() {
                   <Link to="/links" className="flex items-center gap-3 py-2">
                     <BarChart3 className="h-5 w-5" />
                     <span>Estatísticas</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Quarentena de IPs (Shopee)">
+                  <Link to="/quarentena" className="flex items-center gap-3 py-2">
+                    <Clock className="h-5 w-5 text-orange-500" />
+                    <span>Quarentena de IPs</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
