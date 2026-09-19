@@ -9,6 +9,7 @@ import { getDashboardStats } from "@/lib/analytics.functions"
 import { getUserLinks, getUserProfile, resetLinkClicks } from "@/lib/links.functions"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { SubscriptionExpiredCard } from "@/components/subscription/SubscriptionExpiredCard"
 
 export function DashboardHome() {
   const queryClient = useQueryClient()
@@ -85,8 +86,48 @@ export function DashboardHome() {
     queryFn: () => getUserProfile(),
   })
 
+  // Validação de expiração da assinatura ou teste de 7 dias
+  const now = new Date().getTime();
+  const expDateStr = profile && !('error' in profile) 
+    ? (profile.subscription_expires_at || profile.trial_expires_at) 
+    : null;
+  const expDate = expDateStr ? new Date(expDateStr).getTime() : 0;
+  const isTrial = profile && !('error' in profile) && (profile.subscription_type === 'trial_7d' || profile.is_trial === true);
+  const isExpired = profile && !('error' in profile) && (
+    (expDate > 0 && expDate < now) || profile.subscription_status === 'expired' || profile.subscription_status === 'suspended'
+  );
+
+  // Se a assinatura ou teste de 7 dias estiver expirado, exibe o Card de Bloqueio com Pix de R$ 30
+  if (isExpired) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <SubscriptionExpiredCard 
+          userName={profile && !('error' in profile) ? profile.full_name : undefined}
+          expiresAt={expDateStr || undefined}
+          isTrial={isTrial}
+          onRenewSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['user-profile'] })
+            queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
+      {/* Banner discreto se estiver em teste grátis */}
+      {isTrial && expDate > now && (
+        <div className="bg-orange-500/10 border border-orange-500/30 text-orange-600 dark:text-orange-400 px-4 py-3 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="border-orange-500/50 bg-orange-500/20 text-orange-600 dark:text-orange-400 font-semibold">
+              ⚡ Teste Grátis (7 Dias)
+            </Badge>
+            <span>Seu período de teste vence em <b>{new Date(expDate).toLocaleDateString('pt-BR')}</b> ({Math.ceil((expDate - now) / (24 * 3600 * 1000))} dias restantes).</span>
+          </div>
+        </div>
+      )}
+
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>

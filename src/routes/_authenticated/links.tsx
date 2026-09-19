@@ -45,6 +45,7 @@ import {
 import { z } from 'zod'
 import { Label } from '@/components/ui/label'
 import { supabase } from '@/integrations/supabase/client'
+import { SubscriptionExpiredCard } from '@/components/subscription/SubscriptionExpiredCard'
 
 const linksSearchSchema = z.object({
   create: z.boolean().optional(),
@@ -236,6 +237,33 @@ function LinksPage() {
 
   const selectedDomainObj = availableDomains.find((d: any) => d.id === newLink.domain_id || d.domain === newLink.domain_id)
   const currentDomainDisplay = selectedDomainObj?.domain || "links.editaveisdocanva.com.br"
+
+  // Validação de expiração da assinatura ou teste de 7 dias
+  const now = new Date().getTime();
+  const expDateStr = profile && !('error' in profile) 
+    ? (profile.subscription_expires_at || profile.trial_expires_at) 
+    : null;
+  const expDate = expDateStr ? new Date(expDateStr).getTime() : 0;
+  const isTrial = profile && !('error' in profile) && (profile.subscription_type === 'trial_7d' || profile.is_trial === true);
+  const isExpired = profile && !('error' in profile) && (
+    (expDate > 0 && expDate < now) || profile.subscription_status === 'expired' || profile.subscription_status === 'suspended'
+  );
+
+  if (isExpired) {
+    return (
+      <div className="container mx-auto p-6 space-y-8 max-w-7xl">
+        <SubscriptionExpiredCard 
+          userName={profile && !('error' in profile) ? profile.full_name : undefined}
+          expiresAt={expDateStr || undefined}
+          isTrial={isTrial}
+          onRenewSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['user-profile'] })
+            queryClient.invalidateQueries({ queryKey: ['user-links'] })
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-8 max-w-7xl">

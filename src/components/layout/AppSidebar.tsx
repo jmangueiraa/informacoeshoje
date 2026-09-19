@@ -141,14 +141,14 @@ export function AppSidebar() {
 
               {isAdmin && (
                 <SidebarGroup>
-                  <SidebarGroupLabel className="text-orange-500/70">Administração</SidebarGroupLabel>
+                  <SidebarGroupLabel className="text-orange-500 font-bold uppercase tracking-wider text-[11px]">SuperAdmin (Revenda)</SidebarGroupLabel>
                   <SidebarGroupContent>
                     <SidebarMenu>
                       <SidebarMenuItem>
-                        <SidebarMenuButton asChild tooltip="Métricas ADM">
-                          <Link to="/admin" className="flex items-center gap-3 py-2 text-orange-500 hover:text-orange-600">
+                        <SidebarMenuButton asChild tooltip="Painel SuperAdmin">
+                          <Link to="/admin" className="flex items-center gap-3 py-2 text-orange-500 hover:text-orange-600 font-semibold">
                             <ShieldAlert className="h-5 w-5" />
-                            <span>Métricas ADM</span>
+                            <span>Painel SuperAdmin</span>
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
