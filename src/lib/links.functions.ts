@@ -380,3 +380,89 @@ export const ensureTrackingLink = createServerFn({ method: "POST" })
 
     return { slug: link.slug, reused: false };
   });
+
+const trackShopeeClickSchema = z.object({
+  slug: z.string().min(1).max(250),
+});
+
+/**
+ * Backend de Rastreamento com Janela de Atribuição da Shopee (7 dias).
+ * Validação dupla: Cookies de Navegador (shopee_click_cooldown) + Registro de IP no Supabase (ip_cooldown).
+ */
+export const trackShopeeClick = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => trackShopeeClickSchema.parse(data))
+  .handler(async ({ data }) => {
+    const rawSlug = String(data.slug ?? '').trim();
+    const cleanSlug = rawSlug.replace(/^\/+|\/+$/g, '').toLowerCase();
+
+    const { getCookie, setCookie, getRequestHeader, getRequestIP, setResponseHeader } = await import("@tanstack/react-start/server");
+
+    // 1. Checagem 1 (Navegador/Cookie):
+    // Verifica se existe o cookie shopee_click_cooldown
+    let hasCookie = false;
+    try {
+      const rawCookie = getCookie('shopee_click_cooldown');
+      hasCookie = rawCookie === 'true' || rawCookie === '1' || Boolean(rawCookie);
+    } catch (e) {
+      console.warn("Aviso ao ler cookie shopee_click_cooldown:", e);
+    }
+
+    // 2. Checagem 2 (Extração do IP da requisição):
+    let clientIp = 'visitor';
+    try {
+      const forwardedFor = getRequestHeader('x-forwarded-for');
+      const realIp = getRequestHeader('x-real-ip');
+      const cfConnectingIp = getRequestHeader('cf-connecting-ip');
+      const h3Ip = getRequestIP({ xForwardedFor: true });
+
+      const extracted = (forwardedFor ? forwardedFor.split(',')[0].trim() : '') || realIp || cfConnectingIp || h3Ip;
+      if (extracted && extracted !== '::1' && extracted !== '127.0.0.1') {
+        clientIp = extracted;
+      }
+    } catch (e) {
+      console.warn("Aviso ao extrair IP do cliente:", e);
+    }
+
+    // 3. Execução da RPC única com Transaction no Supabase:
+    // (Valida cooldown de 7 dias, incrementa contador se válido e faz UPSERT do IP)
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc('process_shopee_click', {
+      p_slug: cleanSlug,
+      p_ip: clientIp,
+      p_has_cookie: hasCookie,
+    });
+
+    if (rpcError) {
+      console.error("Erro na RPC process_shopee_click:", rpcError);
+      throw rpcError;
+    }
+
+    const result = (rpcResult as any) || {};
+
+    // 4. Injeção do Cookie (Crucial):
+    // Se o usuário não tinha o cookie na etapa 1, injeta Set-Cookie de 7 dias (Max-Age=604800)
+    if (!hasCookie) {
+      try {
+        setCookie('shopee_click_cooldown', 'true', {
+          maxAge: 604800, // 7 dias (7 * 24 * 60 * 60)
+          path: '/',
+          httpOnly: true,
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production',
+        });
+        setResponseHeader(
+          'Set-Cookie',
+          'shopee_click_cooldown=true; Max-Age=604800; Path=/; HttpOnly; SameSite=Lax'
+        );
+      } catch (cookieErr) {
+        console.warn("Aviso ao injetar cookie de cooldown:", cookieErr);
+      }
+    }
+
+    return {
+      destinationUrl: result.destination_url || null,
+      isValidClick: Boolean(result.is_valid_click),
+      inCooldown: Boolean(result.in_cooldown || hasCookie),
+      success: Boolean(result.success),
+    };
+  });

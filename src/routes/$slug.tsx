@@ -1,8 +1,23 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
-import { supabase } from '@/integrations/supabase/client'
+import { useEffect, useState, useRef } from 'react'
+import { trackShopeeClick } from '@/lib/links.functions'
 
 export const Route = createFileRoute('/$slug')({
+  loader: async ({ params }) => {
+    const rawSlug = String(params.slug ?? '').trim()
+    const cleanSlug = rawSlug.replace(/^\/+|\/+$/g, '')
+    if (!cleanSlug || cleanSlug.includes('.')) {
+      return { destinationUrl: null, success: false }
+    }
+
+    try {
+      const response = await trackShopeeClick({ data: { slug: cleanSlug } })
+      return response
+    } catch (err) {
+      console.error('Erro no loader ao rastrear clique:', err)
+      return { destinationUrl: null, success: false }
+    }
+  },
   component: SlugRedirectPage,
 })
 
@@ -52,9 +67,13 @@ function autoRedirectToShopee(destinationUrl: string) {
 
 function SlugRedirectPage() {
   const { slug } = Route.useParams()
+  const loaderData = Route.useLoaderData()
   const [statusText, setStatusText] = useState('Abrindo o aplicativo da Shopee...')
+  const hasRedirectedRef = useRef(false)
 
   useEffect(() => {
+    if (hasRedirectedRef.current) return
+
     const rawSlug = String(slug ?? '').trim()
     const cleanSlug = rawSlug.replace(/^\/+|\/+$/g, '')
 
@@ -65,53 +84,23 @@ function SlugRedirectPage() {
 
     async function processAndRedirect() {
       try {
-        let destinationUrl: string | null = null
+        let destinationUrl = loaderData?.destinationUrl
 
-        // 1. Incrementa clique no banco e busca o link de forma atômica
-        try {
-          const { data: rpcDest, error: rpcError } = await supabase.rpc('incrementar_clique', {
-            link_slug: cleanSlug,
-          })
-          if (!rpcError && typeof rpcDest === 'string' && rpcDest) {
-            destinationUrl = rpcDest
-          }
-        } catch (e) {
-          console.warn('Erro na RPC de clique:', e)
-        }
-
-        // 2. Fallback de busca no Supabase
+        // Se não obteve a URL no loader (ex: navegação client-side pura), executa a rota backend
         if (!destinationUrl) {
-          const { data: link, error } = await supabase
-            .from('links')
-            .select('*')
-            .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
-            .maybeSingle()
-
-          if (error || !link) {
-            console.error('Link não localizado no Supabase:', error)
-            setStatusText('Link não encontrado. Redirecionando...')
-            setTimeout(() => {
-              window.location.replace('/')
-            }, 800)
-            return
-          }
-
-          destinationUrl = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
-          if (!destinationUrl) {
-            window.location.replace('/')
-            return
-          }
-
-          // Registra clique no banco com await garantido
-          try {
-            await Promise.allSettled([
-              supabase.rpc('increment_clicks', { row_id: link.id }),
-              supabase.from('clicks').insert({ link_id: link.id }),
-              supabase.from('link_clicks').insert({ link_id: link.id, ip_address: 'visitor' }),
-            ])
-          } catch (_) {}
+          const res = await trackShopeeClick({ data: { slug: cleanSlug } })
+          destinationUrl = res?.destinationUrl
         }
 
+        if (!destinationUrl) {
+          setStatusText('Link não encontrado. Redirecionando...')
+          setTimeout(() => {
+            window.location.replace('/')
+          }, 800)
+          return
+        }
+
+        hasRedirectedRef.current = true
         // Executa abertura automática no App Shopee com fallback web em 1.5s
         autoRedirectToShopee(destinationUrl)
       } catch (err) {
@@ -121,7 +110,7 @@ function SlugRedirectPage() {
     }
 
     processAndRedirect()
-  }, [slug])
+  }, [slug, loaderData])
 
   return (
     <div
