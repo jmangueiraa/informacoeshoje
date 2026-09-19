@@ -1,34 +1,17 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { 
-  PlusCircle, 
-  Link2, 
-  BarChart3, 
-  MousePointer2, 
-  Activity, 
-  Copy, 
-  ExternalLink, 
-  TrendingUp, 
-  RotateCcw,
-  ShieldAlert,
-  ShieldCheck,
-  Clock,
-  Search,
-  RefreshCw
-} from "lucide-react"
+import { PlusCircle, Link2, BarChart3, MousePointer2, Activity, Copy, ExternalLink, TrendingUp, RotateCcw } from "lucide-react"
 import { Link } from "@tanstack/react-router"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { useEffect, useState, useMemo } from "react"
+import { useEffect } from "react"
 import { supabase } from "@/integrations/supabase/client"
-import { getDashboardStats, getIpCooldownList } from "@/lib/analytics.functions"
+import { getDashboardStats } from "@/lib/analytics.functions"
 import { getUserLinks, getUserProfile, resetLinkClicks } from "@/lib/links.functions"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 
 export function DashboardHome() {
   const queryClient = useQueryClient()
-  const [ipSearch, setIpSearch] = useState("")
 
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
     queryKey: ['dashboard-stats'],
@@ -42,13 +25,6 @@ export function DashboardHome() {
     refetchOnWindowFocus: true,
   })
 
-  const { data: cooldownList, isLoading: cooldownLoading, refetch: refetchCooldown } = useQuery({
-    queryKey: ['ip-cooldown-list'],
-    queryFn: () => getIpCooldownList(),
-    refetchOnWindowFocus: true,
-    refetchInterval: 15000,
-  })
-
   useEffect(() => {
     const channel = supabase
       .channel('links-changes-dashboard')
@@ -59,15 +35,10 @@ export function DashboardHome() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clicks' }, () => {
         queryClient.invalidateQueries({ queryKey: ['user-links'] })
         queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
-        queryClient.invalidateQueries({ queryKey: ['ip-cooldown-list'] })
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'link_clicks' }, () => {
         queryClient.invalidateQueries({ queryKey: ['user-links'] })
         queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
-        queryClient.invalidateQueries({ queryKey: ['ip-cooldown-list'] })
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ip_cooldown' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['ip-cooldown-list'] })
       })
       .subscribe()
 
@@ -113,46 +84,6 @@ export function DashboardHome() {
     queryKey: ['user-profile'],
     queryFn: () => getUserProfile(),
   })
-
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '-'
-    try {
-      const d = new Date(dateStr)
-      return new Intl.DateTimeFormat('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      }).format(d)
-    } catch (_) {
-      return dateStr
-    }
-  }
-
-  // Filtragem da lista de IPs por busca
-  const filteredCooldownList = useMemo(() => {
-    if (!cooldownList || !Array.isArray(cooldownList)) return []
-    if (!ipSearch.trim()) return cooldownList
-    const query = ipSearch.toLowerCase().trim()
-    return cooldownList.filter((item: any) => 
-      item.ip_address?.toLowerCase().includes(query) ||
-      item.status?.toLowerCase().includes(query) ||
-      item.formatted_time_remaining?.toLowerCase().includes(query)
-    )
-  }, [cooldownList, ipSearch])
-
-  // Contadores de quarentena
-  const quarantineCount = useMemo(() => {
-    if (!cooldownList || !Array.isArray(cooldownList)) return 0
-    return cooldownList.filter((item: any) => item.status === 'Em Quarentena' || (item.days_remaining && item.days_remaining > 0)).length
-  }, [cooldownList])
-
-  const releasedCount = useMemo(() => {
-    if (!cooldownList || !Array.isArray(cooldownList)) return 0
-    return cooldownList.filter((item: any) => item.status === 'Liberado' || !item.days_remaining || item.days_remaining === 0).length
-  }, [cooldownList])
 
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
@@ -293,145 +224,6 @@ export function DashboardHome() {
                       </td>
                     </tr>
                   ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      {/* Seção: Controle de Quarentena de IPs (Janela de Atribuição de 7 Dias da Shopee) */}
-      <div className="space-y-4 pt-4 border-t">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-orange-500" />
-              <h2 className="text-xl font-semibold tracking-tight">Rastreamento de IPs e Janela de 7 Dias (Shopee)</h2>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Controle de quarentena de cliques únicos por IP e Cookies para espelhar a janela de comissionamento da Shopee.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-64">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Filtrar por IP ou status..."
-                value={ipSearch}
-                onChange={(e) => setIpSearch(e.target.value)}
-                className="pl-8 h-9 text-xs"
-              />
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => refetchCooldown()}
-              disabled={cooldownLoading}
-              className="h-9 gap-1"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${cooldownLoading ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Atualizar</span>
-            </Button>
-            <Button variant="ghost" size="sm" asChild className="h-9">
-              <Link to="/quarentena">Ver Completo</Link>
-            </Button>
-          </div>
-        </div>
-
-        {/* Resumo de Quarentena */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="bg-muted/40 p-3 rounded-lg border flex items-center justify-between">
-            <span className="text-xs text-muted-foreground font-medium">Total de IPs Registrados:</span>
-            <span className="text-sm font-bold text-foreground">{cooldownList?.length || 0}</span>
-          </div>
-          <div className="bg-red-500/10 p-3 rounded-lg border border-red-500/20 flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <ShieldAlert className="h-4 w-4 text-red-500" />
-              <span className="text-xs text-red-600 dark:text-red-400 font-medium">Em Quarentena:</span>
-            </div>
-            <span className="text-sm font-bold text-red-600 dark:text-red-400">{quarantineCount}</span>
-          </div>
-          <div className="bg-green-500/10 p-3 rounded-lg border border-green-500/20 flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <ShieldCheck className="h-4 w-4 text-green-500" />
-              <span className="text-xs text-green-600 dark:text-green-400 font-medium">Liberados para Clique:</span>
-            </div>
-            <span className="text-sm font-bold text-green-600 dark:text-green-400">{releasedCount}</span>
-          </div>
-        </div>
-
-        {/* Tabela de IPs e Dias Faltantes */}
-        <div className="rounded-md border bg-card overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/60 border-b text-xs">
-                <tr>
-                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Endereço IP</th>
-                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Último Clique Registrado</th>
-                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Data de Liberação (+7 dias)</th>
-                  <th className="text-center p-3.5 font-semibold text-muted-foreground">Dias Restantes</th>
-                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Tempo Restante</th>
-                  <th className="text-center p-3.5 font-semibold text-muted-foreground">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y text-xs">
-                {cooldownLoading ? (
-                  Array(3).fill(0).map((_, i) => (
-                    <tr key={i} className="animate-pulse">
-                      <td colSpan={6} className="p-4 h-12 bg-muted/10"></td>
-                    </tr>
-                  ))
-                ) : filteredCooldownList.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-muted-foreground">
-                      {ipSearch ? "Nenhum IP encontrado com este filtro." : "Nenhum IP registrado em quarentena ainda. Os acessos aos links aparecerão aqui."}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredCooldownList.map((item: any) => {
-                    const isQuarantine = item.status === 'Em Quarentena' || (item.days_remaining && item.days_remaining > 0);
-                    return (
-                      <tr key={item.ip_address} className="hover:bg-muted/30 transition-colors">
-                        <td className="p-3.5 font-mono font-medium text-foreground">
-                          {item.ip_address}
-                        </td>
-                        <td className="p-3.5 text-muted-foreground">
-                          {formatDate(item.last_click_at)}
-                        </td>
-                        <td className="p-3.5 text-muted-foreground">
-                          {formatDate(item.cooldown_until)}
-                        </td>
-                        <td className="p-3.5 text-center font-semibold">
-                          <span className={isQuarantine ? 'text-orange-600 dark:text-orange-400' : 'text-green-600 dark:text-green-400'}>
-                            {Number(item.days_remaining || 0).toFixed(1)} dias
-                          </span>
-                        </td>
-                        <td className="p-3.5">
-                          <span className="font-medium text-foreground">
-                            {item.formatted_time_remaining || (isQuarantine ? `${item.days_remaining}d restantes` : 'Liberado para novo clique')}
-                          </span>
-                        </td>
-                        <td className="p-3.5 text-center">
-                          {isQuarantine ? (
-                            <Badge 
-                              variant="outline" 
-                              className="bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 gap-1 font-medium"
-                            >
-                              <span>🔴</span> Em Quarentena
-                            </Badge>
-                          ) : (
-                            <Badge 
-                              variant="outline" 
-                              className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30 gap-1 font-medium"
-                            >
-                              <span>🟢</span> Liberado
-                            </Badge>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })
                 )}
               </tbody>
             </table>
