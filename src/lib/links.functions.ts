@@ -547,9 +547,9 @@ export const trackShopeeClick = createServerFn({ method: "POST" })
             try {
               await Promise.allSettled([
                 supabaseAdmin.from("links").update({ clicks_count: ((link as any).clicks_count || 0) + 1 }).eq("id", link.id),
-                supabaseAdmin.from("clicks").insert({ link_id: link.id, ip_address: clientIp }),
+                supabaseAdmin.from("clicks").insert({ link_id: link.id, ip_address: clientIp, slug: cleanSlug }),
                 supabaseAdmin.from("link_clicks").insert({ link_id: link.id, ip_address: clientIp }),
-                supabaseAdmin.from("ip_cooldown" as any).upsert({ ip_address: clientIp, last_click_at: new Date().toISOString() }),
+                supabaseAdmin.from("ip_cooldown" as any).upsert({ ip_address: clientIp, last_click_at: new Date().toISOString(), slug: cleanSlug, link_id: link.id }),
               ]);
             } catch (_) {}
           }

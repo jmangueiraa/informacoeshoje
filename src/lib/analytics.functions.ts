@@ -59,25 +59,40 @@ export const getIpCooldownList = createServerFn({ method: "GET" })
   .handler(async () => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // 1. Tenta buscar via RPC get_ip_cooldown_status
-    try {
-      const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('get_ip_cooldown_status' as any);
-      if (!rpcError && Array.isArray(rpcData) && rpcData.length > 0) {
-        return rpcData;
-      }
-    } catch (e) {
-      console.warn("Aviso ao buscar RPC get_ip_cooldown_status:", e);
-    }
-
-    // 2. Consulta direta na tabela ip_cooldown (com fallback de cálculo)
-    const { data: rawData, error: rawError } = await supabaseAdmin
-      .from('ip_cooldown' as any)
-      .select('*')
-      .order('last_click_at', { ascending: false });
+    // 1. Busca dados da tabela ip_cooldown, clicks e links em paralelo
+    const [{ data: rawData, error: rawError }, { data: clicksData }, { data: linksData }] = await Promise.all([
+      supabaseAdmin
+        .from('ip_cooldown' as any)
+        .select('*')
+        .order('last_click_at', { ascending: false }),
+      supabaseAdmin
+        .from('clicks')
+        .select('ip_address, slug, link_id, clicked_at')
+        .order('clicked_at', { ascending: false })
+        .limit(3000),
+      supabaseAdmin
+        .from('links')
+        .select('id, slug, title')
+    ]);
 
     if (rawError || !rawData) {
       return [];
     }
+
+    const linksMap = new Map<string, string>();
+    (linksData || []).forEach((l: any) => {
+      if (l.id && l.slug) linksMap.set(l.id, l.slug);
+    });
+
+    const slugByIp = new Map<string, string>();
+    (clicksData || []).forEach((c: any) => {
+      if (c.ip_address && !slugByIp.has(c.ip_address)) {
+        const foundSlug = c.slug || (c.link_id ? linksMap.get(c.link_id) : '') || '';
+        if (foundSlug) {
+          slugByIp.set(c.ip_address, foundSlug);
+        }
+      }
+    });
 
     const now = new Date().getTime();
     return rawData.map((row: any) => {
@@ -96,8 +111,11 @@ export const getIpCooldownList = createServerFn({ method: "GET" })
         formattedTimeRemaining = `${days}d ${hours}h ${minutes}m restantes`;
       }
 
+      const rowSlug = row.slug || slugByIp.get(row.ip_address) || (row.link_id ? linksMap.get(row.link_id) : null) || null;
+
       return {
         ip_address: row.ip_address,
+        slug: rowSlug,
         last_click_at: row.last_click_at,
         cooldown_until: new Date(cooldownUntil).toISOString(),
         days_remaining: daysRemaining,

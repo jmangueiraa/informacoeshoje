@@ -85,13 +85,14 @@ export function QuarentenaPage() {
     }
   }
 
-  // Filtragem da lista de IPs por busca
+  // Filtragem da lista de IPs por busca (IP, slug, status, tempo)
   const filteredCooldownList = useMemo(() => {
     if (!cooldownList || !Array.isArray(cooldownList)) return []
     if (!ipSearch.trim()) return cooldownList
     const query = ipSearch.toLowerCase().trim()
     return cooldownList.filter((item: any) => 
       item.ip_address?.toLowerCase().includes(query) ||
+      item.slug?.toLowerCase().includes(query) ||
       item.status?.toLowerCase().includes(query) ||
       item.formatted_time_remaining?.toLowerCase().includes(query)
     )
@@ -204,10 +205,10 @@ export function QuarentenaPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h2 className="text-xl font-semibold tracking-tight">Status Individual dos Endereços IP</h2>
 
-          <div className="relative w-full sm:w-72">
+          <div className="relative w-full sm:w-80">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por IP, status ou tempo..."
+              placeholder="Buscar por IP, slug, status ou tempo..."
               value={ipSearch}
               onChange={(e) => setIpSearch(e.target.value)}
               className="pl-8 h-9 text-xs"
@@ -222,6 +223,7 @@ export function QuarentenaPage() {
               <thead className="bg-muted/60 border-b text-xs">
                 <tr>
                   <th className="text-left p-4 font-semibold text-muted-foreground">Endereço IP</th>
+                  <th className="text-left p-4 font-semibold text-muted-foreground">Slug / Link Clicado</th>
                   <th className="text-left p-4 font-semibold text-muted-foreground">Último Clique Registrado</th>
                   <th className="text-left p-4 font-semibold text-muted-foreground">Data de Liberação (+7 dias)</th>
                   <th className="text-center p-4 font-semibold text-muted-foreground">Dias Restantes</th>
@@ -233,12 +235,12 @@ export function QuarentenaPage() {
                 {cooldownLoading ? (
                   Array(3).fill(0).map((_, i) => (
                     <tr key={i} className="animate-pulse">
-                      <td colSpan={6} className="p-4 h-12 bg-muted/10"></td>
+                      <td colSpan={7} className="p-4 h-12 bg-muted/10"></td>
                     </tr>
                   ))
                 ) : filteredCooldownList.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                    <td colSpan={7} className="p-8 text-center text-muted-foreground">
                       {ipSearch ? "Nenhum IP localizado para a busca informada." : "Nenhum endereço IP registrado ainda. Os cliques nos links aparecerão aqui automaticamente."}
                     </td>
                   </tr>
@@ -249,6 +251,15 @@ export function QuarentenaPage() {
                       <tr key={item.ip_address} className="hover:bg-muted/30 transition-colors">
                         <td className="p-4 font-mono font-medium text-foreground">
                           {item.ip_address}
+                        </td>
+                        <td className="p-4">
+                          {item.slug ? (
+                            <Badge variant="outline" className="font-mono text-xs bg-primary/10 text-primary border-primary/20 py-0.5 px-2 font-semibold">
+                              /{item.slug.replace(/^\/+/, '')}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs italic">-</span>
+                          )}
                         </td>
                         <td className="p-4 text-muted-foreground">
                           {formatDate(item.last_click_at)}

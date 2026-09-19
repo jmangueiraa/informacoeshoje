@@ -120,18 +120,18 @@ BEGIN
     WHERE id = v_link.id;
 
     -- Registra o evento de clique para o Supabase Realtime e gráficos do painel
-    INSERT INTO public.clicks (link_id, ip_address, clicked_at)
-    VALUES (v_link.id, COALESCE(p_ip, 'visitor'), now());
+    INSERT INTO public.clicks (link_id, ip_address, slug, clicked_at)
+    VALUES (v_link.id, COALESCE(p_ip, 'visitor'), v_clean_slug, now());
 
     INSERT INTO public.link_clicks (link_id, ip_address, created_at)
     VALUES (v_link.id, COALESCE(p_ip, 'visitor'), now());
 
-    -- UPSERT do IP na tabela ip_cooldown com a data atual (now())
+    -- UPSERT do IP na tabela ip_cooldown com a data atual (now()) e slug
     IF p_ip IS NOT NULL AND p_ip <> '' AND p_ip <> 'visitor' AND p_ip <> 'unknown' THEN
-      INSERT INTO public.ip_cooldown (ip_address, last_click_at)
-      VALUES (p_ip, now())
+      INSERT INTO public.ip_cooldown (ip_address, last_click_at, slug, link_id)
+      VALUES (p_ip, now(), v_clean_slug, v_link.id)
       ON CONFLICT (ip_address)
-      DO UPDATE SET last_click_at = now();
+      DO UPDATE SET last_click_at = now(), slug = v_clean_slug, link_id = v_link.id;
     END IF;
   END IF;
 
@@ -183,6 +183,7 @@ GRANT EXECUTE ON FUNCTION public.incrementar_clique(text) TO anon, authenticated
 CREATE OR REPLACE FUNCTION public.get_ip_cooldown_status()
 RETURNS TABLE (
   ip_address text,
+  slug text,
   last_click_at timestamp with time zone,
   cooldown_until timestamp with time zone,
   days_remaining numeric,
@@ -198,6 +199,12 @@ BEGIN
   RETURN QUERY
   SELECT 
     c.ip_address,
+    COALESCE(c.slug, (
+      SELECT cl.slug FROM public.clicks cl 
+      WHERE cl.ip_address = c.ip_address 
+      ORDER BY cl.clicked_at DESC 
+      LIMIT 1
+    )) AS slug,
     c.last_click_at,
     (c.last_click_at + interval '7 days') AS cooldown_until,
     ROUND(GREATEST(0, EXTRACT(EPOCH FROM ((c.last_click_at + interval '7 days') - now())) / 86400.0)::numeric, 1) AS days_remaining,
