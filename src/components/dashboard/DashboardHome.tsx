@@ -110,7 +110,7 @@ export function DashboardHome() {
   const isTrial = profile && !('error' in profile) && (profile.subscription_type === 'trial_7d' || profile.is_trial === true);
   const isExpired = !isMasterAdmin && (
     (effectiveExpDate > 0 && effectiveExpDate < now) || 
-    (profile && !('error' in profile) && (profile.subscription_status === 'expired' || profile.subscription_status === 'suspended'))
+    (profile && !('error' in profile) && (profile.subscription_status === 'suspended'))
   );
 
   const daysRemaining = isMasterAdmin ? 9999 : Math.ceil((effectiveExpDate - now) / (24 * 3600 * 1000));

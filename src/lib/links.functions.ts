@@ -201,42 +201,69 @@ export const resetLinkClicks = createServerFn({ method: "POST" })
 export const getUserProfile = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { userId, supabase: authenticatedSupabase, claims } = context;
+    const { userId, claims } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
     const userEmail = typeof claims.email === 'string' ? claims.email.toLowerCase() : '';
     const isMasterAdmin = userEmail === 'ajpentretedimento@hotmail.com';
 
-    const { data: profile } = await authenticatedSupabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle();
+    // 1. Busca profile do banco e dados do auth do usuário com supabaseAdmin
+    const [{ data: profile }, authUserRes] = await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle(),
+      supabaseAdmin.auth.admin.getUserById(userId).catch(() => ({ data: { user: null } }))
+    ]);
 
-    if (!profile) {
-      const defaultExp = isMasterAdmin 
-        ? new Date(Date.now() + 10 * 365 * 24 * 3600 * 1000).toISOString()
-        : (claims.user_metadata?.subscription_expires_at || new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString());
+    const authUser = authUserRes?.data?.user;
+    const authMeta = authUser?.user_metadata || (claims.user_metadata as any) || {};
 
-      const initialProfile = {
-        id: userId,
-        full_name: (claims.user_metadata as any)?.full_name || userEmail.split('@')[0] || 'Usuário',
-        username: userEmail,
-        phone_number: (claims.user_metadata as any)?.phone_number || (claims.user_metadata as any)?.phone || null,
-        subscription_type: isMasterAdmin ? 'lifetime' : ((claims.user_metadata as any)?.subscription_type || 'trial_7d'),
-        subscription_price: isMasterAdmin ? 0.00 : (Number((claims.user_metadata as any)?.subscription_price) || 30.00),
-        subscription_status: isMasterAdmin ? 'active' : ((claims.user_metadata as any)?.subscription_status || 'trial'),
-        subscription_expires_at: defaultExp,
-        trial_expires_at: defaultExp,
-        is_trial: isMasterAdmin ? false : ((claims.user_metadata as any)?.is_trial !== false),
-        updated_at: new Date().toISOString(),
-      };
+    // Expiração: prioriza a data salva no profile ou metadata do auth
+    let expDateStr = profile?.subscription_expires_at 
+      || profile?.trial_expires_at 
+      || authMeta?.subscription_expires_at 
+      || authMeta?.trial_expires_at;
 
-      try {
-        await authenticatedSupabase.from("profiles").upsert(initialProfile, { onConflict: 'id' });
-      } catch (_) {}
-      return initialProfile;
+    if (!expDateStr && !isMasterAdmin) {
+      const createdDate = profile?.created_at || authUser?.created_at;
+      if (createdDate) {
+        expDateStr = new Date(new Date(createdDate).getTime() + 30 * 24 * 3600 * 1000).toISOString();
+      }
     }
 
-    return profile;
+    const subStatus = profile?.subscription_status || authMeta?.subscription_status || 'active';
+    const subType = isMasterAdmin ? 'lifetime' : (profile?.subscription_type || authMeta?.subscription_type || 'monthly');
+    const isTrial = isMasterAdmin ? false : (subType === 'trial_7d' || profile?.is_trial === true || authMeta?.is_trial === true);
+
+    const mergedProfile = {
+      id: userId,
+      full_name: profile?.full_name || authMeta?.full_name || userEmail.split('@')[0] || 'Usuário',
+      username: profile?.username || userEmail,
+      phone_number: profile?.phone_number || authMeta?.phone_number || authMeta?.phone || null,
+      custom_domain: profile?.custom_domain || null,
+      shopee_app_id: profile?.shopee_app_id || null,
+      shopee_app_secret: profile?.shopee_app_secret || null,
+      shopee_api_key: profile?.shopee_api_key || null,
+      subscription_type: subType,
+      subscription_price: isMasterAdmin ? 0.00 : (Number(profile?.subscription_price) || Number(authMeta?.subscription_price) || 30.00),
+      subscription_status: subStatus,
+      subscription_expires_at: isMasterAdmin ? null : expDateStr,
+      trial_expires_at: isMasterAdmin ? null : expDateStr,
+      is_trial: isTrial,
+      created_at: profile?.created_at || authUser?.created_at || new Date().toISOString(),
+      updated_at: profile?.updated_at || new Date().toISOString(),
+    };
+
+    // Sincroniza no banco caso a coluna estivesse nula
+    if (!profile?.subscription_expires_at && expDateStr && !isMasterAdmin) {
+      try {
+        await supabaseAdmin.from("profiles").upsert(mergedProfile, { onConflict: 'id' });
+      } catch (_) {}
+    }
+
+    return mergedProfile;
   });
 
 export const updateProfileDomain = createServerFn({ method: "POST" })

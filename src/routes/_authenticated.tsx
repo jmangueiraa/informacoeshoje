@@ -69,7 +69,6 @@ function AuthenticatedLayout() {
   const isTrial = profile && !('error' in profile) && (profile.subscription_type === 'trial_7d' || profile.is_trial === true)
   const isExpired = !isMasterAdmin && profile && !('error' in profile) && (
     (effectiveExpDate > 0 && effectiveExpDate < now) ||
-    profile.subscription_status === 'expired' ||
     profile.subscription_status === 'suspended'
   )
 
