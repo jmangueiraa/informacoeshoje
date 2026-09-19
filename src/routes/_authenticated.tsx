@@ -3,6 +3,9 @@ import { supabase } from '@/integrations/supabase/client'
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { Toaster } from '@/components/ui/sonner'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { getUserProfile } from '@/lib/links.functions'
+import { SubscriptionExpiredCard } from '@/components/subscription/SubscriptionExpiredCard'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async ({ location }) => {
@@ -41,6 +44,35 @@ export const Route = createFileRoute('/_authenticated')({
 })
 
 function AuthenticatedLayout() {
+  const queryClient = useQueryClient()
+  const { data: profile } = useQuery({
+    queryKey: ['user-profile'],
+    queryFn: () => getUserProfile(),
+    refetchOnWindowFocus: true,
+  })
+
+  const now = new Date().getTime()
+  const userEmail = profile && !('error' in profile) ? (profile.username || '').toLowerCase() : ''
+  const isMasterAdmin = userEmail === 'ajpentretedimento@hotmail.com' || 
+    (profile && !('error' in profile) && (profile.subscription_type === 'lifetime' || profile.full_name?.toLowerCase() === 'ajp entretenimento'))
+
+  const expDateStr = profile && !('error' in profile)
+    ? (profile.subscription_expires_at || profile.trial_expires_at)
+    : null
+
+  const effectiveExpDate = expDateStr
+    ? new Date(expDateStr).getTime()
+    : (profile && !('error' in profile) && profile.created_at
+        ? new Date(profile.created_at).getTime() + 30 * 24 * 3600 * 1000
+        : now)
+
+  const isTrial = profile && !('error' in profile) && (profile.subscription_type === 'trial_7d' || profile.is_trial === true)
+  const isExpired = !isMasterAdmin && profile && !('error' in profile) && (
+    (effectiveExpDate > 0 && effectiveExpDate < now) ||
+    profile.subscription_status === 'expired' ||
+    profile.subscription_status === 'suspended'
+  )
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background flex-col md:flex-row">
@@ -57,7 +89,22 @@ function AuthenticatedLayout() {
             </div>
           </header>
           <div className="flex-1">
-            <Outlet />
+            {isExpired ? (
+              <div className="p-4 sm:p-8 max-w-7xl mx-auto flex items-center justify-center min-h-[calc(100vh-140px)]">
+                <SubscriptionExpiredCard
+                  userName={profile && !('error' in profile) ? profile.full_name : undefined}
+                  expiresAt={new Date(effectiveExpDate).toISOString()}
+                  isTrial={isTrial}
+                  onRenewSuccess={() => {
+                    queryClient.invalidateQueries({ queryKey: ['user-profile'] })
+                    queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+                    queryClient.invalidateQueries({ queryKey: ['user-links'] })
+                  }}
+                />
+              </div>
+            ) : (
+              <Outlet />
+            )}
           </div>
           <footer className="p-4 border-t text-center text-xs text-muted-foreground bg-card/50 flex flex-col gap-1">
             <p>Desenvolvido pela AJP Entretenimento, responsável pela criação e produção deste projeto</p>
