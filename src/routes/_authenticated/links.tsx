@@ -95,6 +95,7 @@ function LinksPage() {
         !d.domain?.includes('editaveisdocanva') && 
         !d.domain?.includes('shopeerastreamento') &&
         !d.domain?.includes('arquivos') &&
+        !d.domain?.includes('loja') &&
         !PREDEFINED_DOMAINS.some((p) => p.domain === d.domain)
       )
       .map((d: any) => ({
