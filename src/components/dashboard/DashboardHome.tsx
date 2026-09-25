@@ -99,21 +99,17 @@ export function DashboardHome() {
     ? (profile.subscription_expires_at || profile.trial_expires_at) 
     : null;
 
-  const userCreatedAt = profile && !('error' in profile) && profile.created_at
-    ? new Date(profile.created_at).getTime()
-    : now;
-
-  const effectiveExpDate = expDateStr 
-    ? new Date(expDateStr).getTime() 
-    : (userCreatedAt + 30 * 24 * 3600 * 1000);
-
+  const expDate = expDateStr ? new Date(expDateStr).getTime() : 0;
   const isTrial = profile && !('error' in profile) && (profile.subscription_type === 'trial_7d' || profile.is_trial === true);
-  const isExpired = !isMasterAdmin && (
-    (effectiveExpDate > 0 && effectiveExpDate < now) || 
-    (profile && !('error' in profile) && (profile.subscription_status === 'suspended'))
+
+  const isExpired = !isMasterAdmin && profile && !('error' in profile) && (
+    (expDate > 0 && expDate < now) || 
+    profile.subscription_status === 'suspended' ||
+    (profile.subscription_status === 'expired' && (expDate === 0 || expDate < now))
   );
 
-  const daysRemaining = isMasterAdmin ? 9999 : Math.ceil((effectiveExpDate - now) / (24 * 3600 * 1000));
+  const effectiveExpDate = expDate > 0 ? expDate : now;
+  const daysRemaining = isMasterAdmin ? 9999 : (expDate > 0 ? Math.ceil((expDate - now) / (24 * 3600 * 1000)) : 30);
 
   // Se a assinatura ou teste de 7 dias estiver expirado, exibe o Card de Bloqueio com Pix de R$ 30
   if (isExpired) {

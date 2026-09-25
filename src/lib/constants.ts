@@ -14,6 +14,20 @@ export const PREDEFINED_DOMAINS = [
     verification_status: "verified"
   },
   {
+    id: "canva-loja",
+    domain: "links.editaveisdocanva.com.br/loja",
+    label: "links.editaveisdocanva.com.br/loja",
+    is_primary: false,
+    verification_status: "verified"
+  },
+  {
+    id: "canva-arquivos",
+    domain: "www.editaveisdocanva.com.br/arquivos",
+    label: "www.editaveisdocanva.com.br/arquivos",
+    is_primary: false,
+    verification_status: "verified"
+  },
+  {
     id: "platform-default",
     domain: "infomacoeshoje.online",
     label: "infomacoeshoje.online",

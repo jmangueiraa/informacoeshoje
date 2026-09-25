@@ -60,17 +60,18 @@ function AuthenticatedLayout() {
     ? (profile.subscription_expires_at || profile.trial_expires_at)
     : null
 
-  const effectiveExpDate = expDateStr
-    ? new Date(expDateStr).getTime()
-    : (profile && !('error' in profile) && profile.created_at
-        ? new Date(profile.created_at).getTime() + 30 * 24 * 3600 * 1000
-        : now)
+  const expDate = expDateStr ? new Date(expDateStr).getTime() : 0
 
   const isTrial = profile && !('error' in profile) && (profile.subscription_type === 'trial_7d' || profile.is_trial === true)
+
+  // Bloqueia se a data de expiração já passou, ou se o status for explicitamente 'suspended' ou 'expired'
   const isExpired = !isMasterAdmin && profile && !('error' in profile) && (
-    (effectiveExpDate > 0 && effectiveExpDate < now) ||
-    profile.subscription_status === 'suspended'
+    (expDate > 0 && expDate < now) ||
+    profile.subscription_status === 'suspended' ||
+    (profile.subscription_status === 'expired' && (expDate === 0 || expDate < now))
   )
+
+  const effectiveExpDate = expDate > 0 ? expDate : now
 
   return (
     <SidebarProvider>

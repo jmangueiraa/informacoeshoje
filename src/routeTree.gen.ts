@@ -21,6 +21,8 @@ import { Route as AuthenticatedQuarentenaRouteImport } from './routes/_authentic
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as ArquivosIndexRouteImport } from './routes/arquivos/index'
 import { Route as ArquivosSlugRouteImport } from './routes/arquivos/$slug'
+import { Route as LojaIndexRouteImport } from './routes/loja/index'
+import { Route as LojaSlugRouteImport } from './routes/loja/$slug'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminDomainsRouteImport } from './routes/_authenticated/admin/domains'
 
@@ -84,6 +86,16 @@ const ArquivosSlugRoute = ArquivosSlugRouteImport.update({
   path: '/arquivos/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LojaIndexRoute = LojaIndexRouteImport.update({
+  id: '/loja/',
+  path: '/loja/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LojaSlugRoute = LojaSlugRouteImport.update({
+  id: '/loja/$slug',
+  path: '/loja/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -108,6 +120,8 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/arquivos/$slug': typeof ArquivosSlugRoute
   '/arquivos/': typeof ArquivosIndexRoute
+  '/loja/$slug': typeof LojaSlugRoute
+  '/loja/': typeof LojaIndexRoute
   '/admin/domains': typeof AuthenticatedAdminDomainsRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
@@ -122,6 +136,8 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/arquivos/$slug': typeof ArquivosSlugRoute
   '/arquivos': typeof ArquivosIndexRoute
+  '/loja/$slug': typeof LojaSlugRoute
+  '/loja': typeof LojaIndexRoute
   '/admin/domains': typeof AuthenticatedAdminDomainsRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
@@ -139,6 +155,8 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/arquivos/$slug': typeof ArquivosSlugRoute
   '/arquivos/': typeof ArquivosIndexRoute
+  '/loja/$slug': typeof LojaSlugRoute
+  '/loja/': typeof LojaIndexRoute
   '/_authenticated/admin/domains': typeof AuthenticatedAdminDomainsRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
@@ -156,6 +174,8 @@ export interface FileRouteTypes {
     | '/settings'
     | '/arquivos/$slug'
     | '/arquivos/'
+    | '/loja/$slug'
+    | '/loja/'
     | '/admin/domains'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
@@ -170,6 +190,8 @@ export interface FileRouteTypes {
     | '/settings'
     | '/arquivos/$slug'
     | '/arquivos'
+    | '/loja/$slug'
+    | '/loja'
     | '/admin/domains'
     | '/admin'
   id:
@@ -186,6 +208,8 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/arquivos/$slug'
     | '/arquivos/'
+    | '/loja/$slug'
+    | '/loja/'
     | '/_authenticated/admin/domains'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
@@ -196,6 +220,8 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   ArquivosSlugRoute: typeof ArquivosSlugRoute
   ArquivosIndexRoute: typeof ArquivosIndexRoute
+  LojaSlugRoute: typeof LojaSlugRoute
+  LojaIndexRoute: typeof LojaIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -284,6 +310,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ArquivosSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/loja/': {
+      id: '/loja/'
+      path: '/loja'
+      fullPath: '/loja/'
+      preLoaderRoute: typeof LojaIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loja/$slug': {
+      id: '/loja/$slug'
+      path: '/loja/$slug'
+      fullPath: '/loja/$slug'
+      preLoaderRoute: typeof LojaSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/admin/': {
       id: '/_authenticated/admin/'
       path: '/'
@@ -344,6 +384,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   ArquivosSlugRoute: ArquivosSlugRoute,
   ArquivosIndexRoute: ArquivosIndexRoute,
+  LojaSlugRoute: LojaSlugRoute,
+  LojaIndexRoute: LojaIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -105,10 +105,11 @@ function SlugRedirectPage() {
         // 2. Fallback de resgate direto no Supabase
         if (!destinationUrl) {
           try {
+            const coreSlug = cleanSlug.replace(/^(loja|arquivos)\//i, '')
             const { data: link } = await supabase
               .from('links')
               .select('*')
-              .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
+              .or(`slug.ilike.${coreSlug},slug.ilike./${coreSlug},slug.ilike.loja/${coreSlug},slug.ilike./loja/${coreSlug},slug.ilike.arquivos/${coreSlug},slug.ilike./arquivos/${coreSlug},slug.ilike.${cleanSlug},slug.ilike./${cleanSlug}`)
               .maybeSingle()
 
             if (link) {

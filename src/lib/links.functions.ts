@@ -52,6 +52,9 @@ export const createCustomLink = createServerFn({ method: "POST" })
       } else if (data.domainId === 'canva-links' || data.domainId === 'links.editaveisdocanva.com.br') {
         customDomain = 'links.editaveisdocanva.com.br';
         domainId = null;
+      } else if (data.domainId === 'canva-loja' || data.domainId.includes('loja')) {
+        customDomain = 'links.editaveisdocanva.com.br/loja';
+        domainId = null;
       } else if (data.domainId === 'canva-arquivos' || data.domainId.includes('arquivos')) {
         customDomain = 'www.editaveisdocanva.com.br/arquivos';
         domainId = null;
@@ -496,6 +499,7 @@ export const trackShopeeClick = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const rawSlug = String(data.slug ?? '').trim();
     const cleanSlug = rawSlug.replace(/^\/+|\/+$/g, '').toLowerCase();
+    const coreSlug = cleanSlug.replace(/^(loja|arquivos)\//, '');
 
     const { getCookie, setCookie, getRequestHeader, getRequestIP, setResponseHeader } = await import("@tanstack/react-start/server");
 
@@ -539,7 +543,7 @@ export const trackShopeeClick = createServerFn({ method: "POST" })
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc('process_shopee_click', {
-        p_slug: cleanSlug,
+        p_slug: coreSlug,
         p_ip: clientIp,
         p_has_cookie: hasCookie,
         p_is_bot: isBot,
@@ -556,6 +560,17 @@ export const trackShopeeClick = createServerFn({ method: "POST" })
       console.warn("Exceção na RPC process_shopee_click:", rpcEx);
     }
 
+    const orFilter = Array.from(new Set([
+      `slug.ilike.${coreSlug}`,
+      `slug.ilike./${coreSlug}`,
+      `slug.ilike.loja/${coreSlug}`,
+      `slug.ilike./loja/${coreSlug}`,
+      `slug.ilike.arquivos/${coreSlug}`,
+      `slug.ilike./arquivos/${coreSlug}`,
+      `slug.ilike.${cleanSlug}`,
+      `slug.ilike./${cleanSlug}`,
+    ])).join(',');
+
     // Tentativa 2: Consulta direta com supabaseAdmin
     if (!destinationUrl) {
       try {
@@ -563,7 +578,7 @@ export const trackShopeeClick = createServerFn({ method: "POST" })
         const { data: link } = await supabaseAdmin
           .from("links")
           .select("*")
-          .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
+          .or(orFilter)
           .maybeSingle();
 
         if (link) {
@@ -574,9 +589,9 @@ export const trackShopeeClick = createServerFn({ method: "POST" })
             try {
               await Promise.allSettled([
                 supabaseAdmin.from("links").update({ clicks_count: ((link as any).clicks_count || 0) + 1 }).eq("id", link.id),
-                supabaseAdmin.from("clicks").insert({ link_id: link.id, ip_address: clientIp, slug: cleanSlug }),
+                supabaseAdmin.from("clicks").insert({ link_id: link.id, ip_address: clientIp, slug: coreSlug }),
                 supabaseAdmin.from("link_clicks").insert({ link_id: link.id, ip_address: clientIp }),
-                supabaseAdmin.from("ip_cooldown" as any).upsert({ ip_address: clientIp, last_click_at: new Date().toISOString(), slug: cleanSlug, link_id: link.id }),
+                supabaseAdmin.from("ip_cooldown" as any).upsert({ ip_address: clientIp, last_click_at: new Date().toISOString(), slug: coreSlug, link_id: link.id }),
               ]);
             } catch (_) {}
           }
@@ -592,7 +607,7 @@ export const trackShopeeClick = createServerFn({ method: "POST" })
         const { data: link } = await supabase
           .from("links")
           .select("*")
-          .or(`slug.ilike.${cleanSlug},slug.ilike./${cleanSlug},slug.ilike.arquivos/${cleanSlug},slug.ilike./arquivos/${cleanSlug}`)
+          .or(orFilter)
           .maybeSingle();
 
         if (link) {

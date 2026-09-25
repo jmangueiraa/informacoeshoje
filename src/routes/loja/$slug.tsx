@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import { trackShopeeClick } from '@/lib/links.functions'
 import { supabase } from '@/integrations/supabase/client'
 
-export const Route = createFileRoute('/arquivos/$slug')({
+export const Route = createFileRoute('/loja/$slug')({
   loader: async ({ params }) => {
     const rawSlug = String(params.slug ?? '').trim()
     const cleanSlug = rawSlug.replace(/^\/+|\/+$/g, '')
@@ -15,11 +15,11 @@ export const Route = createFileRoute('/arquivos/$slug')({
       const response = await trackShopeeClick({ data: { slug: cleanSlug } })
       return response
     } catch (err) {
-      console.warn('Aviso no loader ao rastrear clique (/arquivos):', err)
+      console.warn('Aviso no loader ao rastrear clique (/loja):', err)
       return { destinationUrl: null, success: false }
     }
   },
-  component: ArquivosRedirectPage,
+  component: LojaRedirectPage,
 })
 
 function autoRedirectToShopee(rawUrl: string) {
@@ -71,7 +71,7 @@ function autoRedirectToShopee(rawUrl: string) {
   window.location.replace(destinationUrl)
 }
 
-function ArquivosRedirectPage() {
+function LojaRedirectPage() {
   const { slug } = Route.useParams()
   const loaderData = Route.useLoaderData()
   const [statusText, setStatusText] = useState('Abrindo o aplicativo da Shopee...')
@@ -98,7 +98,7 @@ function ArquivosRedirectPage() {
             const res = await trackShopeeClick({ data: { slug: cleanSlug } })
             destinationUrl = res?.destinationUrl
           } catch (e) {
-            console.warn('Erro ao chamar trackShopeeClick (/arquivos):', e)
+            console.warn('Erro ao chamar trackShopeeClick (/loja):', e)
           }
         }
 
@@ -109,14 +109,14 @@ function ArquivosRedirectPage() {
             const { data: link } = await supabase
               .from('links')
               .select('*')
-              .or(`slug.ilike.${coreSlug},slug.ilike./${coreSlug},slug.ilike.loja/${coreSlug},slug.ilike./loja/${coreSlug},slug.ilike.arquivos/${coreSlug},slug.ilike./arquivos/${coreSlug},slug.ilike.${cleanSlug},slug.ilike./${cleanSlug}`)
+              .or(`slug.ilike.${coreSlug},slug.ilike./${coreSlug},slug.ilike.loja/${coreSlug},slug.ilike./loja/${coreSlug},slug.ilike.arquivos/${coreSlug},slug.ilike./arquivos/${coreSlug}`)
               .maybeSingle()
 
             if (link) {
               destinationUrl = (link as any)?.affiliate_url || (link as any)?.destination_url || (link as any)?.url_destino
             }
           } catch (dbErr) {
-            console.warn('Erro na busca de resgate no Supabase (/arquivos):', dbErr)
+            console.warn('Erro na busca de resgate no Supabase (/loja):', dbErr)
           }
         }
 
@@ -132,7 +132,7 @@ function ArquivosRedirectPage() {
         // Executa abertura automática no App Shopee com fallback web em 1.5s
         autoRedirectToShopee(destinationUrl)
       } catch (err) {
-        console.error('Erro no processamento do clique (/arquivos):', err)
+        console.error('Erro no processamento do clique (/loja):', err)
         window.location.replace('/')
       }
     }
