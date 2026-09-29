@@ -521,14 +521,20 @@ export const trackShopeeClick = createServerFn({ method: "POST" })
     // 2. Checagem 2 (Extração do IP da requisição):
     let clientIp = 'visitor';
     try {
-      const forwardedFor = getRequestHeader('x-forwarded-for');
-      const realIp = getRequestHeader('x-real-ip');
       const cfConnectingIp = getRequestHeader('cf-connecting-ip');
+      const trueClientIp = getRequestHeader('true-client-ip');
+      const xRealIp = getRequestHeader('x-real-ip');
+      const xForwardedFor = getRequestHeader('x-forwarded-for');
+      const xClientIp = getRequestHeader('x-client-ip');
+      const fastlyClientIp = getRequestHeader('fastly-client-ip');
       const h3Ip = getRequestIP({ xForwardedFor: true });
 
-      const extracted = (forwardedFor ? forwardedFor.split(',')[0].trim() : '') || realIp || cfConnectingIp || h3Ip;
-      if (extracted && extracted !== '::1' && extracted !== '127.0.0.1') {
-        clientIp = extracted;
+      const rawCandidate = cfConnectingIp || trueClientIp || xRealIp || (xForwardedFor ? xForwardedFor.split(',')[0].trim() : '') || xClientIp || fastlyClientIp || h3Ip;
+      if (rawCandidate) {
+        const cleanIp = String(rawCandidate).replace(/^::ffff:/i, '').trim();
+        if (cleanIp) {
+          clientIp = cleanIp;
+        }
       }
     } catch (e) {
       console.warn("Aviso ao extrair IP do cliente:", e);
@@ -587,11 +593,18 @@ export const trackShopeeClick = createServerFn({ method: "POST" })
           if (!hasCookie && !isBot && destinationUrl) {
             isValidClick = true;
             try {
+              const nowIso = new Date().toISOString();
               await Promise.allSettled([
                 supabaseAdmin.from("links").update({ clicks_count: ((link as any).clicks_count || 0) + 1 }).eq("id", link.id),
-                supabaseAdmin.from("clicks").insert({ link_id: link.id, ip_address: clientIp, slug: coreSlug }),
-                supabaseAdmin.from("link_clicks").insert({ link_id: link.id, ip_address: clientIp }),
-                supabaseAdmin.from("ip_cooldown" as any).upsert({ ip_address: clientIp, last_click_at: new Date().toISOString(), slug: coreSlug, link_id: link.id }),
+                supabaseAdmin.from("clicks").insert({ link_id: link.id, ip_address: clientIp, slug: coreSlug, clicked_at: nowIso }),
+                supabaseAdmin.from("link_clicks").insert({ link_id: link.id, ip_address: clientIp, created_at: nowIso }),
+                supabaseAdmin.from("ip_cooldown" as any).upsert({ 
+                  ip_address: clientIp, 
+                  last_click_at: nowIso, 
+                  slug: coreSlug, 
+                  link_id: link.id,
+                  user_id: (link as any).user_id
+                }),
               ]);
             } catch (_) {}
           }
