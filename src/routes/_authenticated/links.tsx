@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getUserLinks, createCustomLink, deleteLink, toggleLinkStatus, resetLinkClicks, getUserProfile, updateProfileDomain } from '@/lib/links.functions'
 import { getUserDomains } from '@/lib/domains.functions'
-import { PREDEFINED_DOMAINS, LINK_DOMAIN } from '@/lib/constants'
+import { PREDEFINED_DOMAINS, ADMIN_PREDEFINED_DOMAINS, LINK_DOMAIN } from '@/lib/constants'
+import { checkIsAdmin } from '@/lib/admin.functions'
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -88,20 +89,40 @@ function LinksPage() {
     queryFn: () => getUserDomains(),
   })
 
+  const { data: isAdmin } = useQuery({
+    queryKey: ['is-admin'],
+    queryFn: () => checkIsAdmin(),
+  })
+
+  const userEmail = profile && !('error' in profile) ? (profile.username || '').toLowerCase() : ''
+  const isMasterAdmin = Boolean(
+    isAdmin ||
+    (profile && !('error' in profile) && (profile as any).is_admin) ||
+    userEmail === 'ajpentretedimento@hotmail.com' ||
+    (profile && !('error' in profile) && (profile.subscription_type === 'lifetime' || profile.full_name?.toLowerCase() === 'ajp entretenimento'))
+  )
+
+  const adminDomains = isMasterAdmin ? ADMIN_PREDEFINED_DOMAINS : []
+  const basePredefined = [...PREDEFINED_DOMAINS, ...adminDomains]
+
+  const cleanDomain = (str: string) => (str || '').toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '').trim()
+
   const availableDomains = [
-    ...PREDEFINED_DOMAINS,
+    ...basePredefined,
     ...(domains || [])
-      .filter((d: any) => 
-        !d.domain?.includes('editaveisdocanva') && 
-        !d.domain?.includes('shopeerastreamento') &&
-        !d.domain?.includes('arquivos') &&
-        !d.domain?.includes('loja') &&
-        !PREDEFINED_DOMAINS.some((p) => p.domain === d.domain)
-      )
+      .filter((d: any) => {
+        const cleaned = cleanDomain(d.domain)
+        if (!isMasterAdmin) {
+          if (cleaned.includes('editaveisdocanva') || cleaned.includes('shopeerastreamento') || cleaned.includes('arquivos') || cleaned.includes('loja')) {
+            return false
+          }
+        }
+        return !basePredefined.some((p) => cleanDomain(p.domain) === cleaned)
+      })
       .map((d: any) => ({
         id: d.id,
-        domain: d.domain,
-        label: `https://${d.domain.replace(/^https?:\/\//, '')}`,
+        domain: cleanDomain(d.domain),
+        label: `https://${cleanDomain(d.domain)}`,
         is_primary: d.is_primary,
         verification_status: d.verification_status
       }))

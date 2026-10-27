@@ -58,6 +58,9 @@ export const createCustomLink = createServerFn({ method: "POST" })
       } else if (data.domainId === 'canva-arquivos' || data.domainId.includes('arquivos')) {
         customDomain = 'www.editaveisdocanva.com.br/arquivos';
         domainId = null;
+      } else if (data.domainId === 'platform-default' || data.domainId.includes('informacoeshoje')) {
+        customDomain = 'informacoeshoje.online';
+        domainId = null;
       } else {
         customDomain = data.domainId;
         domainId = null;
@@ -255,6 +258,7 @@ export const getUserProfile = createServerFn({ method: "GET" })
       subscription_expires_at: isMasterAdmin ? null : expDateStr,
       trial_expires_at: isMasterAdmin ? null : expDateStr,
       is_trial: isTrial,
+      is_admin: isMasterAdmin,
       created_at: profile?.created_at || authUser?.created_at || new Date().toISOString(),
       updated_at: profile?.updated_at || new Date().toISOString(),
     };

@@ -119,8 +119,8 @@ export interface FileRoutesByFullPath {
   '/quarentena': typeof AuthenticatedQuarentenaRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/arquivos/$slug': typeof ArquivosSlugRoute
-  '/arquivos/': typeof ArquivosIndexRoute
   '/loja/$slug': typeof LojaSlugRoute
+  '/arquivos/': typeof ArquivosIndexRoute
   '/loja/': typeof LojaIndexRoute
   '/admin/domains': typeof AuthenticatedAdminDomainsRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
@@ -135,8 +135,8 @@ export interface FileRoutesByTo {
   '/quarentena': typeof AuthenticatedQuarentenaRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/arquivos/$slug': typeof ArquivosSlugRoute
-  '/arquivos': typeof ArquivosIndexRoute
   '/loja/$slug': typeof LojaSlugRoute
+  '/arquivos': typeof ArquivosIndexRoute
   '/loja': typeof LojaIndexRoute
   '/admin/domains': typeof AuthenticatedAdminDomainsRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
@@ -154,8 +154,8 @@ export interface FileRoutesById {
   '/_authenticated/quarentena': typeof AuthenticatedQuarentenaRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/arquivos/$slug': typeof ArquivosSlugRoute
-  '/arquivos/': typeof ArquivosIndexRoute
   '/loja/$slug': typeof LojaSlugRoute
+  '/arquivos/': typeof ArquivosIndexRoute
   '/loja/': typeof LojaIndexRoute
   '/_authenticated/admin/domains': typeof AuthenticatedAdminDomainsRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
@@ -173,8 +173,8 @@ export interface FileRouteTypes {
     | '/quarentena'
     | '/settings'
     | '/arquivos/$slug'
-    | '/arquivos/'
     | '/loja/$slug'
+    | '/arquivos/'
     | '/loja/'
     | '/admin/domains'
     | '/admin/'
@@ -189,8 +189,8 @@ export interface FileRouteTypes {
     | '/quarentena'
     | '/settings'
     | '/arquivos/$slug'
-    | '/arquivos'
     | '/loja/$slug'
+    | '/arquivos'
     | '/loja'
     | '/admin/domains'
     | '/admin'
@@ -207,8 +207,8 @@ export interface FileRouteTypes {
     | '/_authenticated/quarentena'
     | '/_authenticated/settings'
     | '/arquivos/$slug'
-    | '/arquivos/'
     | '/loja/$slug'
+    | '/arquivos/'
     | '/loja/'
     | '/_authenticated/admin/domains'
     | '/_authenticated/admin/'
@@ -219,8 +219,8 @@ export interface RootRouteChildren {
   SlugRoute: typeof SlugRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   ArquivosSlugRoute: typeof ArquivosSlugRoute
-  ArquivosIndexRoute: typeof ArquivosIndexRoute
   LojaSlugRoute: typeof LojaSlugRoute
+  ArquivosIndexRoute: typeof ArquivosIndexRoute
   LojaIndexRoute: typeof LojaIndexRoute
 }
 
@@ -383,8 +383,8 @@ const rootRouteChildren: RootRouteChildren = {
   SlugRoute: SlugRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   ArquivosSlugRoute: ArquivosSlugRoute,
-  ArquivosIndexRoute: ArquivosIndexRoute,
   LojaSlugRoute: LojaSlugRoute,
+  ArquivosIndexRoute: ArquivosIndexRoute,
   LojaIndexRoute: LojaIndexRoute,
 }
 export const routeTree = rootRouteImport
