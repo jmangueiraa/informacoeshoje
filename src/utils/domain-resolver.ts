@@ -14,6 +14,8 @@ export async function resolveDomain(hostname: string): Promise<ResolvedDomain | 
   // 1. Se for o domínio principal da plataforma ou ambiente de desenvolvimento
   if (
     normalizedHost === platformDomainNormalized || 
+    normalizedHost === 'infomacoeshoje.online' ||
+    normalizedHost === 'informacoeshoje.online' || 
     normalizedHost === LINK_DOMAIN || 
     normalizedHost.includes('lovable.app') || 
     normalizedHost.includes('localhost') ||

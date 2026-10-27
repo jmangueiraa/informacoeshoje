@@ -240,7 +240,7 @@ function LinksPage() {
     const domainName = linkDomain?.domain || link.custom_domain || availableDomains[0]?.domain || "links.editaveisdocanva.com.br"
 
     if (domainName) {
-      const clean = domainName.replace(/^https?:\/\//, '').replace(/\/+$/, '')
+      let clean = domainName.replace(/^https?:\/\//, '').replace(/\/+$/, ''); if (clean === 'informacoeshoje.online') clean = 'infomacoeshoje.online';
       return `https://${clean}`
     }
     return window.location.origin

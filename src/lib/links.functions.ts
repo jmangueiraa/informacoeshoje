@@ -58,8 +58,8 @@ export const createCustomLink = createServerFn({ method: "POST" })
       } else if (data.domainId === 'canva-arquivos' || data.domainId.includes('arquivos')) {
         customDomain = 'www.editaveisdocanva.com.br/arquivos';
         domainId = null;
-      } else if (data.domainId === 'platform-default' || data.domainId.includes('informacoeshoje')) {
-        customDomain = 'informacoeshoje.online';
+      } else if (data.domainId === 'platform-default' || data.domainId.includes('infomacoeshoje') || data.domainId.includes('informacoeshoje')) {
+        customDomain = 'infomacoeshoje.online';
         domainId = null;
       } else {
         customDomain = data.domainId;

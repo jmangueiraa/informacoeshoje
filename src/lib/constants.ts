@@ -1,4 +1,4 @@
-export const PLATFORM_DOMAIN = "informacoeshoje.online";
+export const PLATFORM_DOMAIN = "infomacoeshoje.online";
 // Domínio padrão usado nos links curtos enviados aos clientes
 export const LINK_DOMAIN = "links.editaveisdocanva.com.br";
 export const PLATFORM_BASE_URL = `https://${PLATFORM_DOMAIN}`;
@@ -15,8 +15,8 @@ export const PREDEFINED_DOMAINS = [
   },
   {
     id: "platform-default",
-    domain: "informacoeshoje.online",
-    label: "informacoeshoje.online",
+    domain: "infomacoeshoje.online",
+    label: "infomacoeshoje.online",
     is_primary: false,
     verification_status: "verified"
   }
