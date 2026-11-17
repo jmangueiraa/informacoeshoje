@@ -13,6 +13,7 @@ export const getContacts = createServerFn({ method: "GET" })
       .from('contacts')
       .select('*')
       .eq('user_id', userId)
+      .neq('phone_normalized', '__queue_config__')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -78,6 +79,7 @@ export const saveContact = createServerFn({ method: "POST" })
       .from('contacts')
       .select('name')
       .eq('user_id', userId)
+      .neq('phone_normalized', '__queue_config__')
       .like('name', 'Cliente%')
       .order('name', { ascending: false })
       .limit(1);
@@ -332,6 +334,7 @@ export const updateContactRecord = createServerFn({ method: "POST" })
       .select('*')
       .eq('id', data.id)
       .eq('user_id', userId)
+      .neq('phone_normalized', '__queue_config__')
       .maybeSingle();
 
     if (fetchError) throw fetchError;
@@ -361,6 +364,7 @@ export const updateContactRecord = createServerFn({ method: "POST" })
       .update(patch)
       .eq('id', data.id)
       .eq('user_id', userId)
+      .neq('phone_normalized', '__queue_config__')
       .select()
       .single();
 
@@ -382,7 +386,7 @@ export const deleteAllContacts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context as any;
-    const { error } = await supabase.from('contacts').delete().eq('user_id', userId);
+    const { error } = await supabase.from('contacts').delete().eq('user_id', userId).neq('phone_normalized', '__queue_config__');
     if (error) throw error;
     return { ok: true };
   });

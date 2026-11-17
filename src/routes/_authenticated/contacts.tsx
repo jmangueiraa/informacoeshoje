@@ -74,8 +74,17 @@ import {
 } from "@/lib/contacts.functions";
 import { LINK_DOMAIN } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-
 import { useServerFn } from "@tanstack/react-start";
+import {
+  getEvolutionQueueState,
+  saveEvolutionSettings,
+  startEvolutionQueueAction,
+  pauseEvolutionQueueAction,
+  resumeEvolutionQueueAction,
+  stopEvolutionQueueAction,
+  skipEvolutionQueueContactAction,
+} from "@/lib/evolution.functions";
+import type { QueueState } from "@/lib/evolution.types";
 
 
 export const Route = createFileRoute("/_authenticated/contacts")({
@@ -138,6 +147,14 @@ function Index() {
   const [filterPending, setFilterPending] = useState(false);
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
   const [isDispatcherOpen, setIsDispatcherOpen] = useState(false);
+  const [isEvolutionSettingsOpen, setIsEvolutionSettingsOpen] = useState(false);
+  const [evolutionForm, setEvolutionForm] = useState({
+    apiUrl: "",
+    apiKey: "",
+    instanceName: "",
+  });
+  const [isQueueActionPending, setIsQueueActionPending] = useState(false);
+  const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
   const [dispatcherQueue, setDispatcherQueue] = useState<(Contact & { id: string })[]>([]);
   const [dispatcherIndex, setDispatcherIndex] = useState(0);
   const [affiliateUrl, setAffiliateUrl] = useState("");
@@ -172,6 +189,22 @@ Equipe Shopee!`
   const updateContactFn = useServerFn(updateContactRecord);
   const deleteContactFn = useServerFn(deleteContactRecord);
   const deleteAllContactsFn = useServerFn(deleteAllContacts);
+  const fetchQueueState = useServerFn(getEvolutionQueueState);
+  const saveEvolutionConfigFn = useServerFn(saveEvolutionSettings);
+  const startEvolutionQueueFn = useServerFn(startEvolutionQueueAction);
+  const pauseEvolutionQueueFn = useServerFn(pauseEvolutionQueueAction);
+  const resumeEvolutionQueueFn = useServerFn(resumeEvolutionQueueAction);
+  const stopEvolutionQueueFn = useServerFn(stopEvolutionQueueAction);
+  const skipEvolutionQueueFn = useServerFn(skipEvolutionQueueContactAction);
+
+  const {
+    data: queueData,
+    refetch: refetchQueueState,
+  } = useQuery<QueueState>({
+    queryKey: ["evolution-queue-state"],
+    queryFn: () => fetchQueueState(),
+    refetchInterval: isDispatcherOpen ? 3000 : 15000,
+  });
 
   // ===== Fonte única de verdade: banco de dados (sincroniza entre dispositivos) =====
   const {
@@ -290,6 +323,45 @@ Equipe Shopee!`
   useEffect(() => {
     localStorage.setItem("linkafiliado_batch_url", affiliateUrl);
   }, [affiliateUrl]);
+
+  // Sincroniza formulário da Evolution quando os dados do servidor chegam
+  useEffect(() => {
+    if (queueData) {
+      setEvolutionForm((prev) => ({
+        apiUrl: prev.apiUrl || queueData.evolutionApiUrl || "",
+        apiKey: prev.apiKey || "",
+        instanceName: prev.instanceName || queueData.evolutionInstanceName || "",
+      }));
+    }
+  }, [queueData]);
+
+  // Contagem regressiva em tempo real para o próximo envio
+  useEffect(() => {
+    if (!queueData?.nextRunAt || !queueData.isRunning || queueData.isPaused) {
+      setSecondsRemaining(null);
+      return;
+    }
+
+    const tick = () => {
+      const diff = Math.max(0, Math.floor((new Date(queueData.nextRunAt!).getTime() - Date.now()) / 1000));
+      setSecondsRemaining(diff);
+      if (diff === 0) {
+        refetchQueueState();
+        invalidateContacts();
+      }
+    };
+
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [queueData?.nextRunAt, queueData?.isRunning, queueData?.isPaused]);
+
+  const formatSeconds = (totalSeconds: number | null) => {
+    if (totalSeconds === null) return "--:--";
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
 
   const saveSettings = (key: string) => {
     localStorage.setItem("fototext_api_key", key);
@@ -428,6 +500,139 @@ Equipe Shopee!`
       advanceQueue();
     }
   };
+
+  const handleSaveEvolutionSettings = async () => {
+    if (!evolutionForm.apiUrl || !evolutionForm.instanceName) {
+      toast.error("Preencha a URL da API e o Nome da Instância.");
+      return;
+    }
+    try {
+      await saveEvolutionConfigFn({
+        data: {
+          apiUrl: evolutionForm.apiUrl,
+          apiKey: evolutionForm.apiKey,
+          instanceName: evolutionForm.instanceName,
+        }
+      });
+      await refetchQueueState();
+      setIsEvolutionSettingsOpen(false);
+      toast.success("Configurações da Evolution API salvas com sucesso!");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao salvar configurações da Evolution API.");
+    }
+  };
+
+  const handleStartAutoQueue = async () => {
+    if (!queueData?.evolutionConfigured && (!evolutionForm.apiUrl || !evolutionForm.apiKey || !evolutionForm.instanceName)) {
+      toast.error("Configure sua Evolution API antes de iniciar a fila automática.");
+      setIsEvolutionSettingsOpen(true);
+      return;
+    }
+
+    if (!affiliateUrl) {
+      toast.error("Informe a URL de Destino (SSA) da Loja antes de iniciar.");
+      return;
+    }
+
+    setIsQueueActionPending(true);
+    setIsDispatcherOpen(true);
+    try {
+      await startEvolutionQueueFn({
+        data: {
+          affiliateUrl,
+          msgTemplates,
+        }
+      });
+      await refetchQueueState();
+      await invalidateContacts();
+      toast.success("Fila de Envios 100% Automática iniciada!");
+    } catch (err: any) {
+      console.error("Erro ao iniciar fila:", err);
+      toast.error(err.message || "Erro ao iniciar fila automática.");
+    } finally {
+      setIsQueueActionPending(false);
+    }
+  };
+
+  const handlePauseResumeQueue = async () => {
+    setIsQueueActionPending(true);
+    try {
+      if (queueData?.isPaused) {
+        toast.info("Retomando fila automática...");
+        await resumeEvolutionQueueFn({});
+        toast.success("Fila retomada!");
+      } else {
+        toast.info("Pausando fila automática...");
+        await pauseEvolutionQueueFn({});
+        toast.warning("Fila pausada.");
+      }
+      await refetchQueueState();
+      await invalidateContacts();
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao alterar estado da fila.");
+    } finally {
+      setIsQueueActionPending(false);
+    }
+  };
+
+  const handleSkipQueueContact = async () => {
+    setIsQueueActionPending(true);
+    try {
+      toast.info("Pulando contato...");
+      await skipEvolutionQueueFn({});
+      await refetchQueueState();
+      await invalidateContacts();
+      toast.success("Contato pulado com sucesso!");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao pular contato.");
+    } finally {
+      setIsQueueActionPending(false);
+    }
+  };
+
+  const handleStopQueue = async () => {
+    setIsQueueActionPending(true);
+    try {
+      await stopEvolutionQueueFn({});
+      await refetchQueueState();
+      await invalidateContacts();
+      setIsDispatcherOpen(false);
+      toast.info("Fila automática encerrada.");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao encerrar fila.");
+    } finally {
+      setIsQueueActionPending(false);
+    }
+  };
+
+  const eligibleQueueContacts = useMemo(() => {
+    const now = new Date();
+    return extractedContacts.filter(c => {
+      if ((c as any).needs_review) return false;
+      const phone = normalizeContactPhone(c.phone);
+      if (phone.length !== 10 && phone.length !== 11) return false;
+      if ((c as any).unsubscribed) return false;
+      if (!c.lastContact) return true;
+      if (c.nextReminder && new Date(c.nextReminder) <= now) return true;
+      return false;
+    });
+  }, [extractedContacts, queueData?.totalEligible]);
+
+  const activeContact = useMemo(() => {
+    if (queueData?.currentContactId) {
+      const found = extractedContacts.find(c => c.id === queueData.currentContactId);
+      if (found) return found;
+    }
+    return eligibleQueueContacts[0] || extractedContacts[0];
+  }, [queueData?.currentContactId, extractedContacts, eligibleQueueContacts]);
+
+  const previewMessageText = useMemo(() => {
+    if (queueData?.currentContactPreview) return queueData.currentContactPreview;
+    if (activeContact) {
+      return getFormattedMessage(activeContact, !activeContact.lastContact);
+    }
+    return "Nenhum contato elegível no momento.";
+  }, [queueData?.currentContactPreview, activeContact, msgTemplates]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -962,13 +1167,48 @@ Equipe Shopee!`
                           Configurar Mensagens
                         </Button>
                         <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setIsEvolutionSettingsOpen(true)}
+                          className={cn(!queueData?.evolutionConfigured && "border-amber-500 text-amber-600 hover:text-amber-700")}
+                        >
+                          <Settings className="size-3 mr-2" /> 
+                          {queueData?.evolutionConfigured ? "Evolution API" : "Configurar Evolution"}
+                        </Button>
+                        <Button 
                           variant="default" 
                           size="sm" 
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                          onClick={startDispatcher}
+                          className={cn(
+                            queueData?.isRunning && !queueData?.isPaused
+                              ? "bg-amber-600 hover:bg-amber-700 text-white animate-pulse"
+                              : queueData?.isPaused
+                              ? "bg-amber-500 hover:bg-amber-600 text-white"
+                              : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                          )}
+                          onClick={() => {
+                            if (queueData?.isRunning) {
+                              setIsDispatcherOpen(true);
+                            } else {
+                              handleStartAutoQueue();
+                            }
+                          }}
                         >
-                          <Play className="size-3 mr-2" /> 
-                          Iniciar Fila de Envios ({pendingCount})
+                          {queueData?.isRunning && !queueData?.isPaused ? (
+                            <>
+                              <Loader2 className="size-3 mr-2 animate-spin" />
+                              Fila Ativa ({secondsRemaining !== null ? formatSeconds(secondsRemaining) : `${queueData?.dailySentCount ?? 0}/100`})
+                            </>
+                          ) : queueData?.isPaused ? (
+                            <>
+                              <Pause className="size-3 mr-2" />
+                              Fila Pausada ({queueData?.dailySentCount ?? 0}/100)
+                            </>
+                          ) : (
+                            <>
+                              <Play className="size-3 mr-2" /> 
+                              Iniciar Fila de Envios ({queueData?.totalEligible ?? pendingCount})
+                            </>
+                          )}
                         </Button>
                       </div>
                       <div className="flex gap-2">
@@ -1223,7 +1463,7 @@ Equipe Shopee!`
       </Dialog>
 
       <Dialog open={isDispatcherOpen} onOpenChange={setIsDispatcherOpen}>
-        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-none bg-transparent shadow-none">
+        <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden border-none bg-transparent shadow-none">
           <Card className="border shadow-2xl overflow-hidden">
             <div className="bg-primary p-6 text-primary-foreground">
               <div className="flex justify-between items-start mb-4">
@@ -1231,54 +1471,249 @@ Equipe Shopee!`
                   <h3 className="text-xl font-bold flex items-center gap-2">
                     <MessageSquare className="size-5" /> Fila de Envios
                   </h3>
-                  <p className="text-primary-foreground/70 text-xs">Modo Semi-automático</p>
+                  <p className="text-primary-foreground/80 text-xs flex items-center gap-1.5 mt-0.5">
+                    <Sparkles className="size-3" /> Modo 100% Automático (Evolution API)
+                  </p>
                 </div>
                 <Badge variant="outline" className="text-primary-foreground border-primary-foreground/30 bg-primary-foreground/10">
-                  {dispatcherIndex + 1} de {dispatcherQueue.length}
+                  {queueData?.dailySentCount ?? 0} de 100 hoje
                 </Badge>
               </div>
-              <Progress value={((dispatcherIndex + 1) / dispatcherQueue.length) * 100} className="h-2 bg-white/20" />
+              <Progress value={Math.min(100, (((queueData?.dailySentCount ?? 0)) / 100) * 100)} className="h-2 bg-white/20" />
             </div>
 
-            <div className="p-6 space-y-6 bg-background">
-              {dispatcherQueue[dispatcherIndex] && (
+            <div className="p-6 space-y-5 bg-background">
+              {/* Alerta se Evolution API não configurada */}
+              {!queueData?.evolutionConfigured && (
+                <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 space-y-2">
+                  <div className="flex items-center gap-2 font-semibold text-sm">
+                    <AlertCircle className="size-4 text-amber-600" />
+                    Evolution API não configurada
+                  </div>
+                  <p className="text-xs leading-relaxed">
+                    Para que as mensagens sejam enviadas sem intervenção manual, configure a URL, Chave de API e Instância.
+                  </p>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="w-full text-xs font-semibold border-amber-500/40"
+                    onClick={() => setIsEvolutionSettingsOpen(true)}
+                  >
+                    <Settings className="size-3.5 mr-1.5" /> Configurar Evolution API
+                  </Button>
+                </div>
+              )}
+
+              {/* Status e Indicadores */}
+              <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-muted/40 border">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground font-medium">Status:</span>
+                  {queueData?.isPaused ? (
+                    <Badge className="bg-amber-500/15 text-amber-600 border border-amber-500/30 gap-1 text-xs">
+                      <Pause className="size-3" /> Fila Pausada
+                    </Badge>
+                  ) : queueData?.currentStatus === "sending" ? (
+                    <Badge className="bg-blue-500/15 text-blue-600 border border-blue-500/30 gap-1 text-xs animate-pulse">
+                      <Loader2 className="size-3 animate-spin" /> Enviando...
+                    </Badge>
+                  ) : queueData?.currentStatus === "sent" ? (
+                    <Badge className="bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 gap-1 text-xs">
+                      <CheckCircle2 className="size-3" /> Enviado
+                    </Badge>
+                  ) : queueData?.currentStatus === "error" ? (
+                    <Badge className="bg-destructive/15 text-destructive border border-destructive/30 gap-1 text-xs">
+                      <AlertCircle className="size-3" /> Erro no Envio
+                    </Badge>
+                  ) : queueData?.isRunning ? (
+                    <Badge className="bg-primary/15 text-primary border border-primary/30 gap-1 text-xs">
+                      <Clock className="size-3" /> Aguardando Próximo Envio
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs">
+                      Pronta para Iniciar
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Tempo até o próximo envio */}
+                {queueData?.isRunning && !queueData?.isPaused && (
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+                    <Clock className="size-3.5" />
+                    <span>Próximo envio: {formatSeconds(secondsRemaining)}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Contadores */}
+              <div className="grid grid-cols-2 gap-3 text-center">
+                <div className="p-3 rounded-xl border bg-muted/20">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Mensagens Enviadas</p>
+                  <p className="text-xl font-bold text-foreground mt-0.5">{queueData?.dailySentCount ?? 0} <span className="text-xs font-normal text-muted-foreground">/ 100 hoje</span></p>
+                </div>
+                <div className="p-3 rounded-xl border bg-muted/20">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Mensagens Pendentes</p>
+                  <p className="text-xl font-bold text-foreground mt-0.5">{queueData?.totalEligible ?? pendingCount} <span className="text-xs font-normal text-muted-foreground">contatos</span></p>
+                </div>
+              </div>
+
+              {/* Mensagem de Erro se houver */}
+              {queueData?.currentError && (
+                <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-xs flex items-start gap-2">
+                  <AlertCircle className="size-4 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-semibold">Aviso de Envio:</p>
+                    <p className="leading-relaxed">{queueData.currentError}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Dados do Contato */}
+              {activeContact && (
                 <>
                   <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/30 border">
-                    <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                       <User className="size-6 text-primary" />
                     </div>
-                    <div>
-                      <h4 className="font-bold text-lg">{dispatcherQueue[dispatcherIndex].name}</h4>
-                      <p className="text-muted-foreground text-sm">{dispatcherQueue[dispatcherIndex].phone}</p>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-bold text-base truncate">{activeContact.name}</h4>
+                      <p className="text-muted-foreground text-sm">{activeContact.phone}</p>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Pré-visualização da Mensagem</Label>
-                    <div className="p-4 rounded-xl bg-muted/20 border text-sm italic whitespace-pre-wrap leading-relaxed">
-                      {getFormattedMessage(dispatcherQueue[dispatcherIndex], !dispatcherQueue[dispatcherIndex].lastContact)}
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">Pré-visualização da Mensagem</Label>
+                      <span className="text-[11px] text-muted-foreground">Intervalo de 10 min entre envios</span>
+                    </div>
+                    <div className="p-4 rounded-xl bg-muted/20 border text-sm italic whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+                      {previewMessageText}
                     </div>
                   </div>
                 </>
               )}
 
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <Button variant="outline" className="w-full" onClick={advanceQueue}>
-                  <SkipForward className="size-4 mr-2" /> Pular
+              {/* Botões de Ação */}
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={handleSkipQueueContact}
+                  disabled={isQueueActionPending || !queueData?.isRunning}
+                >
+                  <SkipForward className="size-4 mr-2" /> Pular Contato
                 </Button>
-                <Button variant="outline" className="w-full" onClick={() => setIsDispatcherOpen(false)}>
-                  <StopCircle className="size-4 mr-2" /> Encerrar
+                <Button 
+                  variant="outline" 
+                  className="w-full text-destructive hover:text-destructive" 
+                  onClick={handleStopQueue}
+                  disabled={isQueueActionPending}
+                >
+                  <StopCircle className="size-4 mr-2" /> Encerrar Fila
                 </Button>
               </div>
               
-              <Button 
-                className="w-full h-14 text-lg font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20"
-                onClick={handleQueueSend}
-              >
-                Abrir WhatsApp e Avançar <ChevronRight className="size-5 ml-2" />
-              </Button>
+              {/* Botão Principal Automatizado */}
+              {queueData?.isRunning && !queueData?.isPaused ? (
+                <Button 
+                  className="w-full h-14 text-base font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-lg shadow-amber-500/20"
+                  onClick={handlePauseResumeQueue}
+                  disabled={isQueueActionPending}
+                >
+                  {isQueueActionPending ? (
+                    <Loader2 className="size-5 mr-2 animate-spin" />
+                  ) : (
+                    <Pause className="size-5 mr-2" />
+                  )}
+                  Pausar Fila Automática ({secondsRemaining !== null ? `Próximo em ${formatSeconds(secondsRemaining)}` : 'Ativa'})
+                </Button>
+              ) : queueData?.isPaused ? (
+                <Button 
+                  className="w-full h-14 text-base font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20"
+                  onClick={handlePauseResumeQueue}
+                  disabled={isQueueActionPending}
+                >
+                  {isQueueActionPending ? (
+                    <Loader2 className="size-5 mr-2 animate-spin" />
+                  ) : (
+                    <Play className="size-5 mr-2" />
+                  )}
+                  Retomar Fila Automática
+                </Button>
+              ) : (
+                <Button 
+                  className="w-full h-14 text-base font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20"
+                  onClick={handleStartAutoQueue}
+                  disabled={isQueueActionPending || (pendingCount === 0 && (queueData?.totalEligible ?? 0) === 0)}
+                >
+                  {isQueueActionPending ? (
+                    <Loader2 className="size-5 mr-2 animate-spin" />
+                  ) : (
+                    <Play className="size-5 mr-2" />
+                  )}
+                  Iniciar Fila 100% Automática
+                </Button>
+              )}
             </div>
           </Card>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de Configuração da Evolution API */}
+      <Dialog open={isEvolutionSettingsOpen} onOpenChange={setIsEvolutionSettingsOpen}>
+        <DialogContent className="sm:max-w-md p-6">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+              <Settings className="size-5 text-primary" /> Configurar Evolution API
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Configure sua instância da Evolution API para envio 100% automático das mensagens pelo servidor.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="evolution-url">URL da Evolution API</Label>
+              <Input
+                id="evolution-url"
+                placeholder="https://sua-evolution-api.com"
+                value={evolutionForm.apiUrl}
+                onChange={(e) => setEvolutionForm((prev) => ({ ...prev, apiUrl: e.target.value }))}
+              />
+              <p className="text-[11px] text-muted-foreground">Exemplo: https://api.seudominio.com (sem barra no final)</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="evolution-instance">Nome da Instância</Label>
+              <Input
+                id="evolution-instance"
+                placeholder="Ex: shopee-atendimento"
+                value={evolutionForm.instanceName}
+                onChange={(e) => setEvolutionForm((prev) => ({ ...prev, instanceName: e.target.value }))}
+              />
+              <p className="text-[11px] text-muted-foreground">O nome da instância conectada ao WhatsApp na Evolution API</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="evolution-key">Chave de API (API Key)</Label>
+              <Input
+                id="evolution-key"
+                type="password"
+                placeholder={queueData?.evolutionApiKeyMasked ? `Configurada (${queueData.evolutionApiKeyMasked}) - digite para alterar` : "Digite a API Key"}
+                value={evolutionForm.apiKey}
+                onChange={(e) => setEvolutionForm((prev) => ({ ...prev, apiKey: e.target.value }))}
+              />
+              <p className="text-[11px] text-muted-foreground">Sua Global API Key ou Instance Token. Não é exposta publicamente.</p>
+            </div>
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button variant="outline" onClick={() => setIsEvolutionSettingsOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEvolutionSettings} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              Salvar Configurações
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       

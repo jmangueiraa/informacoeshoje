@@ -1,4 +1,11 @@
 import "./lib/error-capture";
+import { initQueueBackgroundWorker } from "./lib/evolution.server";
+
+try {
+  initQueueBackgroundWorker();
+} catch (e) {
+  console.warn("Evolution worker init notice:", e);
+}
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
