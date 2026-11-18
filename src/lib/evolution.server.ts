@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { normalizeContactPhone } from "./phone";
+import { normalizeContactPhone, VALID_BRAZILIAN_DDDS } from "./phone";
 import { LINK_DOMAIN } from "./constants";
 import type { EvolutionConfig, QueueState } from "./evolution.types";
 
@@ -21,6 +21,44 @@ export function getSaoPauloDateString(date: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+export function validateAndNormalizeWhatsAppPhone(phone: string): { normalized: string; error?: string } {
+  let digits = String(phone || '').replace(/\D/g, '');
+  if (digits.startsWith('55') && digits.length >= 12) {
+    digits = digits.slice(2);
+  }
+  while (digits.startsWith('0') && digits.length > 10) {
+    digits = digits.slice(1);
+  }
+
+  // Se tiver 10 dígitos (ex: 16 8876-3790), insere o 9 se for celular brasileiro (começa com 6, 7, 8 ou 9)
+  if (digits.length === 10) {
+    const ddd = digits.slice(0, 2);
+    const thirdDigit = digits.slice(2, 3);
+    if (VALID_BRAZILIAN_DDDS.has(ddd) && ['6', '7', '8', '9'].includes(thirdDigit)) {
+      digits = `${ddd}9${digits.slice(2)}`;
+    }
+  }
+
+  const ddd = digits.slice(0, 2);
+  if (!VALID_BRAZILIAN_DDDS.has(ddd)) {
+    return {
+      normalized: `55${digits}`,
+      error: `O DDD (${ddd}) não existe no Brasil. Verifique o número digitado.`,
+    };
+  }
+
+  if (digits.length !== 10 && digits.length !== 11) {
+    return {
+      normalized: `55${digits}`,
+      error: `Telefone com quantidade inválida de dígitos (${digits.length}). Celulares no Brasil possuem DDD + 9 dígitos (11 dígitos).`,
+    };
+  }
+
+  return {
+    normalized: `55${digits}`,
+  };
+}
+
 /**
  * Envia mensagem de texto via Evolution API
  */
@@ -37,13 +75,11 @@ export async function sendEvolutionTextMessage(params: {
     throw new Error("Evolution API não configurada. Preencha URL, Chave de API e Nome da Instância.");
   }
 
-  // Sanitização e normalização do telefone (somente dígitos com DDI 55)
-  const cleanDigits = phone.replace(/\D/g, '');
-  const normalizedPhone = cleanDigits.startsWith('55') ? cleanDigits : `55${cleanDigits}`;
-
-  if (normalizedPhone.length < 12 || normalizedPhone.length > 13) {
-    throw new Error(`Número de telefone inválido para envio: ${phone} (normalizado: ${normalizedPhone})`);
+  const validation = validateAndNormalizeWhatsAppPhone(phone);
+  if (validation.error) {
+    throw new Error(validation.error);
   }
+  const normalizedPhone = validation.normalized;
 
   const cleanBaseUrl = apiUrl.trim().replace(/\/+$/, '');
   const endpoint = `${cleanBaseUrl}/message/sendText/${encodeURIComponent(instanceName.trim())}`;
@@ -80,13 +116,28 @@ export async function sendEvolutionTextMessage(params: {
     }
 
     if (!response.ok) {
-      const errDetail = responseData?.message || responseData?.error || response.statusText || responseText;
+      let errDetail = "";
+      if (Array.isArray(responseData?.response?.message)) {
+        errDetail = responseData.response.message.join(", ");
+      } else if (typeof responseData?.response?.message === "string") {
+        errDetail = responseData.response.message;
+      } else if (Array.isArray(responseData?.message)) {
+        errDetail = responseData.message.join(", ");
+      } else if (typeof responseData?.message === "string") {
+        errDetail = responseData.message;
+      } else if (responseData?.error) {
+        errDetail = typeof responseData.error === "string" ? responseData.error : JSON.stringify(responseData.error);
+      } else {
+        errDetail = response.statusText || responseText;
+      }
       console.error(`[EVOLUTION-API] Erro HTTP ${response.status}:`, errDetail);
       throw new Error(`Evolution API retornou erro ${response.status}: ${errDetail}`);
     }
 
     if (responseData?.status === "ERROR" || responseData?.error) {
-      const errDetail = responseData?.message || responseData?.error;
+      const errDetail = Array.isArray(responseData?.message)
+        ? responseData.message.join(", ")
+        : (responseData?.message || responseData?.error);
       console.error(`[EVOLUTION-API] Erro no corpo da resposta:`, errDetail);
       throw new Error(`Falha no envio da Evolution API: ${errDetail}`);
     }
@@ -427,6 +478,35 @@ export async function executeQueueTick(
     const found = eligibleContacts.find((c: any) => c.id === options.forceContactId);
     if (found) targetContact = found;
   } else if (options?.skipCurrent && config.current_contact_id) {
+    const skippedContact = eligibleContacts.find((c: any) => c.id === config.current_contact_id);
+    if (skippedContact) {
+      const skippedRaw = (skippedContact.raw_data && typeof skippedContact.raw_data === 'object') ? skippedContact.raw_data : {};
+      await supabase
+        .from("contacts")
+        .update({
+          last_send: new Date().toISOString(),
+          raw_data: {
+            ...skippedRaw,
+            status: "skipped",
+            nextReminder: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          },
+        })
+        .eq("id", skippedContact.id);
+    }
+    const remaining = eligibleContacts.filter((c: any) => c.id !== config.current_contact_id);
+    if (remaining.length > 0) {
+      targetContact = remaining[0];
+    } else {
+      const updated = await saveQueueConfigRow(supabase, userId, {
+        is_running: false,
+        current_status: "idle",
+        current_error: null,
+        current_contact_id: null,
+        next_run_at: null,
+      });
+      return buildQueueStateResponse(updated, 0, dailySentCount, dailySentDate);
+    }
+  } else if (config.current_status === "error" && config.current_contact_id) {
     const currentIndex = eligibleContacts.findIndex((c: any) => c.id === config.current_contact_id);
     if (currentIndex >= 0 && currentIndex < eligibleContacts.length - 1) {
       targetContact = eligibleContacts[currentIndex + 1];
@@ -551,12 +631,24 @@ export async function executeQueueTick(
 
     return buildQueueStateResponse(updatedConfig, totalEligible - 1, dailySentCount, dailySentDate);
   } else {
-    // ERRO: Registra tentativa e erro, NÃO marca como confirmado, aguarda 10 minutos antes do próximo
+    // ERRO: Registra tentativa e erro
+    const attempts = (Number(rawData.attempts) || 0) + 1;
+    // Erros fatais (400 Bad Request, DDD inexistente, número não registrado no WhatsApp ou 2+ tentativas)
+    const isFatal = attempts >= 2 || Boolean(sendError && (
+      sendError.includes("400") ||
+      sendError.includes("Bad Request") ||
+      sendError.includes("DDD") ||
+      sendError.includes("inválido") ||
+      sendError.includes("not registered") ||
+      sendError.includes("não existe")
+    ));
+
     const updatedRaw = {
       ...rawData,
       status: "error",
       last_error: sendError,
-      attempts: (Number(rawData.attempts) || 0) + 1,
+      attempts,
+      ...(isFatal ? { nextReminder: nextReminder.toISOString(), fatal_error: true } : {}),
       history: [
         ...existingHistory,
         {
@@ -571,6 +663,7 @@ export async function executeQueueTick(
       .from("contacts")
       .update({
         raw_data: updatedRaw,
+        ...(isFatal ? { last_send: sendTimestamp.toISOString() } : {}),
       })
       .eq("id", targetContact.id);
 
@@ -587,7 +680,7 @@ export async function executeQueueTick(
       daily_sent_date: dailySentDate,
     });
 
-    return buildQueueStateResponse(updatedConfig, totalEligible, dailySentCount, dailySentDate);
+    return buildQueueStateResponse(updatedConfig, isFatal ? totalEligible - 1 : totalEligible, dailySentCount, dailySentDate);
   }
   } finally {
     queueProcessingLocks.delete(userId);
