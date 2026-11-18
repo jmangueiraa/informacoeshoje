@@ -66,15 +66,6 @@ export const getEvolutionQueueState = createServerFn({ method: "GET" })
 
     const totalEligible = eligibleContacts.length;
 
-    // Se a fila estiver ativa e o próximo envio já venceu (ou está atrasado), avança automaticamente para o próximo contato!
-    if (config.is_running && !config.is_paused && config.next_run_at) {
-      const nextRun = new Date(config.next_run_at);
-      if (nextRun <= now) {
-        console.log(`[EVOLUTION-QUEUE] Horário atingido (${config.next_run_at}). Executando próximo envio...`);
-        return executeQueueTick(supabase, userId);
-      }
-    }
-
     const key = config.evolution_api_key || "";
     const maskedKey = key ? `••••••••${key.slice(-4)}` : "";
 
@@ -229,21 +220,24 @@ export const stopEvolutionQueueAction = createServerFn({ method: "POST" })
   });
 
 /**
- * Pula o contato atual e avança para o próximo
+ * Pula o contato atual e avança para o próximo imediatamente
  */
 export const skipEvolutionQueueContactAction = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context as any;
-    return executeQueueTick(supabase, userId, { skipCurrent: true });
+    return executeQueueTick(supabase, userId, { skipCurrent: true, immediate: true });
   });
 
 /**
- * Dispara o próximo ciclo da fila quando o tempo de 10 minutos se esgota
+ * Dispara o próximo ciclo da fila quando o tempo de 10 minutos se esgota (ou forçado pelo usuário)
  */
 export const executeNextQueueTickAction = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((data: any) => z.object({
+    immediate: z.boolean().optional(),
+  }).optional().parse(data))
+  .handler(async ({ data, context }) => {
     const { supabase, userId } = context as any;
-    return executeQueueTick(supabase, userId);
+    return executeQueueTick(supabase, userId, { immediate: data?.immediate ?? true });
   });

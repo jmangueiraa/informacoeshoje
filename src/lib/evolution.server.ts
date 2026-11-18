@@ -87,7 +87,7 @@ export async function sendEvolutionTextMessage(params: {
   console.log(`[EVOLUTION-API] Enviando mensagem para ${normalizedPhone} via ${endpoint}`);
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
   try {
     const response = await fetch(endpoint, {
@@ -99,7 +99,7 @@ export async function sendEvolutionTextMessage(params: {
       body: JSON.stringify({
         number: normalizedPhone,
         text: message,
-        delay: 1200,
+        delay: 0,
         linkPreview: false,
       }),
       signal: controller.signal,
@@ -352,7 +352,7 @@ export async function saveQueueConfigRow(supabase: any, userId: string, patch: a
   return updated;
 }
 
-const queueProcessingLocks = new Set<string>();
+const queueProcessingLocks = new Map<string, number>();
 
 /**
  * Executa um ciclo (tick) da fila automática
@@ -360,7 +360,7 @@ const queueProcessingLocks = new Set<string>();
 export async function executeQueueTick(
   supabase: any,
   userId: string,
-  options?: { forceContactId?: string; skipCurrent?: boolean }
+  options?: { forceContactId?: string; skipCurrent?: boolean; immediate?: boolean }
 ): Promise<QueueState> {
   const now = new Date();
   const todayInSP = getSaoPauloDateString(now);
@@ -376,13 +376,15 @@ export async function executeQueueTick(
     dailySentDate = todayInSP;
   }
 
-  // Previne processamento simultâneo/concorrente para o mesmo usuário
-  if (queueProcessingLocks.has(userId)) {
+  // Previne processamento simultâneo/concorrente para o mesmo usuário com TTL de 20 segundos
+  const nowMs = Date.now();
+  const lockTime = queueProcessingLocks.get(userId);
+  if (lockTime && (nowMs - lockTime) < 20000) {
     console.log(`[EVOLUTION-QUEUE] Processamento já em andamento para o usuário ${userId}. Ignorando tick concorrente.`);
     return buildQueueStateResponse(config, 0, dailySentCount, dailySentDate);
   }
 
-  queueProcessingLocks.add(userId);
+  queueProcessingLocks.set(userId, nowMs);
   try {
 
   // 2. Se a fila estiver pausada ou encerrada, retorna estado
@@ -390,10 +392,11 @@ export async function executeQueueTick(
     return buildQueueStateResponse(config, 0, dailySentCount, dailySentDate);
   }
 
-  // Se ainda estiver aguardando o intervalo de 10 min e não for um comando explícito (pular ou forçar)
-  if (!options?.forceContactId && !options?.skipCurrent && config.next_run_at) {
+  // Se ainda estiver aguardando o intervalo de 10 min e não for um comando explícito (pular, forçar ou imediato)
+  if (!options?.forceContactId && !options?.skipCurrent && !options?.immediate && config.next_run_at) {
     const nextRun = new Date(config.next_run_at);
-    if (nextRun.getTime() - now.getTime() > 3000) {
+    // Margem de tolerância de até 15s para diferenças de relógio entre cliente e servidor
+    if (nextRun.getTime() - now.getTime() > 15000) {
       console.log(`[EVOLUTION-QUEUE] Aguardando intervalo de 10 min. Próximo envio em ${config.next_run_at}`);
       return buildQueueStateResponse(config, 0, dailySentCount, dailySentDate);
     }

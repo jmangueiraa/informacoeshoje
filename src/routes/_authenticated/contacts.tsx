@@ -56,6 +56,7 @@ import {
   MessageSquare,
   Play,
   SkipForward,
+  FastForward,
   Pause,
   StopCircle,
   ChevronRight,
@@ -63,7 +64,7 @@ import {
   EyeOff
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { normalizeContactPhone } from "@/lib/phone";
+import { normalizeContactPhone, isValidBrazilianContactPhone } from "@/lib/phone";
 import { processarTextoComGemini } from "@/lib/gemini-ocr.functions";
 import Tesseract from 'tesseract.js';
 import { createTrackingLink, ensureTrackingLink, getUserProfile } from "@/lib/links.functions";
@@ -158,6 +159,7 @@ function Index() {
   });
   const [showApiKey, setShowApiKey] = useState(false);
   const [isQueueActionPending, setIsQueueActionPending] = useState(false);
+  const [isAdvancingQueue, setIsAdvancingQueue] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
   const [dispatcherQueue, setDispatcherQueue] = useState<(Contact & { id: string })[]>([]);
   const [dispatcherIndex, setDispatcherIndex] = useState(0);
@@ -382,18 +384,23 @@ Equipe Shopee!`
       // Quando o cronômetro atinge 0 segundos (10 minutos transcorridos), dispara automaticamente o próximo contato da fila
       if (diff === 0 && !isExecutingTickRef.current) {
         isExecutingTickRef.current = true;
+        setIsAdvancingQueue(true);
         try {
           console.log("[AUTO-QUEUE] 10 minutos transcorridos! Executando envio do próximo contato...");
-          await executeNextTickFn({});
+          const res = await executeNextTickFn({ data: { immediate: true } });
+          if (res) {
+            queryClient.setQueryData(["evolution-queue-state"], res);
+          }
           await refetchQueueState();
           await invalidateContacts();
         } catch (err) {
           console.error("Erro ao avançar envio automático da fila:", err);
           await refetchQueueState();
         } finally {
+          setIsAdvancingQueue(false);
           setTimeout(() => {
             isExecutingTickRef.current = false;
-          }, 4000);
+          }, 3000);
         }
       }
     };
@@ -695,7 +702,10 @@ Equipe Shopee!`;
     setIsQueueActionPending(true);
     try {
       toast.info("Pulando contato...");
-      await skipEvolutionQueueFn({});
+      const res = await skipEvolutionQueueFn({});
+      if (res) {
+        queryClient.setQueryData(["evolution-queue-state"], res);
+      }
       await refetchQueueState();
       await invalidateContacts();
       toast.success("Contato pulado com sucesso!");
@@ -703,6 +713,25 @@ Equipe Shopee!`;
       toast.error(err.message || "Erro ao pular contato.");
     } finally {
       setIsQueueActionPending(false);
+    }
+  };
+
+  const handleForceNextContact = async () => {
+    setIsAdvancingQueue(true);
+    try {
+      toast.info("Enviando próximo contato da fila...");
+      const res = await executeNextTickFn({ data: { immediate: true } });
+      if (res) {
+        queryClient.setQueryData(["evolution-queue-state"], res);
+      }
+      await refetchQueueState();
+      await invalidateContacts();
+      toast.success("Envio do próximo contato processado!");
+    } catch (err: any) {
+      console.error("Erro ao avançar fila:", err);
+      toast.error(err.message || "Erro ao avançar para o próximo contato.");
+    } finally {
+      setIsAdvancingQueue(false);
     }
   };
 
@@ -726,7 +755,7 @@ Equipe Shopee!`;
     return extractedContacts.filter(c => {
       if ((c as any).needs_review) return false;
       const phone = normalizeContactPhone(c.phone);
-      if (phone.length !== 10 && phone.length !== 11) return false;
+      if (!isValidBrazilianContactPhone(phone)) return false;
       if ((c as any).unsubscribed) return false;
       if (!c.lastContact) return true;
       if (c.nextReminder && new Date(c.nextReminder) <= now) return true;
@@ -735,20 +764,32 @@ Equipe Shopee!`;
   }, [extractedContacts, queueData?.totalEligible]);
 
   const activeContact = useMemo(() => {
+    // Se a fila está em execução e o último contato já foi enviado com sucesso,
+    // ou se o cronômetro zerou / está avançando, exibimos o próximo da fila!
+    if (queueData?.isRunning && (queueData?.currentStatus === "sent" || isAdvancingQueue || secondsRemaining === 0)) {
+      const nextInLine = eligibleQueueContacts.find(c => c.id !== queueData.currentContactId);
+      if (nextInLine) return nextInLine;
+    }
+
     if (queueData?.currentContactId) {
       const found = extractedContacts.find(c => c.id === queueData.currentContactId);
       if (found) return found;
     }
     return eligibleQueueContacts[0] || extractedContacts[0];
-  }, [queueData?.currentContactId, extractedContacts, eligibleQueueContacts]);
+  }, [queueData?.currentContactId, queueData?.currentStatus, queueData?.isRunning, isAdvancingQueue, secondsRemaining, extractedContacts, eligibleQueueContacts]);
 
   const previewMessageText = useMemo(() => {
+    if (queueData?.isRunning && (queueData?.currentStatus === "sent" || isAdvancingQueue || secondsRemaining === 0)) {
+      if (activeContact) {
+        return getFormattedMessage(activeContact, !activeContact.lastContact);
+      }
+    }
     if (queueData?.currentContactPreview) return queueData.currentContactPreview;
     if (activeContact) {
       return getFormattedMessage(activeContact, !activeContact.lastContact);
     }
     return "Nenhum contato elegível no momento.";
-  }, [queueData?.currentContactPreview, activeContact, msgTemplates]);
+  }, [queueData?.currentContactPreview, queueData?.currentStatus, queueData?.isRunning, isAdvancingQueue, secondsRemaining, activeContact, msgTemplates]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1628,6 +1669,10 @@ Equipe Shopee!`;
                     <Badge className="bg-amber-500/15 text-amber-600 border border-amber-500/30 gap-1 text-xs">
                       <Pause className="size-3" /> Fila Pausada
                     </Badge>
+                  ) : isAdvancingQueue || (queueData?.isRunning && secondsRemaining === 0) ? (
+                    <Badge className="bg-blue-500/15 text-blue-600 border border-blue-500/30 gap-1 text-xs animate-pulse">
+                      <Loader2 className="size-3 animate-spin" /> Enviando Próximo Contato...
+                    </Badge>
                   ) : queueData?.currentStatus === "sending" ? (
                     <Badge className="bg-blue-500/15 text-blue-600 border border-blue-500/30 gap-1 text-xs animate-pulse">
                       <Loader2 className="size-3 animate-spin" /> Enviando...
@@ -1655,7 +1700,9 @@ Equipe Shopee!`;
                 {queueData?.isRunning && !queueData?.isPaused && (
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
                     <Clock className="size-3.5" />
-                    <span>Próximo envio: {formatSeconds(secondsRemaining)}</span>
+                    <span>
+                      {isAdvancingQueue || secondsRemaining === 0 ? "Avançando agora..." : `Próximo envio: ${formatSeconds(secondsRemaining)}`}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1691,7 +1738,14 @@ Equipe Shopee!`;
                       <User className="size-6 text-primary" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h4 className="font-bold text-base truncate">{activeContact.name}</h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-base truncate">{activeContact.name}</h4>
+                        {queueData?.isRunning && queueData?.currentStatus === "sent" && secondsRemaining !== null && secondsRemaining > 0 && (
+                          <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 text-muted-foreground border-dashed">
+                            Próximo da fila
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-muted-foreground text-sm">{activeContact.phone}</p>
                     </div>
                   </div>
@@ -1730,18 +1784,44 @@ Equipe Shopee!`;
               
               {/* Botão Principal Automatizado */}
               {queueData?.isRunning && !queueData?.isPaused ? (
-                <Button 
-                  className="w-full h-14 text-base font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-lg shadow-amber-500/20"
-                  onClick={handlePauseResumeQueue}
-                  disabled={isQueueActionPending}
-                >
-                  {isQueueActionPending ? (
-                    <Loader2 className="size-5 mr-2 animate-spin" />
+                <div className="space-y-2">
+                  {secondsRemaining === 0 || isAdvancingQueue ? (
+                    <Button 
+                      className="w-full h-14 text-base font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20"
+                      onClick={handleForceNextContact}
+                      disabled={isAdvancingQueue || isQueueActionPending}
+                    >
+                      <Loader2 className="size-5 mr-2 animate-spin" />
+                      Enviando próximo contato...
+                    </Button>
                   ) : (
-                    <Pause className="size-5 mr-2" />
+                    <Button 
+                      className="w-full h-14 text-base font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-lg shadow-amber-500/20"
+                      onClick={handlePauseResumeQueue}
+                      disabled={isQueueActionPending || isAdvancingQueue}
+                    >
+                      {isQueueActionPending ? (
+                        <Loader2 className="size-5 mr-2 animate-spin" />
+                      ) : (
+                        <Pause className="size-5 mr-2" />
+                      )}
+                      Pausar Fila Automática ({secondsRemaining !== null ? `Próximo em ${formatSeconds(secondsRemaining)}` : 'Ativa'})
+                    </Button>
                   )}
-                  Pausar Fila Automática ({secondsRemaining !== null ? `Próximo em ${formatSeconds(secondsRemaining)}` : 'Ativa'})
-                </Button>
+
+                  {secondsRemaining !== null && secondsRemaining > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-xs text-muted-foreground hover:text-foreground"
+                      onClick={handleForceNextContact}
+                      disabled={isAdvancingQueue || isQueueActionPending}
+                    >
+                      <FastForward className="size-3.5 mr-1.5 text-primary" />
+                      Enviar Próximo Contato Agora (sem aguardar 10 min)
+                    </Button>
+                  )}
+                </div>
               ) : queueData?.isPaused ? (
                 <Button 
                   className="w-full h-14 text-base font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20"
