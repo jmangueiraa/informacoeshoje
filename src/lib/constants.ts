@@ -1,16 +1,23 @@
 export const PLATFORM_DOMAIN = "infomacoeshoje.online";
 // Domínio padrão usado nos links curtos enviados aos clientes
-export const LINK_DOMAIN = "links.editaveisdocanva.com.br";
+export const LINK_DOMAIN = "www.shopeerastreamento.com.br";
 export const PLATFORM_BASE_URL = `https://${PLATFORM_DOMAIN}`;
 export const PLATFORM_NAME = "LinkAfiliado";
 
 // Domínios disponíveis no criador de links para todos os usuários
 export const PREDEFINED_DOMAINS = [
   {
+    id: "shopee-rastreamento",
+    domain: "www.shopeerastreamento.com.br",
+    label: "www.shopeerastreamento.com.br (Principal)",
+    is_primary: true,
+    verification_status: "verified"
+  },
+  {
     id: "canva-links",
     domain: "links.editaveisdocanva.com.br",
-    label: "links.editaveisdocanva.com.br (Principal)",
-    is_primary: true,
+    label: "links.editaveisdocanva.com.br",
+    is_primary: false,
     verification_status: "verified"
   },
   {

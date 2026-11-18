@@ -133,7 +133,7 @@ function LinksPage() {
     if (isCreateOpen) {
       setNewLink(prev => ({ 
         ...prev, 
-        domain_id: prev.domain_id && prev.domain_id !== 'platform-default' ? prev.domain_id : 'canva-links' 
+        domain_id: prev.domain_id && prev.domain_id !== 'platform-default' ? prev.domain_id : (availableDomains[0]?.id || 'shopee-rastreamento') 
       }))
     }
   }, [isCreateOpen])
@@ -176,7 +176,7 @@ function LinksPage() {
             affiliateUrl: data.affiliate_url,
             slug: data.slug,
             title: data.title || undefined,
-            domainId: data.domain_id || 'canva-links'
+            domainId: data.domain_id || (availableDomains[0]?.id || 'shopee-rastreamento')
           }
         });
         return result;
@@ -192,7 +192,7 @@ function LinksPage() {
         queryClient.invalidateQueries({ queryKey: ['user-links'] })
         toast.success("Link criado com sucesso!")
         setIsCreateOpen(false)
-        setNewLink({ title: '', slug: '', affiliate_url: '', domain_id: 'canva-links' })
+        setNewLink({ title: '', slug: '', affiliate_url: '', domain_id: (availableDomains[0]?.id || 'shopee-rastreamento') })
       }
     },
     onError: (error: any) => {
@@ -237,7 +237,8 @@ function LinksPage() {
   // Resolve a URL base do link: domínio escolhido na criação > custom_domain > padrão links.editaveisdocanva.com.br
   const getLinkBaseUrl = (link: any) => {
     const linkDomain = link.domain_id ? availableDomains.find((d: any) => d.id === link.domain_id) : null
-    const domainName = linkDomain?.domain || link.custom_domain || availableDomains[0]?.domain || "links.editaveisdocanva.com.br"
+    let domainName = linkDomain?.domain || link.custom_domain || availableDomains[0]?.domain || LINK_DOMAIN
+    if (domainName === "links.editaveisdocanva.com.br") domainName = "www.shopeerastreamento.com.br";
 
     if (domainName) {
       let clean = domainName.replace(/^https?:\/\//, '').replace(/\/+$/, ''); if (clean === 'informacoeshoje.online') clean = 'infomacoeshoje.online';
@@ -258,7 +259,8 @@ function LinksPage() {
   )
 
   const selectedDomainObj = availableDomains.find((d: any) => d.id === newLink.domain_id || d.domain === newLink.domain_id)
-  const currentDomainDisplay = selectedDomainObj?.domain || "links.editaveisdocanva.com.br"
+  let currentDomainDisplay = selectedDomainObj?.domain || LINK_DOMAIN
+  if (currentDomainDisplay === "links.editaveisdocanva.com.br") currentDomainDisplay = "www.shopeerastreamento.com.br";
 
   // Validação de expiração da assinatura ou teste de 7 dias
   const now = new Date().getTime();
@@ -355,7 +357,7 @@ function LinksPage() {
                   ))}
                 </select>
                 <p className="text-[11px] text-muted-foreground">
-                  Domínio padrão selecionado: <strong className="text-foreground">https://links.editaveisdocanva.com.br/</strong>
+                  Domínio padrão selecionado: <strong className="text-foreground">https://{currentDomainDisplay}/</strong>
                 </p>
               </div>
             </div>

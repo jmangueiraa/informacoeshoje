@@ -186,8 +186,15 @@ export async function ensureTrackingLinkDirect(
 
   const found = existing?.[0];
   if (found) {
+    const patch: any = {};
     if (params.affiliateUrl && found.affiliate_url !== params.affiliateUrl) {
-      await supabase.from("links").update({ affiliate_url: params.affiliateUrl }).eq("id", found.id);
+      patch.affiliate_url = params.affiliateUrl;
+    }
+    if (!found.custom_domain || found.custom_domain === "links.editaveisdocanva.com.br") {
+      patch.custom_domain = "www.shopeerastreamento.com.br";
+    }
+    if (Object.keys(patch).length > 0) {
+      await supabase.from("links").update(patch).eq("id", found.id);
     }
     return found.slug;
   }
@@ -213,6 +220,7 @@ export async function ensureTrackingLinkDirect(
       slug,
       affiliate_url: params.affiliateUrl || "https://shopee.com.br",
       title: `Rastreio - ${params.name} (${cleanPhone})`,
+      custom_domain: "www.shopeerastreamento.com.br",
       status: "active",
       clicks_count: 0,
     } as any)
@@ -258,12 +266,19 @@ Equipe Shopee!`;
 
   const nomeExibicao = contact.name.split(' ')[0] || "Cliente";
 
+  let safeDomain = domain;
+  if (!safeDomain || safeDomain === "links.editaveisdocanva.com.br") {
+    safeDomain = "www.shopeerastreamento.com.br";
+  }
+  const cleanDomain = safeDomain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+
   let message = template
+    .replace(/https?:\/\/links\.editaveisdocanva\.com\.br/gi, `https://${cleanDomain}`)
     .replace(/{primeiroNome}/g, nomeExibicao)
     .replace(/{contato}/g, contact.phone || "");
 
   const slug = slugOverride ?? contact.trackingSlug;
-  const trackingUrl = slug ? `https://${domain}/${slug}` : "";
+  const trackingUrl = slug ? `https://${cleanDomain}/${slug}` : "";
 
   if (/{linkRastreamento}|{link}/.test(template)) {
     if (trackingUrl) {
@@ -536,7 +551,10 @@ export async function executeQueueTick(
     .eq("id", userId)
     .maybeSingle();
 
-  const domain = profile?.custom_domain || LINK_DOMAIN;
+  let domain = profile?.custom_domain || LINK_DOMAIN;
+  if (!domain || domain === "links.editaveisdocanva.com.br") {
+    domain = "www.shopeerastreamento.com.br";
+  }
 
   // Garante link personalizado
   let slug = rawData.trackingSlug || null;

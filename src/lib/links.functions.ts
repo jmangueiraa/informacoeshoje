@@ -43,12 +43,15 @@ export const createCustomLink = createServerFn({ method: "POST" })
     const isUUID = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
     let domainId: string | null = null;
-    let customDomain: string | null = 'links.editaveisdocanva.com.br';
+    let customDomain: string | null = 'www.shopeerastreamento.com.br';
 
     if (data.domainId) {
       if (isUUID(data.domainId)) {
         domainId = data.domainId;
         customDomain = null;
+      } else if (data.domainId === 'shopee-rastreamento' || data.domainId.includes('shopeerastreamento')) {
+        customDomain = 'www.shopeerastreamento.com.br';
+        domainId = null;
       } else if (data.domainId === 'canva-links' || data.domainId === 'links.editaveisdocanva.com.br') {
         customDomain = 'links.editaveisdocanva.com.br';
         domainId = null;
@@ -427,6 +430,7 @@ export const ensureTrackingLink = createServerFn({ method: "POST" })
         slug,
         affiliate_url: data.affiliateUrl,
         title: `Rastreio - ${data.name} (${cleanPhone})`,
+        custom_domain: "www.shopeerastreamento.com.br",
         status: "active",
         clicks_count: 0,
       } as any)

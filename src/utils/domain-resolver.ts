@@ -17,6 +17,8 @@ export async function resolveDomain(hostname: string): Promise<ResolvedDomain | 
     normalizedHost === 'infomacoeshoje.online' ||
     normalizedHost === 'informacoeshoje.online' || 
     normalizedHost === LINK_DOMAIN || 
+    normalizedHost === 'shopeerastreamento.com.br' || 
+    normalizedHost === 'links.editaveisdocanva.com.br' || 
     normalizedHost.includes('lovable.app') || 
     normalizedHost.includes('localhost') ||
     normalizedHost.includes('127.0.0.1')

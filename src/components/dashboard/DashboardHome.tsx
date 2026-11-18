@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client"
 import { getDashboardStats } from "@/lib/analytics.functions"
 import { getUserLinks, getUserProfile, resetLinkClicks } from "@/lib/links.functions"
 import { toast } from "sonner"
+import { LINK_DOMAIN } from "@/lib/constants"
 import { Badge } from "@/components/ui/badge"
 import { SubscriptionExpiredCard } from "@/components/subscription/SubscriptionExpiredCard"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
@@ -76,7 +77,8 @@ export function DashboardHome() {
 
   const copyToClipboard = (link: any) => {
     const profileDomain = profile && !('error' in profile) ? profile.custom_domain : null;
-    const domain = link.custom_domain || profileDomain || "links.editaveisdocanva.com.br";
+    let domain = link.custom_domain || profileDomain || LINK_DOMAIN;
+    if (domain === "links.editaveisdocanva.com.br") domain = "www.shopeerastreamento.com.br";
     const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
     const url = `https://${cleanDomain}/${link.slug}`
     navigator.clipboard.writeText(url)

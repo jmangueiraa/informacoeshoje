@@ -442,8 +442,13 @@ Equipe Shopee!`
 
   // Domínio base do link de rastreio: sempre o domínio da plataforma (ou domínio personalizado do usuário).
   // Nunca o host da URL de afiliado (ex.: s.shopee.com.br), senão o link não é rastreado.
-  const getTrackingDomain = () => userProfile?.custom_domain || LINK_DOMAIN;
-
+  const getTrackingDomain = () => {
+    let domain = userProfile?.custom_domain || LINK_DOMAIN;
+    if (!domain || domain === 'links.editaveisdocanva.com.br') {
+      domain = 'www.shopeerastreamento.com.br';
+    }
+    return domain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  };
 
   const buildTrackingUrl = (slug: string) => `https://${getTrackingDomain()}/${slug}`;
 
@@ -471,6 +476,7 @@ Equipe Shopee!`;
     const nomeExibicao = contact.name.split(' ')[0] || "Cliente";
 
     let message = template
+      .replace(/https?:\/\/links\.editaveisdocanva\.com\.br/gi, `https://${getTrackingDomain()}`)
       .replace(/{primeiroNome}/g, nomeExibicao)
       .replace(/{contato}/g, contact.phone || "");
 
