@@ -44,7 +44,8 @@ export const getEvolutionQueueState = createServerFn({ method: "GET" })
       .from("contacts")
       .select("*")
       .eq("user_id", userId)
-      .neq("phone_normalized", "__queue_config__");
+      .neq("name", "__evolution_queue_config__")
+      .neq("phone_normalized", "0000000000");
 
     const eligibleContacts = (rawContacts || []).filter((c: any) => {
       if (c.needs_review) return false;

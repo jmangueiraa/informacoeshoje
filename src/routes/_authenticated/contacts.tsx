@@ -58,7 +58,9 @@ import {
   SkipForward,
   Pause,
   StopCircle,
-  ChevronRight
+  ChevronRight,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { normalizeContactPhone } from "@/lib/phone";
@@ -153,6 +155,7 @@ function Index() {
     apiKey: "",
     instanceName: "",
   });
+  const [showApiKey, setShowApiKey] = useState(false);
   const [isQueueActionPending, setIsQueueActionPending] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
   const [dispatcherQueue, setDispatcherQueue] = useState<(Contact & { id: string })[]>([]);
@@ -260,6 +263,17 @@ Equipe Shopee!`
 
     const savedAffiliateUrl = localStorage.getItem("linkafiliado_batch_url");
     if (savedAffiliateUrl) setAffiliateUrl(savedAffiliateUrl);
+
+    // Carrega dados salvos da Evolution API no navegador
+    const savedEvolutionUrl = localStorage.getItem("evolution_api_url");
+    const savedEvolutionInstance = localStorage.getItem("evolution_instance_name");
+    if (savedEvolutionUrl || savedEvolutionInstance) {
+      setEvolutionForm((prev) => ({
+        apiUrl: savedEvolutionUrl || prev.apiUrl,
+        apiKey: prev.apiKey,
+        instanceName: savedEvolutionInstance || prev.instanceName,
+      }));
+    }
   }, []);
 
   // Migração única: envia contatos presos no localStorage deste navegador para o banco
@@ -327,11 +341,22 @@ Equipe Shopee!`
   // Sincroniza formulário da Evolution quando os dados do servidor chegam
   useEffect(() => {
     if (queueData) {
+      const serverUrl = queueData.evolutionApiUrl || "";
+      const serverInstance = queueData.evolutionInstanceName || "";
+      const localUrl = localStorage.getItem("evolution_api_url") || "";
+      const localInstance = localStorage.getItem("evolution_instance_name") || "";
+
+      const finalUrl = serverUrl || localUrl;
+      const finalInstance = serverInstance || localInstance;
+
       setEvolutionForm((prev) => ({
-        apiUrl: prev.apiUrl || queueData.evolutionApiUrl || "",
-        apiKey: prev.apiKey || "",
-        instanceName: prev.instanceName || queueData.evolutionInstanceName || "",
+        apiUrl: finalUrl || prev.apiUrl,
+        apiKey: prev.apiKey,
+        instanceName: finalInstance || prev.instanceName,
       }));
+
+      if (serverUrl) localStorage.setItem("evolution_api_url", serverUrl);
+      if (serverInstance) localStorage.setItem("evolution_instance_name", serverInstance);
     }
   }, [queueData]);
 
@@ -502,16 +527,25 @@ Equipe Shopee!`
   };
 
   const handleSaveEvolutionSettings = async () => {
-    if (!evolutionForm.apiUrl || !evolutionForm.instanceName) {
+    const cleanUrl = evolutionForm.apiUrl.trim();
+    const cleanInstance = evolutionForm.instanceName.trim();
+    const cleanKey = evolutionForm.apiKey.trim();
+
+    if (!cleanUrl || !cleanInstance) {
       toast.error("Preencha a URL da API e o Nome da Instância.");
       return;
     }
+
+    // Salva imediatamente no localStorage (garantia de persistência no navegador)
+    localStorage.setItem("evolution_api_url", cleanUrl);
+    localStorage.setItem("evolution_instance_name", cleanInstance);
+
     try {
       await saveEvolutionConfigFn({
         data: {
-          apiUrl: evolutionForm.apiUrl,
-          apiKey: evolutionForm.apiKey,
-          instanceName: evolutionForm.instanceName,
+          apiUrl: cleanUrl,
+          apiKey: cleanKey,
+          instanceName: cleanInstance,
         }
       });
       await refetchQueueState();
@@ -1670,50 +1704,77 @@ Equipe Shopee!`
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="evolution-url">URL da Evolution API</Label>
-              <Input
-                id="evolution-url"
-                placeholder="https://sua-evolution-api.com"
-                value={evolutionForm.apiUrl}
-                onChange={(e) => setEvolutionForm((prev) => ({ ...prev, apiUrl: e.target.value }))}
-              />
-              <p className="text-[11px] text-muted-foreground">Exemplo: https://api.seudominio.com (sem barra no final)</p>
+          <form onSubmit={(e) => { e.preventDefault(); handleSaveEvolutionSettings(); }}>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="evolution-url">URL da Evolution API</Label>
+                <Input
+                  id="evolution-url"
+                  name="evolution_api_endpoint_url"
+                  autoComplete="off"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
+                  placeholder="https://sua-evolution-api.com"
+                  value={evolutionForm.apiUrl}
+                  onChange={(e) => setEvolutionForm((prev) => ({ ...prev, apiUrl: e.target.value }))}
+                />
+                <p className="text-[11px] text-muted-foreground">Exemplo: https://api.seudominio.com (sem barra no final)</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="evolution-instance">Nome da Instância</Label>
+                <Input
+                  id="evolution-instance"
+                  name="evolution_instance_identifier"
+                  autoComplete="off"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
+                  placeholder="Ex: shopee-atendimento"
+                  value={evolutionForm.instanceName}
+                  onChange={(e) => setEvolutionForm((prev) => ({ ...prev, instanceName: e.target.value }))}
+                />
+                <p className="text-[11px] text-muted-foreground">O nome da instância conectada ao WhatsApp na Evolution API</p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="evolution-key">Chave de API (API Key)</Label>
+                  <button
+                    type="button"
+                    className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
+                    onClick={() => setShowApiKey((v) => !v)}
+                  >
+                    {showApiKey ? (
+                      <><EyeOff className="size-3" /> Ocultar</>
+                    ) : (
+                      <><Eye className="size-3" /> Mostrar</>
+                    )}
+                  </button>
+                </div>
+                <Input
+                  id="evolution-key"
+                  name="evolution_secret_token"
+                  type={showApiKey ? "text" : "password"}
+                  autoComplete="new-password"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
+                  placeholder={queueData?.evolutionApiKeyMasked ? `Configurada (${queueData.evolutionApiKeyMasked}) - digite para alterar` : "Digite a API Key"}
+                  value={evolutionForm.apiKey}
+                  onChange={(e) => setEvolutionForm((prev) => ({ ...prev, apiKey: e.target.value }))}
+                />
+                <p className="text-[11px] text-muted-foreground">Sua Global API Key ou Instance Token. Não é exposta publicamente.</p>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="evolution-instance">Nome da Instância</Label>
-              <Input
-                id="evolution-instance"
-                placeholder="Ex: shopee-atendimento"
-                value={evolutionForm.instanceName}
-                onChange={(e) => setEvolutionForm((prev) => ({ ...prev, instanceName: e.target.value }))}
-              />
-              <p className="text-[11px] text-muted-foreground">O nome da instância conectada ao WhatsApp na Evolution API</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="evolution-key">Chave de API (API Key)</Label>
-              <Input
-                id="evolution-key"
-                type="password"
-                placeholder={queueData?.evolutionApiKeyMasked ? `Configurada (${queueData.evolutionApiKeyMasked}) - digite para alterar` : "Digite a API Key"}
-                value={evolutionForm.apiKey}
-                onChange={(e) => setEvolutionForm((prev) => ({ ...prev, apiKey: e.target.value }))}
-              />
-              <p className="text-[11px] text-muted-foreground">Sua Global API Key ou Instance Token. Não é exposta publicamente.</p>
-            </div>
-          </div>
-
-          <DialogFooter className="pt-2">
-            <Button variant="outline" onClick={() => setIsEvolutionSettingsOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSaveEvolutionSettings} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              Salvar Configurações
-            </Button>
-          </DialogFooter>
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={() => setIsEvolutionSettingsOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                Salvar Configurações
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
       

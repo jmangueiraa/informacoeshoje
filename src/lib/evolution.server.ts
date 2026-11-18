@@ -225,13 +225,14 @@ Equipe Shopee!`;
  * Busca a configuração e estado da fila do usuário
  */
 export async function getQueueConfigRow(supabase: any, userId: string): Promise<any> {
-  const { data } = await supabase
+  const { data: rows } = await supabase
     .from("contacts")
     .select("*")
     .eq("user_id", userId)
-    .eq("phone_normalized", "__queue_config__")
-    .maybeSingle();
+    .or("name.eq.__evolution_queue_config__,phone_normalized.eq.0000000000,phone_normalized.eq.__queue_config__")
+    .order("created_at", { ascending: false });
 
+  const data = rows?.[0];
   const raw = (data?.raw_data && typeof data.raw_data === "object") ? data.raw_data : {};
 
   // Verifica também variáveis de ambiente como fallback
@@ -266,7 +267,7 @@ export async function saveQueueConfigRow(supabase: any, userId: string, patch: a
     .upsert({
       user_id: userId,
       name: "__evolution_queue_config__",
-      phone_normalized: "__queue_config__",
+      phone_normalized: "0000000000",
       needs_review: false,
       raw_data: updated,
     }, { onConflict: "user_id,phone_normalized" })
@@ -274,8 +275,12 @@ export async function saveQueueConfigRow(supabase: any, userId: string, patch: a
     .single();
 
   if (error) {
-    console.error("[EVOLUTION-QUEUE] Erro ao salvar configuração da fila:", error);
-    throw error;
+    console.error("[EVOLUTION-QUEUE] Erro no upsert da configuração da fila:", error);
+    await supabase
+      .from("contacts")
+      .update({ raw_data: updated })
+      .eq("user_id", userId)
+      .eq("name", "__evolution_queue_config__");
   }
 
   return updated;
@@ -339,7 +344,8 @@ export async function executeQueueTick(
     .from("contacts")
     .select("*")
     .eq("user_id", userId)
-    .neq("phone_normalized", "__queue_config__")
+    .neq("name", "__evolution_queue_config__")
+    .neq("phone_normalized", "0000000000")
     .order("created_at", { ascending: true });
 
   if (contactsErr) {
@@ -623,7 +629,7 @@ export function initQueueBackgroundWorker() {
       const { data: activeConfigs, error } = await supabase
         .from("contacts")
         .select("user_id, raw_data")
-        .eq("phone_normalized", "__queue_config__");
+        .or("name.eq.__evolution_queue_config__,phone_normalized.eq.0000000000");
 
       if (error || !activeConfigs) {
         isWorkerRunning = false;
