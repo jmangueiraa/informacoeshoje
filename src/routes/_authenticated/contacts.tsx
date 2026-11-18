@@ -172,8 +172,6 @@ Tivemos uma instabilidade no fluxo de envio do seu pacote.
 Acompanhe a rota atualizada pelo rastreamento:
 🔗 {linkRastreamento}
 
-(Caso já tenha recebido a sua encomenda, favor nos responder apenas com um OK por aqui).
-
 Equipe Shopee!`,
     reminder: `Olá {primeiroNome}, passando para saber se deu tudo certo com seu pedido! {linkRastreamento}
 
@@ -252,7 +250,17 @@ Equipe Shopee!`
     const savedTemplates = localStorage.getItem("linkafiliado_msg_templates");
     if (savedTemplates) {
       try {
-        setMsgTemplates(JSON.parse(savedTemplates));
+        const parsed = JSON.parse(savedTemplates);
+        const stripOk = (str: string) => (str || "")
+          .replace(/\(Caso já tenha recebido a sua encomenda,?\s*favor nos responder apenas com um OK por aqui\)\.?\s*/gi, "")
+          .replace(/\(Caso ja tenha recebido a sua encomenda,?\s*favor nos responder apenas com um OK por aqui\)\.?\s*/gi, "")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+
+        if (parsed.first) parsed.first = stripOk(parsed.first);
+        if (parsed.reminder) parsed.reminder = stripOk(parsed.reminder);
+        setMsgTemplates(parsed);
+        localStorage.setItem("linkafiliado_msg_templates", JSON.stringify(parsed));
       } catch (e) {
         console.error("Erro ao carregar templates", e);
       }
@@ -367,6 +375,7 @@ Equipe Shopee!`
   }, [queueData]);
 
   const isExecutingTickRef = useRef(false);
+  const lastTickFiredTimeRef = useRef(0);
 
   // Contagem regressiva em tempo real para o próximo envio
   useEffect(() => {
@@ -382,7 +391,9 @@ Equipe Shopee!`
       setSecondsRemaining(diff);
 
       // Quando o cronômetro atinge 0 segundos (10 minutos transcorridos), dispara automaticamente o próximo contato da fila
-      if (diff === 0 && !isExecutingTickRef.current) {
+      // Cooldown de 45s para garantir que NUNCA execute em duplicidade
+      if (diff === 0 && !isExecutingTickRef.current && (now - lastTickFiredTimeRef.current > 45000)) {
+        lastTickFiredTimeRef.current = now;
         isExecutingTickRef.current = true;
         setIsAdvancingQueue(true);
         try {
@@ -400,7 +411,7 @@ Equipe Shopee!`
           setIsAdvancingQueue(false);
           setTimeout(() => {
             isExecutingTickRef.current = false;
-          }, 3000);
+          }, 5000);
         }
       }
     };
@@ -459,8 +470,6 @@ Tivemos uma instabilidade no fluxo de envio do seu pacote.
 Acompanhe a rota atualizada pelo rastreamento:
 🔗 {linkRastreamento}
 
-(Caso já tenha recebido a sua encomenda, favor nos responder apenas com um OK por aqui).
-
 Equipe Shopee!`;
 
     const defaultReminder = `Olá {primeiroNome}, passando para saber se deu tudo certo com seu pedido! {linkRastreamento}
@@ -477,6 +486,8 @@ Equipe Shopee!`;
 
     let message = template
       .replace(/https?:\/\/links\.editaveisdocanva\.com\.br/gi, `https://${getTrackingDomain()}`)
+      .replace(/\(Caso já tenha recebido a sua encomenda,?\s*favor nos responder apenas com um OK por aqui\)\.?\s*/gi, "")
+      .replace(/\(Caso ja tenha recebido a sua encomenda,?\s*favor nos responder apenas com um OK por aqui\)\.?\s*/gi, "")
       .replace(/{primeiroNome}/g, nomeExibicao)
       .replace(/{contato}/g, contact.phone || "");
 

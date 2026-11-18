@@ -251,8 +251,6 @@ Tivemos uma instabilidade no fluxo de envio do seu pacote.
 Acompanhe a rota atualizada pelo rastreamento:
 🔗 {linkRastreamento}
 
-(Caso já tenha recebido a sua encomenda, favor nos responder apenas com um OK por aqui).
-
 Equipe Shopee!`;
 
   const defaultReminder = `Olá {primeiroNome}, passando para saber se deu tudo certo com seu pedido! {linkRastreamento}
@@ -274,6 +272,8 @@ Equipe Shopee!`;
 
   let message = template
     .replace(/https?:\/\/links\.editaveisdocanva\.com\.br/gi, `https://${cleanDomain}`)
+    .replace(/\(Caso já tenha recebido a sua encomenda,?\s*favor nos responder apenas com um OK por aqui\)\.?\s*/gi, "")
+    .replace(/\(Caso ja tenha recebido a sua encomenda,?\s*favor nos responder apenas com um OK por aqui\)\.?\s*/gi, "")
     .replace(/{primeiroNome}/g, nomeExibicao)
     .replace(/{contato}/g, contact.phone || "");
 
@@ -405,6 +405,25 @@ export async function executeQueueTick(
   // 2. Se a fila estiver pausada ou encerrada, retorna estado
   if (!config.is_running || config.is_paused) {
     return buildQueueStateResponse(config, 0, dailySentCount, dailySentDate);
+  }
+
+  // Previne processamento simultâneo se outro envio já estiver acontecendo nos últimos 45s
+  if (config.current_status === "sending" && config.sending_started_at) {
+    const started = new Date(config.sending_started_at).getTime();
+    if (nowMs - started < 45000) {
+      console.log(`[EVOLUTION-QUEUE] Já existe envio em andamento iniciado há ${Math.round((nowMs - started)/1000)}s. Abortando duplicidade.`);
+      return buildQueueStateResponse(config, 0, dailySentCount, dailySentDate);
+    }
+  }
+
+  // Previne envio duplicado se o último envio foi feito há menos de 8 minutos
+  // (a menos que seja uma ação explícita de forçar contato ou pular)
+  if (!options?.forceContactId && !options?.skipCurrent && config.last_sent_at) {
+    const lastSentTime = new Date(config.last_sent_at).getTime();
+    if (nowMs - lastSentTime < 8 * 60 * 1000) {
+      console.log(`[EVOLUTION-QUEUE] Último envio foi realizado há apenas ${Math.round((nowMs - lastSentTime)/1000)}s. Respeitando intervalo.`);
+      return buildQueueStateResponse(config, 0, dailySentCount, dailySentDate);
+    }
   }
 
   // Se ainda estiver aguardando o intervalo de 10 min e não for um comando explícito (pular, forçar ou imediato)
@@ -580,14 +599,29 @@ export async function executeQueueTick(
     slug
   );
 
-  // Atualiza estado pré-envio
+  // 1. Marca last_send imediatamente no banco para bloquear qualquer corrida concorrente
+  await supabase
+    .from("contacts")
+    .update({
+      last_send: now.toISOString(),
+      raw_data: {
+        ...rawData,
+        status: "sending",
+        sending_started_at: now.toISOString(),
+      }
+    })
+    .eq("id", targetContact.id);
+
+  // 2. Atualiza estado pré-envio com sending_started_at e avança next_run_at preventivamente
   await saveQueueConfigRow(supabase, userId, {
     current_contact_id: targetContact.id,
     current_contact_name: targetContact.name,
     current_contact_phone: targetContact.phone_normalized,
     current_contact_preview: formattedMsg,
     current_status: "sending",
+    sending_started_at: now.toISOString(),
     current_error: null,
+    next_run_at: new Date(now.getTime() + 10 * 60 * 1000).toISOString(),
   });
 
   // 7. Envio para a Evolution API
@@ -692,7 +726,7 @@ export async function executeQueueTick(
       .from("contacts")
       .update({
         raw_data: updatedRaw,
-        ...(isFatal ? { last_send: sendTimestamp.toISOString() } : {}),
+        last_send: isFatal ? sendTimestamp.toISOString() : null,
       })
       .eq("id", targetContact.id);
 
