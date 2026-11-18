@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { normalizeContactPhone, VALID_BRAZILIAN_DDDS } from "./phone";
+import { normalizeContactPhone, isValidBrazilianContactPhone, VALID_BRAZILIAN_DDDS } from "./phone";
 import { LINK_DOMAIN } from "./constants";
 import type { EvolutionConfig, QueueState } from "./evolution.types";
 
@@ -390,6 +390,15 @@ export async function executeQueueTick(
     return buildQueueStateResponse(config, 0, dailySentCount, dailySentDate);
   }
 
+  // Se ainda estiver aguardando o intervalo de 10 min e não for um comando explícito (pular ou forçar)
+  if (!options?.forceContactId && !options?.skipCurrent && config.next_run_at) {
+    const nextRun = new Date(config.next_run_at);
+    if (nextRun.getTime() - now.getTime() > 3000) {
+      console.log(`[EVOLUTION-QUEUE] Aguardando intervalo de 10 min. Próximo envio em ${config.next_run_at}`);
+      return buildQueueStateResponse(config, 0, dailySentCount, dailySentDate);
+    }
+  }
+
   // 3. Verifica limite diário
   if (dailySentCount >= 100) {
     const updated = await saveQueueConfigRow(supabase, userId, {
@@ -437,8 +446,7 @@ export async function executeQueueTick(
   // - Recorrência individual de 7 dias: !last_send OU new Date(nextReminder || last_send) <= now
   const eligibleContacts = (rawContacts || []).filter((c: any) => {
     if (c.needs_review) return false;
-    const phone = normalizeContactPhone(c.phone_normalized);
-    if (phone.length !== 10 && phone.length !== 11) return false;
+    if (!isValidBrazilianContactPhone(c.phone_normalized)) return false;
 
     const raw = (c.raw_data && typeof c.raw_data === 'object') ? c.raw_data : {};
     if (raw.unsubscribed === true) return false;

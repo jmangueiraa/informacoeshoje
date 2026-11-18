@@ -85,6 +85,7 @@ import {
   resumeEvolutionQueueAction,
   stopEvolutionQueueAction,
   skipEvolutionQueueContactAction,
+  executeNextQueueTickAction,
 } from "@/lib/evolution.functions";
 import type { QueueState } from "@/lib/evolution.types";
 
@@ -199,6 +200,7 @@ Equipe Shopee!`
   const resumeEvolutionQueueFn = useServerFn(resumeEvolutionQueueAction);
   const stopEvolutionQueueFn = useServerFn(stopEvolutionQueueAction);
   const skipEvolutionQueueFn = useServerFn(skipEvolutionQueueContactAction);
+  const executeNextTickFn = useServerFn(executeNextQueueTickAction);
 
   const {
     data: queueData,
@@ -362,6 +364,8 @@ Equipe Shopee!`
     }
   }, [queueData]);
 
+  const isExecutingTickRef = useRef(false);
+
   // Contagem regressiva em tempo real para o próximo envio
   useEffect(() => {
     if (!queueData?.nextRunAt || !queueData.isRunning || queueData.isPaused) {
@@ -369,12 +373,28 @@ Equipe Shopee!`
       return;
     }
 
-    const tick = () => {
-      const diff = Math.max(0, Math.floor((new Date(queueData.nextRunAt!).getTime() - Date.now()) / 1000));
+    const tick = async () => {
+      const nextTime = new Date(queueData.nextRunAt!).getTime();
+      const now = Date.now();
+      const diff = Math.max(0, Math.floor((nextTime - now) / 1000));
       setSecondsRemaining(diff);
-      if (diff === 0) {
-        refetchQueueState();
-        invalidateContacts();
+
+      // Quando o cronômetro atinge 0 segundos (10 minutos transcorridos), dispara automaticamente o próximo contato da fila
+      if (diff === 0 && !isExecutingTickRef.current) {
+        isExecutingTickRef.current = true;
+        try {
+          console.log("[AUTO-QUEUE] 10 minutos transcorridos! Executando envio do próximo contato...");
+          await executeNextTickFn({});
+          await refetchQueueState();
+          await invalidateContacts();
+        } catch (err) {
+          console.error("Erro ao avançar envio automático da fila:", err);
+          await refetchQueueState();
+        } finally {
+          setTimeout(() => {
+            isExecutingTickRef.current = false;
+          }, 4000);
+        }
       }
     };
 

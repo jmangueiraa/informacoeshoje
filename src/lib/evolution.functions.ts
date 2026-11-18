@@ -8,7 +8,7 @@ import {
   getSaoPauloDateString,
   initQueueBackgroundWorker,
 } from "./evolution.server";
-import { normalizeContactPhone } from "./phone";
+import { normalizeContactPhone, isValidBrazilianContactPhone } from "./phone";
 import type { QueueState } from "./evolution.types";
 
 // Inicia o worker de segundo plano no servidor
@@ -49,8 +49,7 @@ export const getEvolutionQueueState = createServerFn({ method: "GET" })
 
     const eligibleContacts = (rawContacts || []).filter((c: any) => {
       if (c.needs_review) return false;
-      const phone = normalizeContactPhone(c.phone_normalized);
-      if (phone.length !== 10 && phone.length !== 11) return false;
+      if (!isValidBrazilianContactPhone(c.phone_normalized)) return false;
 
       const raw = (c.raw_data && typeof c.raw_data === 'object') ? c.raw_data : {};
       if (raw.unsubscribed === true) return false;
@@ -66,6 +65,15 @@ export const getEvolutionQueueState = createServerFn({ method: "GET" })
     });
 
     const totalEligible = eligibleContacts.length;
+
+    // Se a fila estiver ativa e o próximo envio já venceu (ou está atrasado), avança automaticamente para o próximo contato!
+    if (config.is_running && !config.is_paused && config.next_run_at) {
+      const nextRun = new Date(config.next_run_at);
+      if (nextRun <= now) {
+        console.log(`[EVOLUTION-QUEUE] Horário atingido (${config.next_run_at}). Executando próximo envio...`);
+        return executeQueueTick(supabase, userId);
+      }
+    }
 
     const key = config.evolution_api_key || "";
     const maskedKey = key ? `••••••••${key.slice(-4)}` : "";
@@ -228,4 +236,14 @@ export const skipEvolutionQueueContactAction = createServerFn({ method: "POST" }
   .handler(async ({ context }) => {
     const { supabase, userId } = context as any;
     return executeQueueTick(supabase, userId, { skipCurrent: true });
+  });
+
+/**
+ * Dispara o próximo ciclo da fila quando o tempo de 10 minutos se esgota
+ */
+export const executeNextQueueTickAction = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    return executeQueueTick(supabase, userId);
   });
