@@ -267,10 +267,11 @@ Equipe Shopee!`
     // Carrega dados salvos da Evolution API no navegador
     const savedEvolutionUrl = localStorage.getItem("evolution_api_url");
     const savedEvolutionInstance = localStorage.getItem("evolution_instance_name");
-    if (savedEvolutionUrl || savedEvolutionInstance) {
+    const savedEvolutionKey = localStorage.getItem("evolution_api_key");
+    if (savedEvolutionUrl || savedEvolutionInstance || savedEvolutionKey) {
       setEvolutionForm((prev) => ({
         apiUrl: savedEvolutionUrl || prev.apiUrl,
-        apiKey: prev.apiKey,
+        apiKey: savedEvolutionKey || prev.apiKey,
         instanceName: savedEvolutionInstance || prev.instanceName,
       }));
     }
@@ -345,13 +346,14 @@ Equipe Shopee!`
       const serverInstance = queueData.evolutionInstanceName || "";
       const localUrl = localStorage.getItem("evolution_api_url") || "";
       const localInstance = localStorage.getItem("evolution_instance_name") || "";
+      const localKey = localStorage.getItem("evolution_api_key") || "";
 
       const finalUrl = serverUrl || localUrl;
       const finalInstance = serverInstance || localInstance;
 
       setEvolutionForm((prev) => ({
         apiUrl: finalUrl || prev.apiUrl,
-        apiKey: prev.apiKey,
+        apiKey: prev.apiKey || localKey || "",
         instanceName: finalInstance || prev.instanceName,
       }));
 
@@ -395,10 +397,19 @@ Equipe Shopee!`
     toast.success("Configurações salvas!");
   };
 
-  const saveTemplates = (templates: typeof msgTemplates) => {
+  const saveTemplates = async (templates: typeof msgTemplates) => {
     localStorage.setItem("linkafiliado_msg_templates", JSON.stringify(templates));
     setMsgTemplates(templates);
     setIsTemplatesOpen(false);
+    try {
+      await saveEvolutionConfigFn({
+        data: {
+          msgTemplates: templates,
+        }
+      });
+    } catch (e) {
+      console.warn("Erro ao sincronizar templates com o servidor:", e);
+    }
     toast.success("Templates de mensagem salvos!");
   };
 
@@ -410,7 +421,24 @@ Equipe Shopee!`
   const buildTrackingUrl = (slug: string) => `https://${getTrackingDomain()}/${slug}`;
 
   const getFormattedMessage = (contact: Contact, isFirst: boolean, slugOverride?: string | null) => {
-    const template = (isFirst ? msgTemplates.first : msgTemplates.reminder) || "";
+    const defaultFirst = `Olá, {primeiroNome}! Tudo bem?
+Tivemos uma instabilidade no fluxo de envio do seu pacote.
+
+Acompanhe a rota atualizada pelo rastreamento:
+🔗 {linkRastreamento}
+
+(Caso já tenha recebido a sua encomenda, favor nos responder apenas com um OK por aqui).
+
+Equipe Shopee!`;
+
+    const defaultReminder = `Olá {primeiroNome}, passando para saber se deu tudo certo com seu pedido! {linkRastreamento}
+
+Equipe Shopee!`;
+
+    const rawTemplate = isFirst ? msgTemplates.first : msgTemplates.reminder;
+    const template = (rawTemplate && rawTemplate.trim().length > 0 && rawTemplate.replace(/Equipe Shopee!/gi, "").trim().length > 5)
+      ? rawTemplate
+      : (isFirst ? defaultFirst : defaultReminder);
     
     // Obter o primeiro nome real se possível
     const nomeExibicao = contact.name.split(' ')[0] || "Cliente";
@@ -420,24 +448,28 @@ Equipe Shopee!`
       .replace(/{contato}/g, contact.phone || "");
 
     const slug = slugOverride ?? contact.trackingSlug;
+    const trackingUrl = slug ? buildTrackingUrl(slug) : "";
 
-    if (slug) {
-      const trackingUrl = buildTrackingUrl(slug);
-      message = message.replace(/{linkRastreamento}/g, trackingUrl).replace(/{link}/g, trackingUrl);
-      if (!/{linkRastreamento}|{link}/.test(template) && !message.includes(trackingUrl)) {
-        message = `${message}\n\n🔗 ${trackingUrl}`;
+    if (/{linkRastreamento}|{link}/.test(template)) {
+      if (trackingUrl) {
+        message = message.replace(/{linkRastreamento}/g, trackingUrl).replace(/{link}/g, trackingUrl);
+      } else {
+        message = message.replace(/{linkRastreamento}/g, "").replace(/{link}/g, "");
       }
     } else {
-      // Se não houver slug de rastreio, remove a tag para não enviar o texto literal
-      message = message.replace(/{linkRastreamento}/g, "").replace(/{link}/g, "");
+      // Se o template já contém um link (ex: https://www.shopeerastreamento.com.br/pedido), não duplica!
+      const hasExistingLink = /https?:\/\//i.test(template);
+      if (!hasExistingLink && trackingUrl) {
+        message = `${message.trimEnd()}\n\n🔗 ${trackingUrl}`;
+      }
     }
 
-    // Rodapé obrigatório
-    if (!/Equipe Shopee!\s*$/.test(message.trim())) {
+    // Evita duplicar o rodapé se o texto já contiver "Equipe Shopee!"
+    if (!/Equipe Shopee!/i.test(message)) {
       message = `${message.trimEnd()}\n\nEquipe Shopee!`;
     }
 
-    return message;
+    return message.trim();
   };
 
   const handleDispatch = async (contact: Contact & { id: string }) => {
@@ -539,12 +571,15 @@ Equipe Shopee!`
     // Salva imediatamente no localStorage (garantia de persistência no navegador)
     localStorage.setItem("evolution_api_url", cleanUrl);
     localStorage.setItem("evolution_instance_name", cleanInstance);
+    if (cleanKey) {
+      localStorage.setItem("evolution_api_key", cleanKey);
+    }
 
     try {
       await saveEvolutionConfigFn({
         data: {
           apiUrl: cleanUrl,
-          apiKey: cleanKey,
+          apiKey: cleanKey || localStorage.getItem("evolution_api_key") || undefined,
           instanceName: cleanInstance,
         }
       });
@@ -557,8 +592,19 @@ Equipe Shopee!`
   };
 
   const handleStartAutoQueue = async () => {
-    if (!queueData?.evolutionConfigured && (!evolutionForm.apiUrl || !evolutionForm.apiKey || !evolutionForm.instanceName)) {
-      toast.error("Configure sua Evolution API antes de iniciar a fila automática.");
+    const effectiveUrl = evolutionForm.apiUrl.trim() || localStorage.getItem("evolution_api_url") || queueData?.evolutionApiUrl || "";
+    const effectiveInstance = evolutionForm.instanceName.trim() || localStorage.getItem("evolution_instance_name") || queueData?.evolutionInstanceName || "";
+    const effectiveKey = evolutionForm.apiKey.trim() || localStorage.getItem("evolution_api_key") || "";
+
+    const hasApiKey = Boolean(queueData?.evolutionApiKeyMasked) || Boolean(effectiveKey);
+    const isEvolutionReady = queueData?.evolutionConfigured || (Boolean(effectiveUrl) && Boolean(effectiveInstance) && hasApiKey);
+
+    if (!isEvolutionReady) {
+      if (!hasApiKey) {
+        toast.error("Informe a Chave de API (API Key) da Evolution para iniciar.");
+      } else {
+        toast.error("Configure sua Evolution API antes de iniciar a fila automática.");
+      }
       setIsEvolutionSettingsOpen(true);
       return;
     }
@@ -566,6 +612,22 @@ Equipe Shopee!`
     if (!affiliateUrl) {
       toast.error("Informe a URL de Destino (SSA) da Loja antes de iniciar.");
       return;
+    }
+
+    // Sincroniza credenciais se o servidor ainda não as gravou completamente
+    if (!queueData?.evolutionConfigured && effectiveUrl && effectiveInstance && effectiveKey) {
+      try {
+        await saveEvolutionConfigFn({
+          data: {
+            apiUrl: effectiveUrl,
+            apiKey: effectiveKey,
+            instanceName: effectiveInstance,
+          }
+        });
+        await refetchQueueState();
+      } catch (e) {
+        console.warn("Auto-sync notice:", e);
+      }
     }
 
     setIsQueueActionPending(true);
@@ -1758,11 +1820,23 @@ Equipe Shopee!`
                   autoComplete="new-password"
                   data-lpignore="true"
                   data-1p-ignore="true"
-                  placeholder={queueData?.evolutionApiKeyMasked ? `Configurada (${queueData.evolutionApiKeyMasked}) - digite para alterar` : "Digite a API Key"}
+                  placeholder={
+                    queueData?.evolutionApiKeyMasked
+                      ? `Configurada (${queueData.evolutionApiKeyMasked}) - digite para alterar`
+                      : "Cole sua API Key aqui"
+                  }
                   value={evolutionForm.apiKey}
                   onChange={(e) => setEvolutionForm((prev) => ({ ...prev, apiKey: e.target.value }))}
                 />
-                <p className="text-[11px] text-muted-foreground">Sua Global API Key ou Instance Token. Não é exposta publicamente.</p>
+                {queueData?.evolutionApiKeyMasked ? (
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                    <CheckCircle2 className="size-3 shrink-0" /> Chave ativa no servidor ({queueData.evolutionApiKeyMasked}). Deixe em branco se não quiser alterá-la.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                    <AlertCircle className="size-3 shrink-0" /> Chave ainda não gravada. Cole sua API Key da Evolution API e clique em Salvar Configurações.
+                  </p>
+                )}
               </div>
             </div>
 

@@ -67,14 +67,6 @@ export const getEvolutionQueueState = createServerFn({ method: "GET" })
 
     const totalEligible = eligibleContacts.length;
 
-    // Se estiver rodando e já passou do horário agendado, executa tick
-    if (config.is_running && !config.is_paused) {
-      const nextRun = config.next_run_at ? new Date(config.next_run_at) : null;
-      if (!nextRun || nextRun <= now) {
-        return executeQueueTick(supabase, userId);
-      }
-    }
-
     const key = config.evolution_api_key || "";
     const maskedKey = key ? `••••••••${key.slice(-4)}` : "";
 
@@ -118,12 +110,16 @@ export const saveEvolutionSettings = createServerFn({ method: "POST" })
     const { supabase, userId } = context as any;
 
     const patch: any = {};
-    if (data.apiUrl !== undefined) patch.evolution_api_url = data.apiUrl.trim();
-    // Só atualiza a apiKey se não for a versão mascarada
-    if (data.apiKey !== undefined && !data.apiKey.includes("••••")) {
+    if (data.apiUrl !== undefined && data.apiUrl.trim()) {
+      patch.evolution_api_url = data.apiUrl.trim();
+    }
+    // Só atualiza a apiKey se o usuário digitou uma nova chave não vazia e não mascarada
+    if (data.apiKey && data.apiKey.trim().length > 0 && !data.apiKey.includes("••••")) {
       patch.evolution_api_key = data.apiKey.trim();
     }
-    if (data.instanceName !== undefined) patch.evolution_instance_name = data.instanceName.trim();
+    if (data.instanceName !== undefined && data.instanceName.trim()) {
+      patch.evolution_instance_name = data.instanceName.trim();
+    }
     if (data.affiliateUrl !== undefined) patch.affiliate_url = data.affiliateUrl.trim();
     if (data.msgTemplates !== undefined) patch.msg_templates = data.msgTemplates;
 

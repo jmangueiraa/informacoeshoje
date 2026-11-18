@@ -64,7 +64,7 @@ export async function sendEvolutionTextMessage(params: {
         number: normalizedPhone,
         text: message,
         delay: 1200,
-        linkPreview: true,
+        linkPreview: false,
       }),
       signal: controller.signal,
     });
@@ -186,8 +186,7 @@ export function formatContactMessage(
   domain: string,
   slugOverride?: string | null
 ): string {
-  const template = (isFirst ? templates.first : templates.reminder) ||
-    `Olá, {primeiroNome}! Tudo bem?
+  const defaultFirst = `Olá, {primeiroNome}! Tudo bem?
 Tivemos uma instabilidade no fluxo de envio do seu pacote.
 
 Acompanhe a rota atualizada pelo rastreamento:
@@ -197,6 +196,15 @@ Acompanhe a rota atualizada pelo rastreamento:
 
 Equipe Shopee!`;
 
+  const defaultReminder = `Olá {primeiroNome}, passando para saber se deu tudo certo com seu pedido! {linkRastreamento}
+
+Equipe Shopee!`;
+
+  const rawTemplate = isFirst ? templates?.first : templates?.reminder;
+  const template = (rawTemplate && rawTemplate.trim().length > 0 && rawTemplate.replace(/Equipe Shopee!/gi, "").trim().length > 5)
+    ? rawTemplate
+    : (isFirst ? defaultFirst : defaultReminder);
+
   const nomeExibicao = contact.name.split(' ')[0] || "Cliente";
 
   let message = template
@@ -204,21 +212,28 @@ Equipe Shopee!`;
     .replace(/{contato}/g, contact.phone || "");
 
   const slug = slugOverride ?? contact.trackingSlug;
-  if (slug) {
-    const trackingUrl = `https://${domain}/${slug}`;
-    message = message.replace(/{linkRastreamento}/g, trackingUrl).replace(/{link}/g, trackingUrl);
-    if (!/{linkRastreamento}|{link}/.test(template) && !message.includes(trackingUrl)) {
-      message = `${message}\n\n🔗 ${trackingUrl}`;
+  const trackingUrl = slug ? `https://${domain}/${slug}` : "";
+
+  if (/{linkRastreamento}|{link}/.test(template)) {
+    if (trackingUrl) {
+      message = message.replace(/{linkRastreamento}/g, trackingUrl).replace(/{link}/g, trackingUrl);
+    } else {
+      message = message.replace(/{linkRastreamento}/g, "").replace(/{link}/g, "");
     }
   } else {
-    message = message.replace(/{linkRastreamento}/g, "").replace(/{link}/g, "");
+    // Se o template já contém um link (ex: https://www.shopeerastreamento.com.br/pedido), não duplica!
+    const hasExistingLink = /https?:\/\//i.test(template);
+    if (!hasExistingLink && trackingUrl) {
+      message = `${message.trimEnd()}\n\n🔗 ${trackingUrl}`;
+    }
   }
 
-  if (!/Equipe Shopee!\s*$/.test(message.trim())) {
+  // Evita duplicar o rodapé se o texto já contiver "Equipe Shopee!"
+  if (!/Equipe Shopee!/i.test(message)) {
     message = `${message.trimEnd()}\n\nEquipe Shopee!`;
   }
 
-  return message;
+  return message.trim();
 }
 
 /**
@@ -286,6 +301,8 @@ export async function saveQueueConfigRow(supabase: any, userId: string, patch: a
   return updated;
 }
 
+const queueProcessingLocks = new Set<string>();
+
 /**
  * Executa um ciclo (tick) da fila automática
  */
@@ -307,6 +324,15 @@ export async function executeQueueTick(
     dailySentCount = 0;
     dailySentDate = todayInSP;
   }
+
+  // Previne processamento simultâneo/concorrente para o mesmo usuário
+  if (queueProcessingLocks.has(userId)) {
+    console.log(`[EVOLUTION-QUEUE] Processamento já em andamento para o usuário ${userId}. Ignorando tick concorrente.`);
+    return buildQueueStateResponse(config, 0, dailySentCount, dailySentDate);
+  }
+
+  queueProcessingLocks.add(userId);
+  try {
 
   // 2. Se a fila estiver pausada ou encerrada, retorna estado
   if (!config.is_running || config.is_paused) {
@@ -562,6 +588,9 @@ export async function executeQueueTick(
     });
 
     return buildQueueStateResponse(updatedConfig, totalEligible, dailySentCount, dailySentDate);
+  }
+  } finally {
+    queueProcessingLocks.delete(userId);
   }
 }
 
