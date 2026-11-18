@@ -1738,12 +1738,22 @@ Equipe Shopee!`;
 
               {/* Mensagem de Erro se houver */}
               {queueData?.currentError && (
-                <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-xs flex items-start gap-2">
-                  <AlertCircle className="size-4 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="font-semibold">Aviso de Envio:</p>
-                    <p className="leading-relaxed">{queueData.currentError}</p>
+                <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-xs space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="size-4 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-semibold">Aviso de Envio:</p>
+                      <p className="leading-relaxed">{queueData.currentError}</p>
+                    </div>
                   </div>
+                  {(queueData.currentError.includes("Connection Closed") || queueData.currentError.includes("desconectad")) && (
+                    <div className="pt-2 border-t border-destructive/20 text-foreground text-[11px] space-y-1">
+                      <p className="font-medium text-amber-600 dark:text-amber-400">💡 Como resolver:</p>
+                      <p className="text-muted-foreground leading-relaxed">
+                        Abra a aba do <strong>Gerenciador de Evolução</strong>, verifique se a instância <strong>{queueData.evolutionInstanceName || 'AFILIADO'}</strong> está conectada. Se estiver desconectada, reconecte o WhatsApp (ou leia o QR Code). Assim que reconectar, clique em <em>Enviar Agora</em> abaixo.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1835,7 +1845,9 @@ Equipe Shopee!`;
                       disabled={isAdvancingQueue || isQueueActionPending}
                     >
                       <FastForward className="size-3.5 mr-1.5 text-primary" />
-                      Enviar Próximo Contato Agora (sem aguardar 10 min)
+                      {queueData?.currentStatus === "error"
+                        ? "Tentar Enviar Próximo Contato Agora (sem aguardar)"
+                        : "Enviar Próximo Contato Agora (sem aguardar 10 min)"}
                     </Button>
                   )}
                 </div>

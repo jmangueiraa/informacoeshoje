@@ -131,6 +131,44 @@ export async function sendEvolutionTextMessage(params: {
         errDetail = response.statusText || responseText;
       }
       console.error(`[EVOLUTION-API] Erro HTTP ${response.status}:`, errDetail);
+
+      // Se for Connection Closed, tenta reconectar a instância e reenviar
+      if (errDetail.includes("Connection Closed") || String(responseText).includes("Connection Closed")) {
+        console.log(`[EVOLUTION-API] Connection Closed detectado. Tentando reconexão da instância ${instanceName}...`);
+        try {
+          await fetch(`${cleanBaseUrl}/instance/connect/${encodeURIComponent(instanceName.trim())}`, {
+            headers: { "apikey": apiKey.trim() },
+          });
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          const retryRes = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "apikey": apiKey.trim(),
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              number: normalizedPhone,
+              text: message,
+              delay: 0,
+              linkPreview: false,
+            }),
+          });
+          if (retryRes.ok) {
+            const retryJson = await retryRes.json().catch(() => ({}));
+            const retryId = retryJson?.key?.id || retryJson?.id || retryJson?.messageId || "ok";
+            console.log(`[EVOLUTION-API] Mensagem enviada com sucesso após reconexão! ID: ${retryId}`);
+            return {
+              success: true,
+              messageId: retryId,
+              responseData: retryJson,
+            };
+          }
+        } catch (retryErr) {
+          console.warn("[EVOLUTION-API] Falha no retry de reconexão:", retryErr);
+        }
+        throw new Error(`WhatsApp desconectado na Evolution API (Connection Closed). Abra o Gerenciador da Evolution API e reconecte a instância '${instanceName.trim()}'.`);
+      }
+
       throw new Error(`Evolution API retornou erro ${response.status}: ${errDetail}`);
     }
 
@@ -139,6 +177,9 @@ export async function sendEvolutionTextMessage(params: {
         ? responseData.message.join(", ")
         : (responseData?.message || responseData?.error);
       console.error(`[EVOLUTION-API] Erro no corpo da resposta:`, errDetail);
+      if (String(errDetail).includes("Connection Closed")) {
+        throw new Error(`WhatsApp desconectado na Evolution API (Connection Closed). Abra o Gerenciador da Evolution API e reconecte a instância '${instanceName.trim()}'.`);
+      }
       throw new Error(`Falha no envio da Evolution API: ${errDetail}`);
     }
 
