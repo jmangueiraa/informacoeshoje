@@ -78,7 +78,6 @@ export function DashboardHome() {
   const copyToClipboard = (link: any) => {
     const profileDomain = profile && !('error' in profile) ? profile.custom_domain : null;
     let domain = link.custom_domain || profileDomain || LINK_DOMAIN;
-    if (domain === "links.editaveisdocanva.com.br") domain = "www.shopeerastreamento.com.br";
     const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
     const url = `https://${cleanDomain}/${link.slug}`
     navigator.clipboard.writeText(url)

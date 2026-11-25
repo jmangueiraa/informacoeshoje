@@ -73,7 +73,7 @@ function LinksPage() {
     title: '', 
     slug: '', 
     affiliate_url: '', 
-    domain_id: 'canva-links' 
+    domain_id: 'shopee-rastreamento' 
   })
   
   const queryClient = useQueryClient()
@@ -133,7 +133,7 @@ function LinksPage() {
     if (isCreateOpen) {
       setNewLink(prev => ({ 
         ...prev, 
-        domain_id: prev.domain_id && prev.domain_id !== 'platform-default' ? prev.domain_id : (availableDomains[0]?.id || 'shopee-rastreamento') 
+        domain_id: prev.domain_id || (availableDomains[0]?.id || 'shopee-rastreamento') 
       }))
     }
   }, [isCreateOpen])
@@ -238,7 +238,7 @@ function LinksPage() {
   const getLinkBaseUrl = (link: any) => {
     const linkDomain = link.domain_id ? availableDomains.find((d: any) => d.id === link.domain_id) : null
     let domainName = linkDomain?.domain || link.custom_domain || availableDomains[0]?.domain || LINK_DOMAIN
-    if (domainName === "links.editaveisdocanva.com.br") domainName = "www.shopeerastreamento.com.br";
+
 
     if (domainName) {
       let clean = domainName.replace(/^https?:\/\//, '').replace(/\/+$/, ''); if (clean === 'informacoeshoje.online') clean = 'infomacoeshoje.online';
@@ -260,7 +260,7 @@ function LinksPage() {
 
   const selectedDomainObj = availableDomains.find((d: any) => d.id === newLink.domain_id || d.domain === newLink.domain_id)
   let currentDomainDisplay = selectedDomainObj?.domain || LINK_DOMAIN
-  if (currentDomainDisplay === "links.editaveisdocanva.com.br") currentDomainDisplay = "www.shopeerastreamento.com.br";
+
 
   // Validação de expiração da assinatura ou teste de 7 dias
   const now = new Date().getTime();
@@ -349,15 +349,15 @@ function LinksPage() {
                 <select 
                   id="domain_id"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={newLink.domain_id || 'canva-links'}
-                  onChange={(e) => setNewLink({...newLink, domain_id: e.target.value || 'canva-links'})}
+                  value={newLink.domain_id || availableDomains[0]?.id || 'shopee-rastreamento'}
+                  onChange={(e) => setNewLink({...newLink, domain_id: e.target.value})}
                 >
                   {availableDomains.map((d: any) => (
                     <option key={d.id} value={d.id}>{d.label || d.domain}</option>
                   ))}
                 </select>
                 <p className="text-[11px] text-muted-foreground">
-                  Domínio padrão selecionado: <strong className="text-foreground">https://{currentDomainDisplay}/</strong>
+                  Domínio selecionado: <strong className="text-foreground">https://{currentDomainDisplay}/</strong>
                 </p>
               </div>
             </div>
@@ -406,11 +406,14 @@ function LinksPage() {
               <CardContent className="p-0">
                 <div className="flex flex-col md:flex-row md:items-center">
                   <div className="p-6 flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-xl font-bold group-hover:text-primary transition-colors">/{link.slug}</h3>
                       <Badge variant={link.status === 'active' ? 'secondary' : 'outline'} className={link.status === 'active' ? 'bg-green-500/10 text-green-500' : ''}>
                         {link.status === 'active' ? 'Ativo' : 'Inativo'}
                       </Badge>
+                      <span className="text-xs font-mono text-muted-foreground bg-muted/60 px-2 py-0.5 rounded border">
+                        {getLinkBaseUrl(link)}/{link.slug}
+                      </span>
                     </div>
                     <p className="text-sm font-medium text-foreground line-clamp-1">{link.title || "Sem título"}</p>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1">
